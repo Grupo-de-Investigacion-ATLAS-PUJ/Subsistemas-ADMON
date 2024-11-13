@@ -13,8 +13,8 @@ Dispón de una licencia válida de WinCC para evitar la limitación de 30 minuto
 Configuración del Driver CAN
 Ejecuta el controlador específico: "Installation and Utilization of ATLAS Modified SystecCAN Driver for USB-CANmodul Series". Este paso permite la comunicación a través del módulo CAN.
 
-Conexión del CAN
-Conecta el hardware del CAN para establecer el enlace de comunicación necesario con el sistema ELMB.
+Conexión del CANOpen UA
+Conecta el hardware del CANOpen UA para establecer el enlace de comunicación necesario con el sistema ELMB.
 
 Alimentación de las Placas de Temperatura
 Asegúrate de que las placas de temperatura del ELMB están debidamente alimentadas para una operación correcta.
