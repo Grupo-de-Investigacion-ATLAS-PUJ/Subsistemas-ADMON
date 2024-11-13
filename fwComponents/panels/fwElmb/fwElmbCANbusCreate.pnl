@@ -1,0 +1,856 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">fwElmbCANBusCreateRef</prop>
+  </prop>
+  <prop name="Size">444 283</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+#uses &quot;fwGeneral/fwExceptionHandling.ctl&quot;
+
+#uses &quot;fwDevice/fwDevice.ctl&quot;
+
+#uses &quot;fwElmb/fwElmbUser.ctl&quot;
+
+#uses &quot;fwGeneral/fwProgressBar.ctl&quot;
+void pnlGetAvailablePortList(dyn_string &amp;dsAvailablePortListKVASER, dyn_string &amp;dsAvailablePortListNICAN)
+{
+// Local Variables
+// ---------------
+	int i;
+
+	string sPortElement = &quot;.interfacePort&quot;;
+	string sPort;
+	string sCardElement = &quot;.id&quot;;
+	string sCard;
+
+	dyn_string dsAllocatedPortListKVASER;
+	dyn_string dsAllocatedPortListNICAN;
+	dyn_string dsAllPortListKVASER = makeDynString(&quot;0&quot;,&quot;1&quot;,&quot;2&quot;,&quot;3&quot;,&quot;4&quot;,&quot;5&quot;,&quot;6&quot;,&quot;7&quot;,&quot;8&quot;,&quot;9&quot;,&quot;10&quot;,&quot;11&quot;,&quot;12&quot;,&quot;13&quot;,&quot;14&quot;,&quot;15&quot;);
+	dyn_string dsAllPortListNICAN = makeDynString(&quot;can0&quot;,&quot;can1&quot;,&quot;can2&quot;,&quot;can3&quot;,&quot;can4&quot;,&quot;can5&quot;,&quot;can6&quot;,&quot;can7&quot;,&quot;can8&quot;,&quot;can9&quot;,&quot;can10&quot;,&quot;can11&quot;,&quot;can12&quot;,&quot;can13&quot;,&quot;can14&quot;,&quot;can15&quot;);
+	dyn_string dsExistingCANbusList;
+
+	dyn_string exceptionInfo;
+
+// Executable Code
+// ---------------
+	//Now we look at the ports already allocated by the existing CANbuses in the project
+	fwDevice_getChildren($sDpName, fwDevice_HARDWARE, dsExistingCANbusList, exceptionInfo);
+
+	// Loop through all buses, finding the allocated ports;
+	for (i = 1; i &lt;= dynlen(dsExistingCANbusList); i++) {
+		dpGet(dsExistingCANbusList[i] + sPortElement, sPort,
+					dsExistingCANbusList[i] + sCardElement, sCard);
+
+		if (sCard == ELMB_CAN_CARD_NICAN) {
+			dynAppend(dsAllocatedPortListNICAN, sPort);
+		} else {
+			dynAppend(dsAllocatedPortListKVASER, sPort);
+		}
+	}
+
+	// Loop through all allocated ports, removing them from the list
+	for (i = 1; i &lt;= dynlen(dsAllocatedPortListKVASER); i++) {
+		dynRemove(dsAllPortListKVASER, dynContains(dsAllPortListKVASER, dsAllocatedPortListKVASER[i]));
+	}
+
+	// Loop through all allocated ports, removing them from the list
+	for (i = 1; i &lt;= dynlen(dsAllocatedPortListNICAN); i++) {
+		dynRemove(dsAllPortListNICAN, dynContains(dsAllPortListNICAN, dsAllocatedPortListNICAN[i]));
+	}
+
+	dsAvailablePortListKVASER = dsAllPortListKVASER;
+	dsAvailablePortListNICAN = dsAllPortListNICAN;
+
+	return;
+}
+
+void pnlUpdateAvailablePorts()
+{
+// Local Variables
+// ---------------
+	dyn_string dsAvailablePortListKVASER;
+	dyn_string dsAvailablePortListNICAN;
+
+// Executable Code
+// ---------------
+	// Get all available ports
+	pnlGetAvailablePortList(dsAvailablePortListKVASER, dsAvailablePortListNICAN);
+
+	// Check the selection for the interface card type
+	if (rdbInterfaceSelector.number == 1)
+		cmbPortSelector.items = dsAvailablePortListNICAN;
+	else
+		cmbPortSelector.items = dsAvailablePortListKVASER;
+
+	// Select the first entry as default
+	cmbPortSelector.selectedPos(1);
+
+	// Return to calling routine
+	return;
+}
+
+void pnlCreateCANBus()
+{
+// Local Variables
+// ---------------
+  bool bIsRunning;
+  bool bDefaultAddressing;
+
+  int iBusSpeed;
+  int iDriverNumber;
+
+	string sPort;
+	string sUserName;
+	string sComment;
+	string sCard;
+
+	dyn_float df;
+
+	dyn_string dsExceptionInfo;
+	dyn_string ds;
+
+// Executable Code
+// ---------------
+	// Check correct driver is running
+	bIsRunning = fwElmbUser_checkDefaultDriver(iDriverNumber, dsExceptionInfo);
+	if (dynlen(dsExceptionInfo) &gt; 0) {
+		fwExceptionHandling_display(dsExceptionInfo);
+		return;
+	} else if (!bIsRunning) {
+		// Display panel indicating what the problem is and how to fix it
+		ChildPanelOnCentralReturn(&quot;fwElmb/fwElmbDriverMessage.pnl&quot;,
+															&quot;Warning&quot;,
+															makeDynString(&quot;$drvNum:&quot; + iDriverNumber),
+															df, ds);
+		return;
+	}
+
+ 	// Warning for empty user name field
+ 	sUserName = txtUserName.text;
+ 	if ((sUserName == &quot;&quot;)) {
+		ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+												&quot;Warning&quot;,
+												makeDynString(&quot;Specify Bus Name&quot;));
+		return;
+	}
+
+	// Now we read all information from the panel
+	sComment = txtComment.text;
+	sPort = cmbPortSelector.text;
+	iBusSpeed = cmbBusSpeedSelector.text;
+	if (rdbInterfaceSelector.number == 1)
+		sCard = ELMB_CAN_CARD_NICAN;
+	else
+		sCard = ELMB_CAN_CARD_KVASER;
+	bDefaultAddressing = chbOpcAddressing.state(0);
+
+	// Start progress bar to indicate system is busy
+	fwOpenProgressBar(&quot;Create CAN Bus&quot;, &quot;In progress. Please wait...&quot;, 1);
+
+	// Create bus
+	fwElmbUser_createCANbus(sUserName,
+													sComment,
+													sPort,
+													sCard,
+													iBusSpeed,
+													bDefaultAddressing,
+													dsExceptionInfo);
+
+	if (dynlen(dsExceptionInfo) &gt; 0) {
+		fwCloseProgressBar(sUserName + &quot; creation encountered errors&quot;);
+		fwExceptionHandling_display(dsExceptionInfo);
+	} else {
+		fwCloseProgressBar(sUserName + &quot; creation completed successfully&quot;);
+		lblLastSuccessfulCreate.text = sUserName;
+	}
+
+	// Update available port in panel
+	pnlUpdateAvailablePorts();
+
+	// Return to calling routine
+	return;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="txtTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 87</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Size">155 25</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Create CAN Bus</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtBusLabelCaption" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">11 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">13 52</prop>
+    <prop name="Size">100 19</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Bus Name</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblBits" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">365 148</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">367 150</prop>
+    <prop name="Size">31 16</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">bits/s</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblComment" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">11 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">13 82</prop>
+    <prop name="Size">100 19</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Comment</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmOpcAddressing" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">11 241</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">11 190</prop>
+    <prop name="Size">424 52</prop>
+   </properties>
+  </shape>
+  <shape Name="frmCardAndPort" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">39</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">11 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">36</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Inteface Type and Port Number</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">11 116</prop>
+    <prop name="Size">231 74</prop>
+   </properties>
+  </shape>
+  <shape Name="frmBusSpeed" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">252 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Bus Speed</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">252 116</prop>
+    <prop name="Size">183 74</prop>
+   </properties>
+  </shape>
+  <shape Name="lblLastSuccessfulCreate" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">45</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">40</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 252</prop>
+    <prop name="Size">187 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtUserName" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">131 46</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">131 46</prop>
+    <prop name="Size">301 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="cmbPortSelector" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">157 146</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">157 146</prop>
+    <prop name="Size">61 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	// Update available port in panel
+	pnlUpdateAvailablePorts();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="rdbInterfaceSelector" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">17 136</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">17 136</prop>
+    <prop name="Size">131 41</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Kvaser</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">National Instr.</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+	// Update available port in panel
+	pnlUpdateAvailablePorts();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmbBusSpeedSelector" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">281 146</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">281 146</prop>
+    <prop name="Size">81 23</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">10000</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">20000</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">50000</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">125000</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">250000</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">500000</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">1000000</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+  </shape>
+  <shape Name="txtComment" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">131 78</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">131 78</prop>
+    <prop name="Size">301 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="chbOpcAddressing" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">18 199</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 199</prop>
+    <prop name="Size">194 41</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Default OPC addressing?</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+	dyn_float df;
+	dyn_string ds;
+	
+	if (!state) {
+		ChildPanelOnCentralReturn(&quot;vision/MessageInfo3&quot;,
+															&quot;Question&quot;,
+															makeDynString(&quot;Unselecting this option you'll have to address\nyour devices by hand.\nAre you sure you want to do it?&quot;, &quot;Yes&quot;, &quot;No&quot;, &quot;Cancel&quot;),
+															df, ds);
+		if (df[1]!= 1)
+			this.state(button) = true;
+		else if (df[1]==1)
+			this.state(button) = false;
+	}			
+
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="Group3" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">405 10</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwElmb/fwElmbCANbusCreate</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="cmdOK" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">42</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">210 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">210 250</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string sText;
+	pnlCreateCANBus();
+	sText = lblLastSuccessfulCreate.text;
+	if (strlen(sText) &gt; 0)
+		PanelOffReturn(makeDynFloat(1.0), makeDynString(lblLastSuccessfulCreate.text));
+	else
+		PanelOffReturn(makeDynFloat(0.0), makeDynString());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdApply" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">43</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">287 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">38</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">287 250</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	pnlCreateCANBus();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">44</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">364 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">39</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">364 250</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string sText;
+	sText = lblLastSuccessfulCreate.text;
+	if (strlen(sText) &gt; 0)
+		PanelOffReturn(makeDynFloat(1.0), makeDynString(lblLastSuccessfulCreate.text));
+	else
+		PanelOffReturn(makeDynFloat(0.0), makeDynString());
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

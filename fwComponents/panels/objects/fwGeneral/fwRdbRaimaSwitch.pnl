@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.iso88591"></prop>
+  </prop>
+  <prop name="Size">120 72</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">30 20</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[const string SOURCE_RDB_TEXT = &quot;Oracle DB&quot;;
+const string SOURCE_RDB_COLOUR = &quot;{0,128,214}&quot;;
+const string SOURCE_RAIMA_TEXT = &quot;local&quot;;
+const string SOURCE_RAIMA_COLOUR = &quot;{255,136,17}&quot;;
+
+string sPreviousSource;
+
+void switchSource()
+{
+
+  dyn_float dfReturn;
+  dyn_string dsReturn;
+  bool editOk = false;
+	string sOtherSource;
+	if(txtSourceType.text == SOURCE_RDB_TEXT)
+	{
+		sOtherSource = SOURCE_RAIMA_TEXT;
+	}
+	else
+	{
+		sOtherSource = SOURCE_RDB_TEXT;
+	}
+
+    unGraphicalFrame_ChildPanelOnCentralModalReturn(&quot;vision/MessageInfo&quot;, &quot;Confirm&quot;, 
+          makeDynString(&quot;$1:Data source is currently set to &quot;+txtSourceType.text+ &quot; archive.&quot;
+												&quot;\nSwitch data source to &quot;+sOtherSource+&quot; archive?&quot; +
+												&quot;\nThis change will be propagated to all your active panels.&quot;,
+          &quot;$2:OK&quot;, &quot;$3:Cancel&quot;),
+          dfReturn, dsReturn);
+    if (dynlen(dfReturn) &gt;= 1)
+    {
+      editOk = dfReturn[1];
+    }
+  	
+	if(editOk)
+	{
+		bool bQueryRDBdirectEnabled;
+	  if(txtSourceType.text == SOURCE_RDB_TEXT)
+		{
+			fwGeneral_setQueryRDBdirectEnabled(false);
+			fwGeneral_getQueryRDBdirectEnabled(bQueryRDBdirectEnabled);
+			if(!bQueryRDBdirectEnabled) showRaima();
+		}	
+		else
+		{
+			fwGeneral_setQueryRDBdirectEnabled(true);
+			fwGeneral_getQueryRDBdirectEnabled(bQueryRDBdirectEnabled);
+			if(bQueryRDBdirectEnabled) showRDB();
+		}
+		rectDb.toolTipText = txtSourceType.toolTipText;
+	}
+}
+
+showRDB()
+{
+	if(sPreviousSource != SOURCE_RDB_TEXT)
+	{
+		txtSourceType.text = SOURCE_RDB_TEXT;
+		txtSourceType.foreCol = SOURCE_RDB_COLOUR;
+		txtSourceType.toolTipText = &quot;Data source: &quot; + SOURCE_RDB_TEXT + &quot; archive&quot;;
+		rectDb.fill(&quot;[pattern,[tile,png,database-blue-16x16.png]]&quot;);
+		rectDb.toolTipText = txtSourceType.toolTipText;
+    sPreviousSource = SOURCE_RDB_TEXT;
+	}
+}
+
+showRaima()
+{
+	if(sPreviousSource != SOURCE_RAIMA_TEXT)
+	{
+		txtSourceType.text = SOURCE_RAIMA_TEXT;
+		txtSourceType.foreCol = SOURCE_RAIMA_COLOUR;
+		txtSourceType.toolTipText = &quot;Data source: &quot; + SOURCE_RAIMA_TEXT + &quot; archive&quot;;
+		rectDb.fill(&quot;[pattern,[tile,png,raima-orange-16x16.png]]&quot;);
+		rectDb.toolTipText = txtSourceType.toolTipText;
+    sPreviousSource = SOURCE_RAIMA_TEXT;
+	}
+}
+
+showItems(bool show)
+{
+// 	txtSourceType.visible = show;
+	rectDb.visible = show;
+}
+
+
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	bool bRdbDirect, bRdbInstalled, bParallelArchiving;
+	int iRdbDirect;
+	fwGeneral_getParallelArchivingEnabled(bRdbInstalled, bParallelArchiving);
+	iRdbDirect = (int)bRdbDirect;
+	if(bParallelArchiving)
+	{
+		showItems(true);
+		while(1)
+		{
+			fwGeneral_getQueryRDBdirectEnabled(bRdbDirect);
+			if(bRdbDirect)
+			{
+				showRDB();
+			}
+			else
+			{
+				showRaima();
+			}
+			delay(5);
+		}
+	}
+}
+
+
+
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="rectDb" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">31 24</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">31 21</prop>
+    <prop name="Size">21 21</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">database-blue-16x16.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	switchSource();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtSourceType" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">27 37</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,133,250}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,9,5,75,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">27 40</prop>
+    <prop name="Size">29 13</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  switchSource();
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

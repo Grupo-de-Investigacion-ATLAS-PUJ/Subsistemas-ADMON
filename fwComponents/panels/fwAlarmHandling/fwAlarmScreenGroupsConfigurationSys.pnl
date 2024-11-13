@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">400 90</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+
+void addRow(string name,string tableName, bool after=false)
+{
+  shape table = getShape(tableName);
+  dyn_int diIndexes;
+  int index;
+  string oldName;
+  bool added;
+  getValue(tableName,&quot;getSelectedLines&quot;,diIndexes);  
+  if(table.lineCount()==0)
+    after = false;
+  if(!strlen(name)) 
+    return;
+  if(dynlen(diIndexes))
+    index = diIndexes[1]+after;
+  else
+    index = table.lineCount()+after;
+
+  table.insertLineN(index);
+  table.cellValueRC(index,&quot;name&quot;,name);
+  
+}
+
+void modifyRow(string name,string tableName)
+{
+  shape table = getShape(tableName);
+  dyn_int diIndexes;
+  int index;
+  string oldName;
+  bool modified;
+  getValue(tableName,&quot;getSelectedLines&quot;,diIndexes);  
+  if(dynlen(diIndexes) &amp;&amp; strlen(name))
+    index = diIndexes[1];
+  else
+    return;
+  getValue(tableName,&quot;cellValueRC&quot;,index,&quot;name&quot;,oldName);  
+  setValue(tableName,&quot;cellValueRC&quot;,index,&quot;name&quot;,name);  
+}
+
+deleteRow(string tableName, int index)
+{
+  shape table = getShape(tableName);
+  string value = table.cellValueRC(index,&quot;name&quot;);
+  table.deleteLineN(index);
+  table.deleteSelection(); 
+}
+
+deleteRows(string tableName)
+{
+  shape table = getShape(tableName);
+  int i;
+  dyn_int diIndexes;
+  getValue(tableName,&quot;getSelectedLines&quot;,diIndexes);
+  for(i=1 ; i&lt;=dynlen(diIndexes) ; i++)
+    deleteRow(tableName, diIndexes[i]);
+}
+
+deleteAll(string tableName)
+{
+  shape table = getShape(tableName);
+  setValue(tableName,&quot;deleteAllLines&quot;);
+}
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="txtNode" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10.00000000000021 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Size">380 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = $sFilter;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">315 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">315 55</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[// SimpleCtrlScriptStart {valid}
+main()
+{
+  EP_panelOff();
+}
+
+EP_panelOff()
+{
+  PanelOff();
+}
+
+// SimpleCtrlScript {EP_panelOff}
+// Function {PanelOff}
+// Panel {}
+// Module {}
+// SimpleCtrlScriptEnd {EP_panelOff}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON7" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">233 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">233 55</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOffReturn(makeDynFloat(1), makeDynString(txtNode.text));
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

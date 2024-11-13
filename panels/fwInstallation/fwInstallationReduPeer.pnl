@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">410 417</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[const shape TABLE_INSTALLED_COMPONENTS_SHAPE = getShape(&quot;tblInstalledComponents&quot;);
+const shape LABEL_FILE_ISSUE_FEEDBACK_SHAPE = getShape(&quot;fileIssueFeedbackText&quot;);
+const shape POLYGON_FILE_ISSUE_FEEDBACK_SHAPE = getShape(&quot;fileIssueFeedbackArrow&quot;);
+
+initPanel()
+{
+  int remoteReduHostNum = fwInstallationRedu_myReduHostNum()==1?2:1;
+  string remoteReduHost = fwInstallationRedu_getPair();
+  frmDelete.text = &quot;View components on &quot; + remoteReduHost + &quot; (#&quot; + remoteReduHostNum + &quot;, REMOTE)&quot;;
+
+  fwInstallation_ui_setTableAlternatingRowColors(TABLE_INSTALLED_COMPONENTS_SHAPE);
+  fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                               POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0),
+                                               remoteReduHostNum);
+}
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  initPanel();
+}
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="frmDelete" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">400 475</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 0.9474726923474043 -400.0000000000002 -37.89890769389617</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">View / delete components</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">400 40</prop>
+    <prop name="Size">410 440</prop>
+   </properties>
+  </shape>
+  <shape Name="installedComponentsLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">11 22</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Installed Components:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="tblInstalledComponents" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-77.0384615384615 -81.4285714285714</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">11 42</prop>
+    <prop name="Size">388 303</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">componentName</prop>
+     <prop name="Width">288</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Subcomponents are shown with a leading underscore.</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">componentVersion</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Version</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">isSubcomponent</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">isSubcomponent</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[/**  if the user  clicks on the Status column
+the column value is changed ( Delete -&gt; &quot;&quot; , or &quot;&quot; -&gt; Delete
+*/
+main(int row, string column, string value)
+{
+  string helpComponent;
+  if(column == &quot;helpFile&quot;)
+  {
+    getValue(&quot;&quot;, &quot;cellValueRC&quot;, row, &quot;componentName&quot;, helpComponent);
+    if(strpos(helpComponent, &quot;_&quot;) == 0)
+      helpComponent = substr(helpComponent, 1, strlen(helpComponent));
+
+    fwInstallation_showHelpFile(helpComponent);
+  }
+}
+
+
+]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[/** if the user double clicks on the componentName column
+the panel with the component details is shown
+*/
+main()
+{
+  int xpos;
+  string columnName;
+  int columnNr;
+  string componentName;
+  string descFile = &quot;&quot;;
+  string typeOfDescription = &quot;PVSSDB&quot;;
+
+  // get shape of the table
+  shape tab = getShape(&quot;tblInstalledComponents&quot;);
+
+  // get the coordinates of current cell
+  getValue(tab, &quot;currentCell&quot;, xpos, columnNr);
+
+  // get the column name
+  columnName = tab.currentColumn();
+
+  if((columnName == &quot;componentName&quot;) || (columnName == &quot;componentVersion&quot;))
+  {
+  // get the name of a component
+  componentName += tab.cellValueRC(xpos, &quot;componentName&quot;);
+
+  int reduHostNum = fwInstallationRedu_myReduHostNum()==1?2:1;
+  // display the panel with component details
+  ChildPanelOnCentral(&quot;fwInstallation/fwInstallationComponentDetails.pnl&quot;, &quot;fwInstallation_ComponentDetails:PVSS&quot;,
+                      makeDynString(&quot;$componentName:&quot; + componentName, &quot;$descFile:&quot; + descFile , &quot;$typeOfDescription:&quot; + typeOfDescription, &quot;$reduHostNum:&quot; + reduHostNum));
+  }
+}
+]]></script>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  fwInstallation_ui_componentsTableRightClickPopupMenu(getShape(&quot;&quot;), row, column);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="ShowInstalledSubComponents" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">247 20.00000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">247 20</prop>
+    <prop name="Size">158 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show sub-components</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  fwInstallation_ui_filterComponentsTable(TABLE_INSTALLED_COMPONENTS_SHAPE, state, true);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnRefresh" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">11 354</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">11 354</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/refresh_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  // refresh the table widget
+  TABLE_INSTALLED_COMPONENTS_SHAPE.deleteAllLines(); // delete lines beforehand to create &quot;flickering&quot; effect on the panel so that the user knows that table was refreshed.
+  int remoteReduHostNum = fwInstallationRedu_myReduHostNum()==1?2:1;
+  fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                               POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0),
+                                               remoteReduHostNum);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="fileIssueFeedbackText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">22.99999999999992 352</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">22.99999999999992 390</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">File issue feedback</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="fileIssueFeedbackArrow" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.7259259259259259 0 0 0.6825000000000002 3.740740740740741 -134.5250000000002</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+     <prop name="Location">20 780</prop>
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

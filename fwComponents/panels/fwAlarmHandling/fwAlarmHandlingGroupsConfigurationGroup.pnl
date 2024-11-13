@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">410 186</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+
+void addRow(string name,string tableName, bool after=false)
+{
+  shape table = getShape(tableName);
+  dyn_int diIndexes;
+  int index;
+  string oldName;
+  bool added;
+  getValue(tableName,&quot;getSelectedLines&quot;,diIndexes);  
+  if(table.lineCount()==0)
+    after = false;
+  if(!strlen(name)) 
+    return;
+  if(dynlen(diIndexes))
+    index = diIndexes[1]+after;
+  else
+    index = table.lineCount()+after;
+
+  table.insertLineN(index);
+  table.cellValueRC(index,&quot;name&quot;,name);
+  
+}
+
+void modifyRow(string name,string tableName)
+{
+  shape table = getShape(tableName);
+  dyn_int diIndexes;
+  int index;
+  string oldName;
+  bool modified;
+  getValue(tableName,&quot;getSelectedLines&quot;,diIndexes);  
+  if(dynlen(diIndexes) &amp;&amp; strlen(name))
+    index = diIndexes[1];
+  else
+    return;
+  getValue(tableName,&quot;cellValueRC&quot;,index,&quot;name&quot;,oldName);  
+  setValue(tableName,&quot;cellValueRC&quot;,index,&quot;name&quot;,name);  
+}
+
+deleteRow(string tableName, int index)
+{
+  shape table = getShape(tableName);
+  string value = table.cellValueRC(index,&quot;name&quot;);
+  table.deleteLineN(index);
+  table.deleteSelection(); 
+}
+
+deleteRows(string tableName)
+{
+  shape table = getShape(tableName);
+  int i;
+  dyn_int diIndexes;
+  getValue(tableName,&quot;getSelectedLines&quot;,diIndexes);
+  for(i=1 ; i&lt;=dynlen(diIndexes) ; i++)
+    deleteRow(tableName, diIndexes[i]);
+}
+
+deleteAll(string tableName)
+{
+  shape table = getShape(tableName);
+  setValue(tableName,&quot;deleteAllLines&quot;);
+}
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="txtNode" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10.00000000000021 60</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 60</prop>
+    <prop name="Size">391 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = $sFilter;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">22 12</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 12</prop>
+    <prop name="Size">476 26</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Add dp pattern for system </prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  switch($sMode)
+  {
+    case &quot;group&quot;:
+      if(strlen($sFilter))
+        this.text(&quot;Edit &quot;+$sMode+ &quot; &quot; + $sFilter);
+      else
+        this.text(&quot;Add new &quot;+$sMode);
+    break;
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">290 150</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">290 150</prop>
+    <prop name="Size">107 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[// SimpleCtrlScriptStart {valid}
+main()
+{
+  EP_panelOff();
+}
+
+EP_panelOff()
+{
+  PanelOff();
+}
+
+// SimpleCtrlScript {EP_panelOff}
+// Function {PanelOff}
+// Panel {}
+// Module {}
+// SimpleCtrlScriptEnd {EP_panelOff}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON7" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">150 150</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">150 150</prop>
+    <prop name="Size">107 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Ok</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string name = txtNode.text;
+  strreplace(name,&quot; &quot;,&quot;&quot;);
+  strreplace(name,&quot;?&quot;,&quot;&quot;);
+  strreplace(name,&quot;$&quot;,&quot;&quot;);
+  strreplace(name,&quot;%&quot;,&quot;&quot;);
+  strreplace(name,&quot;#&quot;,&quot;&quot;);
+  strreplace(name,&quot;@&quot;,&quot;&quot;);
+  strreplace(name,&quot;!&quot;,&quot;&quot;);
+  strreplace(name,&quot;^&quot;,&quot;&quot;);
+  strreplace(name,&quot;&amp;&quot;,&quot;&quot;);
+  strreplace(name,&quot;*&quot;,&quot;&quot;);
+  if(name==&quot;&quot;) return;
+  PanelOffReturn(makeDynFloat(1), makeDynString(name, txtLabel.text));
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtLabel" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10.00000000000021 110</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 110</prop>
+    <prop name="Size">391 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = $sLabel;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Name (no spaces allowed)</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 90</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Description (optional)</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

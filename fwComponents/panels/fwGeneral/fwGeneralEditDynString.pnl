@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">454 330</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">11 28</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="StartZoomPoint">0 0</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[string editMode;
+const string fwGeneral_PANEL_LIST  = &quot;PANEL_LIST&quot;;
+const string fwGeneral_DP_LIST     = &quot;DP_LIST&quot;;
+
+insert(bool before)
+{
+  int position, index = 0;
+  string newString;
+  dyn_int selLines;
+  dyn_dyn_string lines;
+
+  switch(editMode)
+  {
+    case fwGeneral_PANEL_LIST:
+      panelSelector(newString);
+      if(newString == &quot;&quot;)
+        return;
+      strreplace(newString, &quot;.pnl&quot;, &quot;&quot;);
+      break;
+
+    case fwGeneral_DP_LIST:
+      panelSelector(newString);
+      if(newString == &quot;&quot;)
+        return;
+      strreplace(newString, &quot;.pnl&quot;, &quot;&quot;);
+      break;
+
+    default:
+      break;
+  }
+
+  selLines = Table1.getSelectedLines();
+
+  if(before)
+  {
+    if(dynlen(selLines) &gt; 0)
+    {
+      position = selLines[1];
+    }
+    else
+    {
+      position = 0;
+    }
+  }
+  else
+  {
+    if(dynlen(selLines) &gt; 0)
+    {
+      position = selLines[1] + 1;
+    }
+    else
+    {
+      position = Table1.lineCount;
+    }
+  }
+
+  Table1.insertLineN(position);
+  Table1.cellValueRC(position, &quot;#1&quot;, makeDynString(newString));
+}]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  bool multipleSelection;
+  dyn_string lines;
+
+
+  // Default settings
+  Table1.deleteAllLines();
+  Table1.tableMode(TABLE_SELECT_BROWSE);
+  Table1.selectByClick(TABLE_SELECT_LINE);
+
+
+  // If title specified, display it
+  if( isDollarDefined(&quot;$sTitle&quot;) )
+  {
+    title.text = $sTitle;
+  }
+
+
+  // If the dyn string has already some values, display them
+  if( isDollarDefined(&quot;$dsValues&quot;) )
+  {
+    fwGeneral_stringToDynString($dsValues, lines);
+    Table1.appendLines(dynlen(lines), &quot;#1&quot;, lines);
+  }
+
+
+  // If edit mode is not specified then it is just a selection from a list
+  if( isDollarDefined(&quot;$sEditMode&quot;) )
+  {
+    editMode = $sEditMode;
+    if( title.text == &quot;&quot; )
+      title.text = &quot;Edit dyn string variable&quot;;
+  }
+  else
+  {
+    if( title.text == &quot;&quot; )
+      title.text = &quot;Select from the list&quot;;
+
+    // Change the mode of the table to allow the selection
+    Table1.selectByClick(TABLE_SELECT_LINE);
+    if( isDollarDefined(&quot;$bMultipleSelection&quot;) )
+    {
+      multipleSelection = $bMultipleSelection;
+    }
+    else
+    {
+      multipleSelection = FALSE;
+    }
+
+
+    //DebugN(multipleSelection + &quot; &quot; + $bMultipleSelection);
+    if( multipleSelection )
+    {
+      Table1.tableMode(TABLE_SELECT_MULTIPLE);
+    }
+    else
+    {
+      Table1.tableMode(TABLE_SELECT_LINE);
+    }
+
+    // Hide buttons to select panels
+    pb_before.visible = FALSE;
+    pb_after.visible  = FALSE;
+    pb_delete.visible = FALSE;
+  }
+
+}
+
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">11 28</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">$sTitle</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Table1" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 50</prop>
+    <prop name="Size">371 231</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">18</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">#1</prop>
+     <prop name="Width">350</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="pb_delete" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">406 174</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">407 175</prop>
+    <prop name="Size">37 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">del_en.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_int lines;
+
+  lines = Table1.getSelectedLines();
+//  DebugN(lines);
+  for(int i = 1; i &lt;= dynlen(lines); i++)
+  {
+    Table1.deleteLineN(lines[i]);
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1195 758</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">371 295</prop>
+    <prop name="Size">71 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOffReturn(makeDynFloat(-1), makeDynString());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="okButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-34 15</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">289 295</prop>
+    <prop name="Size">71 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int i;
+  string returnDynString;
+  dyn_int selectedLines;
+  dyn_string line, lines;
+
+  if(editMode != &quot;&quot;)
+  {
+    for(i = 1; i &lt;= Table1.lineCount; i++)
+    {
+      line = Table1.getLineN(i - 1);
+      lines[i] = line[1];
+    }
+  }
+  else
+  {
+    selectedLines = Table1.getSelectedLines();
+    for(i = 1; i &lt;= dynlen(selectedLines); i++)
+    {
+      line = Table1.getLineN(selectedLines[i]);
+      lines[i] = line[1];
+    }
+  }
+
+  PanelOffReturn(makeDynFloat(0), lines);
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  if(isDollarDefined(&quot;$bHierarchyBrowser&quot;))
+  {
+    if(!$bHierarchyBrowser)
+      this.visible = TRUE;
+  }
+  else
+    this.visible = TRUE;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="pb_before" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">405 104</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">407 106</prop>
+    <prop name="Size">37 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">insertB_en.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  insert(TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="pb_after" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">405 138</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">407 140</prop>
+    <prop name="Size">37 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">insertA_en.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  insert(FALSE);
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

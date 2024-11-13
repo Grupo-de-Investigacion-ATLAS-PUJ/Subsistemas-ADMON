@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Delete components ...</prop>
+  </prop>
+  <prop name="Size">345 440</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">60 30</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">6</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwInstallation/fwInstallation.ctl&quot;
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  int i; // Override 'Close' script to prevent panel from being closed by clicking 'X' button.
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[/**
+
+fwInstallationToDelete.pnl
+
+This panel displays the list of components to be deleted.
+The user can confirm the component deletion by pressing the OK button - in this case the return value is set to &quot;Delete&quot;.
+If the user clicks on the Cancel button then the return value is &quot;DoNotDelete&quot;.
+The Main panel checks the return value and does the appropriate action.
+
+Required $-parameters:
+
+$componentsNames - string - components names separated by &quot;|&quot;
+
+Panels called from this panel:
+
+none
+
+*/
+
+main()
+{
+
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="tblComponentsToDelete" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-173 -111</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 30</prop>
+    <prop name="Size">330 355</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">componentName</prop>
+     <prop name="Width">240</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">componentVersion</prop>
+     <prop name="Width">70</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Version</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  shape shape_componentsToDelete = getShape(&quot;tblComponentsToDelete&quot;);
+  fwInstallation_ui_setTableAlternatingRowColors(shape_componentsToDelete);
+
+  string componentsNamesStr = $componentsNames; // it contains the names of components to be deleted
+
+  dyn_string componentVersions;
+  dyn_string componentNames = strsplit(componentsNamesStr, &quot;|&quot;);
+  int componentNamesLen = dynlen(componentNames);
+  for(int i=1;i&lt;=componentNamesLen;i++){
+    dynAppend(componentVersions, fwInstallation_getComponentVersion(componentNames[i]));
+  }
+  shape_componentsToDelete.deleteAllLines();
+  shape_componentsToDelete.appendLines(componentNamesLen, &quot;componentName&quot;, componentNames, &quot;componentVersion&quot;, componentVersions);
+  shape_componentsToDelete.columnStretchable(1, true); // make componentVersion column (idx=1) stretchable
+}
+]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[main()
+{
+  const string typeOfDescription = &quot;PVSSDB&quot;;
+
+  shape tab = getShape(&quot;tblComponentsToDelete&quot;);
+
+  int row, column;
+  getValue(tab, &quot;currentCell&quot;, row, column);
+  string columnName = tab.currentColumn();
+
+  if(columnName == &quot;componentName&quot;){
+    string componentName = tab.cellValueRC(row, &quot;componentName&quot;);
+
+    ChildPanelOnCentral(&quot;fwInstallation/fwInstallationComponentDetails.pnl&quot;, &quot;fwInstallation_ComponentDetails&quot;,
+                        makeDynString(&quot;$componentName:&quot; + componentName, &quot;$descFile:&quot;, &quot;$typeOfDescription:&quot; + typeOfDescription,
+                                      &quot;$reduHostNum:&quot; + fwInstallationRedu_myReduHostNum()));
+  }
+}
+]]></script>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  fwInstallation_ui_componentsTableRightClickPopupMenu(getShape(&quot;&quot;), row, column);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deleteFiles" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 407</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 407</prop>
+    <prop name="Size">101 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Delete files</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="btnCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">265 405</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Esc</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">265 405</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_float df = makeDynFloat(1);
+  dyn_string ds = makeDynString(&quot;DoNotDelete&quot;);
+
+// return values to the parent panel
+  PanelOffReturn(df, ds);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnOKtoDelete" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">183 405</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">183 405</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+    <prop name="IsDefault">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  bool canDeleteFile = deleteFiles.state(0);
+
+  dyn_float df = makeDynFloat(1);
+  dyn_string ds = canDeleteFile?(makeDynString(&quot;Delete&quot;)):(makeDynString(&quot;DeleteNoFiles&quot;));
+// return values to the parent panel
+  PanelOffReturn(df, ds);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="deleteCompLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Components to be deleted:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">1</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">140 400</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">140 400</prop>
+    <prop name="Size">21 31</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="iconResizeable" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">303.2596804880605 478.9315312476092</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{80,80,80,142}</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">15 15</prop>
+    <prop name="maximumSize">15 15</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignTrailing|AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">True</prop>
+    <prop name="LineType">[none,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">-0.1176527493693916 0.1773866839332782 -0.1656742797242453 -0.139488015248372 445.0259716589811 483.0109796411501</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">303.2502187589321 478.9382504465556</prop>
+     <prop name="Location">344 450</prop>
+     <prop name="Location">377.2849518548865 492.7581994829599</prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="1" Name="LAYOUT_GROUP1" serial="0">
+   <properties>
+    <prop idx="0" name="shapeSerial">4</prop>
+    <prop idx="1" name="shapeSerial">7</prop>
+    <prop idx="2" name="shapeSerial">3</prop>
+    <prop idx="3" name="shapeSerial">2</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutLeftMargin">0</prop>
+    <prop name="layoutRightMargin">0</prop>
+    <prop name="layoutTopMargin">6</prop>
+    <prop name="layoutBottomMargin">0</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="2" Name="LAYOUT_GROUP2" serial="1">
+   <properties>
+    <prop idx="1" name="shapeSerial">0</prop>
+    <prop idx="0" name="shapeSerial">5</prop>
+    <prop idx="2" name="groupSerial">0</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">9</prop>
+    <prop name="layoutBottomMargin">0</prop>
+    <prop name="layoutSpacing">6</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP3" serial="2">
+   <properties>
+    <prop idx="1" name="shapeSerial">8</prop>
+    <prop idx="0" name="groupSerial">1</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">0</prop>
+    <prop name="layoutRightMargin">0</prop>
+    <prop name="layoutTopMargin">0</prop>
+    <prop name="layoutBottomMargin">0</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

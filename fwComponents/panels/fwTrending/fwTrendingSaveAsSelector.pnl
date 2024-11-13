@@ -1,0 +1,686 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">420 461</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 10</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTree/fwTree.ctl&quot;
+#uses &quot;fwTree/fwTreeDisplay.ctl&quot;
+#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+string g_sTrendingType;
+string g_sDpType;
+
+
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  int iCloseWindow; // Avoids to close window from X button un top right.
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+  int iCloseWindow; // Avoids to close window from X button un top right.
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[//  Following shapes are required for fwTrending/fwTree.pnl
+//  Please don't renamed them:
+//
+//  itemDpName,  TEXT_FIELD
+//  itemDpType,  TEXT_FIELD
+
+
+
+main()
+{
+  int iIndex;
+  string sProposedName;
+
+  // 20190819, PG, remove the dependency on fwFsm
+  // Initialize FSM to access their funtions to handle fwNodes  
+  //	fwFsm_initialize();
+
+  //delay(0, 100);
+  
+  // Checking dollar parameters
+  switch( $sDpType )
+  {
+    case fwTrending_PLOT:
+    		g_sTrendingType = &quot;plot&quot;;
+    		g_sDpType       = fwTrending_PLOT;
+      break;
+      
+    case fwTrending_PAGE:
+    		g_sTrendingType = &quot;page&quot;;
+    		g_sDpType       = fwTrending_PAGE;
+      break;
+
+    default:
+      DebugTN(&quot;Error: unknown $sDpType value: &quot; + $sDpType);
+      return;
+      break;
+  }
+
+
+  if( isDollarDefined(&quot;$sProposedName&quot;) )
+  {
+    sProposedName = $sProposedName;
+  }
+  else
+  {
+    sProposedName = &quot;&quot;;
+  }
+
+  delay(0, 500); //FWTREND-1123: wait 500ms for the init script of the tree inside the embedded fwTreeDisplay/fwTree.pnl panel to finish
+
+  iIndex = fwTreeDisplay_getTreeIndex();
+  
+  // Setting shapes
+	setMultiValue(&quot;PRIMITIVE_TEXT_TITLE&quot;,     &quot;text&quot;,     &quot;Save &quot; + g_sTrendingType + &quot; settings&quot;,
+                &quot;PRIMITIVE_TEXT_NEW_NAME&quot;,  &quot;text&quot;,     &quot;New &quot;  + g_sTrendingType + &quot; DP Name:&quot;,
+                &quot;TEXT_FIELD_DP_NAME&quot;,       &quot;text&quot;,     sProposedName,
+                &quot;TreePanel.Tree_&quot; + iIndex, &quot;animated&quot;, TRUE);
+
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="PRIMITIVE_TEXT_TITLE" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,75,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,75,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Save (page/plot) settings</prop>
+     <prop name="en_US.iso88591">Save (page/plot) settings</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT_NEW_NAME" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 53</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 55</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">New (page/plot): </prop>
+     <prop name="en_US.iso88591">New (page/plot): </prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="TEXT_FIELD_DP_NAME" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">140 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">140 50</prop>
+    <prop name="Size">251 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PUSH_BUTTON_OK" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">220 420</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">220 420</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+//  int iNewPos;
+	string sNewTrendingDp, sNodeToSave, sParent, sDevice, sType;
+	dyn_float dfResult;
+	dyn_string dsResult, dsChildren, exceptionInfo;
+  bool bCanOverwrite;
+
+
+  getMultiValue(&quot;TEXT_FIELD_DP_NAME&quot;, &quot;text&quot;,       sNewTrendingDp,
+                &quot;TEXT_FIELD_SELECTED_NODE&quot;, &quot;text&quot;, sNodeToSave);
+
+
+  // Check if new fwNode name is allowed.
+	if( !dpNameCheck(sNewTrendingDp) )
+	{
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The data point name is not valid. Valid characters are A..Z, a..z, 0..9 and _&quot;, &quot;&quot;);
+		fwExceptionHandling_display(exceptionInfo);
+		return;
+	}
+
+
+  // Check overwrite
+	if( dpExists(sNewTrendingDp) )
+	{
+    string sAccessControlExtension;
+    string sAccessRights;
+
+		if( dpTypeName(sNewTrendingDp) != g_sDpType )
+		{
+			fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The chosen data point exists and is not a &quot; + g_sTrendingType + &quot; data point.  Can not save the settings to this data point.&quot;, &quot;&quot;);
+			fwExceptionHandling_display(exceptionInfo);
+			return;
+		}
+
+
+    bCanOverwrite = true;
+
+    switch( g_sDpType )
+    {
+      case fwTrending_PLOT:
+        sAccessControlExtension = fwTrending_PLOT_ACCESS_CONTROL_SAVE;
+        break;
+
+      case fwTrending_PAGE:
+        sAccessControlExtension = fwTrending_PAGE_ACCESS_CONTROL_SAVE;
+        break;
+            
+      default:
+        DebugTN(&quot;Error: Trending type unknown, type: &quot; + g_sDpType);
+        PanelOffReturn(makeDynFloat(0), makeDynString());
+        return;
+        break;        
+    } // end switch
+
+
+    // if DP to be overwritten has access control implemented, check if the user has the rights to overwrite
+    if ( dpExists(sNewTrendingDp + sAccessControlExtension) )
+    {
+      bool bIsAllowed = true;
+      dyn_errClass err; 
+
+      dpGet(sNewTrendingDp + sAccessControlExtension, sAccessRights);
+          
+      err = getLastError(); //test whether an error occurred 
+      if(dynlen(err) &gt; 0) 
+      { 
+        sAccessRights = &quot;&quot;; // do not trust returned value in case of error
+  			fwException_raise(exceptionInfo, &quot;WARNING&quot;, &quot;Could not retrieve the acces rights for the data point &quot; + sNewTrendingDp + &quot;. Continuing without any access protection.&quot;, &quot;&quot;);
+  			fwExceptionHandling_display(exceptionInfo);
+      } 
+
+      if( sAccessRights != &quot;&quot; )
+      {
+        fwAccessControl_isGranted(sAccessRights, bIsAllowed, exceptionInfo);
+        bCanOverwrite = bIsAllowed;
+      }
+
+    } // end if dpExists(...)
+      
+    if (bCanOverwrite)
+    {
+  		ChildPanelOnCentralReturn(&quot;fwGeneral/fwOkCancel.pnl&quot;,
+                                &quot;Overwrite current &quot; + g_sTrendingType + &quot; data point&quot;,
+  															makeDynString(&quot;$text:A &quot; + g_sTrendingType + &quot; data point called &quot; + sNewTrendingDp + &quot;\n&quot; +
+                															&quot;already exists.  Do you want to overwrite it with these&quot;             + &quot;\n&quot; +
+                															&quot;new configuration settings? (Old settings will be lost)&quot;),
+                                dfResult, dsResult);
+    }
+    else
+    {
+			fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;You do not have the access rights (&quot; + sAccessRights + &quot;) to overwrite existing the data point &quot; + sNewTrendingDp + &quot;. Please save using another name.&quot;, &quot;&quot;);
+			fwExceptionHandling_display(exceptionInfo);
+    }
+    
+		if ( (! bCanOverwrite) || ( dsResult[1] != &quot;ok&quot; ) )
+    {
+			return;
+    }
+  }
+
+
+  // If node selected
+  if( strlen(sNodeToSave) )
+  {
+    fwTree_getNodeDevice(sNodeToSave, sDevice, sType, exceptionInfo);
+      
+    // The selected node is a node (folder of Plots/Pages)
+    if( (sType == &quot;&quot;) || (sType == &quot; &quot;) )
+    {
+      // Create fwTN_PLOT node
+      fwTree_addNode(sNodeToSave, sNewTrendingDp, exceptionInfo);
+    }
+
+/*
+    else
+    {
+      // The selected node is a Plot or Page, get its parent node and put new node above selected node
+      DebugTN(&quot;Selected is not a node&quot;);
+
+      fwTree_getParent(sNodeToSave, sParent, exceptionInfo);
+      DebugTN(&quot;sParent node = &quot; + sParent);
+
+      DebugTN(&quot;Add node, parent node: &quot; + sParent + &quot;, sNewTrendingDp = &quot; + sNewTrendingDp);
+      fwTree_addNode(sParent, sNewTrendingDp, exceptionInfo);
+      if( dynlen(exceptionInfo) == 0 )
+      {
+        fwTree_getChildren(sParent, dsChildren, exceptionInfo);
+        DebugTN(&quot;Children from &quot; + sParent + &quot; = &quot;, dsChildren);          
+         
+        iNewPos = dynContains(dsChildren, sNodeToSave);
+        DebugTN(&quot;iPos selected node: &quot; + sNodeToSave + &quot; = &quot; + iNewPos);
+        if( iNewPos &gt; 0 )
+        {
+          DebugTN(&quot;dynContains(dsChildren, sNewTrendingDp) = &quot; + dynContains(dsChildren, sNewTrendingDp));
+          dynRemove(dsChildren, dynContains(dsChildren, sNewTrendingDp));
+          DebugTN(&quot;dsChildren = &quot;, dsChildren);
+
+          dynInsertAt(dsChildren, sNewTrendingDp, iNewPos);
+          DebugTN(&quot;dsChildren = &quot;, dsChildren + &quot;, sNewTrendingDp = &quot; + sNewTrendingDp + &quot;, iNewPos = &quot; + iNewPos);
+        }
+        fwTree_reorderChildren(sParent, dsChildren, exceptionInfo);
+        DebugTN(&quot;Reorder -&gt; sParent = &quot; + sParent + &quot;, dsChildren = &quot;, dsChildren);          
+      }
+
+    }
+*/
+
+    switch( g_sDpType )
+    {
+      case fwTrending_PLOT:
+        // If Plot DP doesn't exist, create DP and make link with fwTN_[Node].        
+        if( !dpExists(sNewTrendingDp) )
+        {
+          // Create Plot DP
+          fwTrending_createPlot(sNewTrendingDp, exceptionInfo);
+        }
+
+        fwTree_setNodeDevice(sNewTrendingDp, sNewTrendingDp, fwTrending_PLOT, exceptionInfo);
+        break;
+
+
+      case fwTrending_PAGE:
+        // If Page DP doesn't exist, create DP and make link with fwTN_[Node].          
+        if (!dpExists(sNewTrendingDp) )
+        {
+          fwTrending_createPage(sNewTrendingDp, exceptionInfo);
+        }
+
+        fwTree_setNodeDevice(sNewTrendingDp, sNewTrendingDp, fwTrending_PAGE, exceptionInfo);
+        break;
+
+
+      default:
+        DebugTN(&quot;Error: Trending type unknown, type: &quot; + g_sDpType);
+        PanelOffReturn(makeDynFloat(0), makeDynString());
+        return;
+        break;
+    }
+
+  }
+  else
+    PanelOffReturn(makeDynFloat(0), makeDynString());
+
+
+	PanelOffReturn(makeDynFloat(1), makeDynString(&quot;ok&quot;, sNewTrendingDp));
+  
+  // Settings are saved from fwTrendingTrendControl.pnl calling fwTrending_saveAs()
+
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="PUSH_BUTTON_CANCEL" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">320 420</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">320 420</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOffReturn(makeDynFloat(0), makeDynString(&quot;cancel&quot;));
+}]]></script>
+   </events>
+  </shape>
+  <reference referenceId="0" Name="Help" parentSerial="-1">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">364 10</prop>
+    <prop name="Geometry">1 0 0 1 29 0</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwTrending/fwTrendingSaveAsSelector</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape layerId="0" Name="PRIMITIVE_TEXT_LABEL_STORE" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 92</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select a Tree node:</prop>
+     <prop name="en_US.iso88591">Select a Tree node:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="itemDpType" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50.61867704280156 178.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">38 252</prop>
+    <prop name="Size">48 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="itemDpName" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">37.81712062256809 257.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">38 282</prop>
+    <prop name="Size">48 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference referenceId="1" Name="TreePanel" parentSerial="-1">
+   <properties>
+    <prop name="FileName">fwTreeDisplay/fwTree.pnl</prop>
+    <prop name="Location">90 101</prop>
+    <prop name="Geometry">1 0 0 1 40 -11</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$1</prop>
+      <prop name="Value">TrendTree</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$2</prop>
+      <prop name="Value">save_as</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape layerId="0" Name="TEXT_FIELD_SELECTED_NODE" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">140 380</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">140 380</prop>
+    <prop name="Size">251 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT_NODE_SELECTED" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 382</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 384</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Tree node selected:</prop>
+     <prop name="en_US.iso88591">Tree node selected:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

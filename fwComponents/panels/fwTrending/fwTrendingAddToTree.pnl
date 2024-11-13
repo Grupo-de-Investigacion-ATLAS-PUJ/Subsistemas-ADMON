@@ -1,0 +1,763 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">502 321</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+
+void showDpList(string sDpType)
+{
+  dyn_string dsDpNameList, exceptionInfo;
+
+  switch(sDpType)
+  {
+    case fwTrending_PLOT:
+      fwTrending_getAllPlots(dsDpNameList, exceptionInfo);
+      break;
+
+    case fwTrending_PAGE:
+      fwTrending_getAllPages(dsDpNameList, exceptionInfo);
+      break;
+
+    default:
+      break;
+  }
+
+  if( dynlen(exceptionInfo) &gt; 0 )
+  {
+    fwExceptionHandling_display(exceptionInfo);
+    return;
+  }
+
+  dpNameSelectionList.items = dsDpNameList;
+  proposeLabel(dpNameSelectionList.selectedText, sDpType);
+
+}
+
+
+
+
+
+void proposeLabel(string sDpName, string sDpType)
+{
+  int iPosition;
+  string sTitle, sDpe;
+  dyn_string dsDpTypeList, dsDpeTitleList;
+
+
+  if( $mode != &quot;addexisting&quot; )
+    return;
+
+  sTitle = sDpName;
+
+  dsDpTypeList   = strsplit($3, &quot;,&quot;);
+  dsDpeTitleList = strsplit($4, &quot;,&quot;);
+
+  // Search insile dsDpTypeList for our type
+  iPosition = dynContains(dsDpTypeList, sDpType);
+  if( iPosition &gt; 0 )
+  {
+    // Construct full DPE: sDpName + &quot;.plotTitle&quot; or &quot;.pageTitle&quot;
+    sDpe = dsDpeTitleList[iPosition];
+    strreplace(sDpe, &quot;DP&quot;, sDpName);
+    if( (sDpe != &quot;&quot;) &amp;&amp; (dpExists(sDpe)) )
+    {
+      dpGet(sDpe, sTitle);
+      strreplace(sTitle, &quot; &quot;, &quot;&quot;);
+    }
+  }
+
+  // In case sDpType is not in dsDpTypeList, we removed system name to show it on &quot;Name in tree:&quot; shape
+  if( sTitle == sDpName )
+    sTitle = dpSubStr(sDpName, DPSUB_DP);
+
+  labelField.text = sTitle;
+
+}
+
+
+
+
+
+
+void switchMode(string sMode)
+{
+  sMode = strtolower(sMode);
+
+  switch(sMode)
+  {
+    case &quot;addnode&quot;:
+
+      dpNameSelectionList.visible = FALSE;
+      dpTypeSelector.visible      = FALSE;
+      labelField.visible          = TRUE;
+      dpNameField.visible         = FALSE;
+      Text2.visible               = FALSE;
+      Text3.visible               = FALSE;
+      Text4.visible               = TRUE;
+      Text4.text                  = &quot;Node Name (DP):&quot;;
+      Text1.text                  = &quot;Add Node to &quot; + $2;
+      Text4.position     (10, 54);
+      labelField.position(130, 54);
+      break;
+
+//CG
+		case &quot;addpage&quot;:
+			dpNameSelectionList.visible = FALSE;
+			dpTypeSelector.visible      = FALSE;
+			labelField.visible          = TRUE;
+			dpNameField.visible         = FALSE;
+			Text2.visible               = FALSE;
+			Text3.visible               = FALSE;
+			Text4.visible               = TRUE;
+			Text4.text                  = &quot;Node Name:&quot;;
+			Text1.text                  = &quot;Add New Page to &quot; + $2;
+			Text4.position(10, 54);
+			labelField.position(94, 50);
+			break;
+//end CG
+      case &quot;addnew&quot;:
+      dpNameSelectionList.visible = FALSE;
+      dpTypeSelector.visible      = TRUE;
+      labelField.visible          = TRUE;
+      dpNameField.visible         = TRUE;
+      Text2.visible               = TRUE;
+      Text3.visible               = TRUE;
+      Text4.visible               = TRUE;
+      Text1.text                  = &quot;Add New Plot/Page to &quot; + $2;
+      Text4.position     (10, 134);
+      labelField.position(130, 134);
+      break;
+
+    case &quot;addexisting&quot;:
+      dpNameSelectionList.visible = TRUE;
+      dpTypeSelector.visible      = TRUE;
+      labelField.visible          = TRUE;
+      dpNameField.visible         = FALSE;
+      Text2.visible               = TRUE;
+      Text3.visible               = TRUE;
+      Text4.visible               = TRUE;
+      Text3.text                  = &quot;Current DPs:&quot;;
+      Text1.text                  = &quot;Add Existing Plot/Page to &quot; + $2;
+      break;
+
+    default:
+      dpNameSelectionList.visible = FALSE;
+      dpTypeSelector.visible      = FALSE;
+      labelField.visible          = FALSE;
+      dpNameField.visible         = FALSE;
+      Text2.visible               = FALSE;
+      Text3.visible               = FALSE;
+      Text4.visible               = FALSE;
+      Text1.text                  = &quot;No action defined&quot;;
+      break;
+  }
+
+}
+
+
+
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}
+]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[// This panel receives as $ parameters:
+//
+// $1: Parent node name
+// $2: Paren reference name
+// $3: TreeType
+// $4: TreeName
+// $5: panel mode: addNode, addnew, addexisting.
+//
+
+
+// This panel returns:
+//
+// dyn_float[1] = number of arguments
+//
+// dyn_string[1] = Type: plot or page. &quot; &quot; for a node.
+// dyn_string[2] = 0
+// dyn_string[3] = Plot or page name: [FwTrendingPlot] or [FwTrendingPage]. Empty for a node.
+// dyn_string[4] = Node or Plot or Page tree node name: fwTT_XXXX [_FwTreeNode]
+//
+
+main()
+{
+  int iLen, iLenIn, iLoop, iLoopIn;  
+  string sMode;
+  dyn_string dsListOptions, dsTypeList, dsDpTypeList, dsModels, exceptionInfo;
+
+
+  sMode = strtolower($mode);
+
+  // Animate panel according mode: addNode, addnew, addexisting
+  switchMode(sMode);
+
+
+  // Split trending types. Possible types: TrendingPlot or TrendingPage
+  dsTypeList = strsplit($3, &quot;,&quot;);
+  iLen       = dynlen(dsTypeList);
+  if(iLen &lt; 1)
+    return;
+
+  
+  switch( sMode )
+  {
+    case &quot;addexisting&quot;:
+    case &quot;addnew&quot;:
+      // display first type by default
+      showDpList(dsTypeList[1]);
+      break;
+
+    default:
+      return;
+      break;
+  }
+
+
+  for( iLoop = 1 ; iLoop &lt;= iLen ; iLoop++ )
+  {
+    fwDevice_getTypeModels(dsTypeList[iLoop], &quot;&quot;, dsModels, exceptionInfo);
+    fwDevice_getType      (dsTypeList[iLoop], dsDpTypeList[iLoop], exceptionInfo);
+    if( dynlen(exceptionInfo) &gt; 0 )
+    {
+      fwExceptionHandling_display(exceptionInfo);
+      return;
+    }
+
+    // When we add new instace we sort it by: TYPE (MODEL)
+    if( (sMode == &quot;addnew&quot;) &amp;&amp; (dynlen(dsModels) &gt; 0) )
+    {
+      iLenIn = dynlen(dsModels);
+      for( iLoopIn = 1 ; iLoopIn &lt;= iLenIn ; iLoopIn++ )
+      {
+        dynAppend(dsListOptions, dsDpTypeList[iLoop] + &quot;  (&quot; + dsModels[iLoopIn] + &quot;)&quot;);
+      }
+    }
+    else
+      dynAppend(dsListOptions, dsDpTypeList[iLoop]);
+  }
+
+  dpTypeSelector.items       = dsListOptions;
+  dpTypeSelector.selectedPos = 1;
+
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="dpNameSelectionList" shapeType="SELECTION_LIST">
+   <properties>
+    <prop name="serialId">41</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 90</prop>
+    <prop name="Size">361 131</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  string sDeviceType, sDeviceDpType;
+  dyn_string exceptionInfo;
+
+  sDeviceType = dpTypeSelector.selectedText;
+  fwDevice_getDpType(sDeviceType, sDeviceDpType, exceptionInfo);
+  if( dynlen(exceptionInfo) &gt; 0 )
+  {
+    fwExceptionHandling_display(exceptionInfo);
+    return;
+  }  
+  
+  proposeLabel(dpNameSelectionList.selectedText, sDeviceDpType);
+
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="Text2" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 54</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 56</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Type:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text3" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">39</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 94</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 96</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">DP Name:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text4" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 244</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 246</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Name in tree (DP)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text1" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Add (Something) to (Somewhere)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="dpTypeSelector" shapeType="COMBO_BOX">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 50</prop>
+    <prop name="Size">361 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  string sDpType;
+  dyn_string exceptionInfo;
+  
+  fwDevice_getDpType(dpTypeSelector.text, sDpType, exceptionInfo);
+  if( dynlen(exceptionInfo) &gt; 0 )
+  {
+    fwExceptionHandling_display(exceptionInfo);
+    return;
+  }
+
+  showDpList(sDpType);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="dpNameField" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130.0000000000001 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 90</prop>
+    <prop name="Size">361 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="labelField" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 240</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 240</prop>
+    <prop name="Size">361 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Button2" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">323 280</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">324 281</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sDeviceType, sDeviceDpType, sModel;
+  dyn_string dsParts, dsReturnValue, exceptionInfo;
+
+  //
+  //
+  //
+  //
+
+  switch($mode)
+  {
+    case &quot;addnode&quot;:
+      dsReturnValue[1] = &quot;&quot;;
+      dsReturnValue[2] = 0;
+      dsReturnValue[3] = &quot;&quot;;
+      dsReturnValue[4] = labelField.text;
+      break;
+
+// CG
+		case &quot;addpage&quot;:
+			dsReturnValue[1] = fwTrending_PAGE;
+			dsReturnValue[2] = 0;
+			dsReturnValue[3] = labelField.text;
+			dsReturnValue[4] = labelField.text;
+			break;
+//end CG
+    case &quot;addnew&quot;:
+      sDeviceType = dpTypeSelector.selectedText;
+
+      // Pick from shape: DeviceType and the model --&gt; TYPE (MODEL)
+      if(strpos(sDeviceType, &quot;(&quot;) &gt; 0 )
+      {
+        dsParts     = strsplit(sDeviceType, &quot;(&quot;);
+
+        sDeviceType = strrtrim(dsParts[1], &quot; &quot;);
+        sModel      = strrtrim(dsParts[2], &quot;)&quot;);
+      }
+
+      // Get the type and creates the plot or the page
+      fwDevice_getDpType(sDeviceType, sDeviceDpType, exceptionInfo);
+      switch(sDeviceDpType)
+      {
+        case fwTrending_PLOT:
+          fwTrending_createPlot(dpNameField.text, exceptionInfo, sModel);
+          break;
+
+        case fwTrending_PAGE:
+          fwTrending_createPage(dpNameField.text, exceptionInfo, sModel);
+          break;
+
+        default:
+          break;
+      }
+      if(dynlen(exceptionInfo) &gt; 0)
+      {
+        fwExceptionHandling_display(exceptionInfo);
+        return;
+      }
+
+      dsReturnValue[1] = sDeviceDpType;
+      dsReturnValue[2] = 0;
+      dsReturnValue[3] = dpNameField.text;
+      dsReturnValue[4] = labelField.text;
+      break;
+
+
+    case &quot;addexisting&quot;:
+      sDeviceDpType = dpTypeSelector.selectedText;
+      fwDevice_getDpType(sDeviceDpType, sDeviceDpType, exceptionInfo);
+      if(dynlen(exceptionInfo) &gt; 0)
+      {
+        fwExceptionHandling_display(exceptionInfo);
+        return;
+      }
+
+      dsReturnValue[1] = sDeviceDpType;
+      dsReturnValue[2] = 0;
+      dsReturnValue[3] = dpNameSelectionList.selectedText;
+      dsReturnValue[4] = labelField.text;
+      break;
+
+
+    default:
+      break;
+  }
+
+  if(dsReturnValue[4] == &quot;&quot;)
+  {
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;You must specify a name to be shown in the tree.&quot;, &quot;&quot;);
+    fwExceptionHandling_display(exceptionInfo);
+    return;
+  }
+
+  PanelOffReturn(makeDynFloat(dynlen(dsReturnValue)), dsReturnValue);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="Button3" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">414 280</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">414 281</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{
+  PanelOffReturn(makeDynFloat(0),
+                 makeDynString() );
+}
+
+]]></script>
+   </events>
+  </shape>
+  <reference referenceId="0" Name="Group2" parentSerial="-1">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">684 10</prop>
+    <prop name="Geometry">1 0 0 1 -320 0</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwTrending/fwTrendingAddToTree</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+ </shapes>
+</panel>

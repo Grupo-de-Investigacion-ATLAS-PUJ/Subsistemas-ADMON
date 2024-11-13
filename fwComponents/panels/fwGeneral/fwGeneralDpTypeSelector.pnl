@@ -1,0 +1,664 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.iso88591"></prop>
+  </prop>
+  <prop name="Size">552 547</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">60 239</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[global bool selectMultiple;
+global dyn_string DPTs,fwDevs,items,disabledItems,selectedItems;
+
+// DPTs and fwDevs are &quot;static&quot; table containing the lists of device/DPT names
+// &quot;items&quot; is being re-built each time filtering is applied, and corresponds
+//     to tha actual items in the table
+
+void PopulatePanel()
+{
+	dyn_string exceptionInfo;
+	if (isDollarDefined(&quot;$text&quot;)) setValue(&quot;Text&quot;,&quot;text&quot;,$text);
+
+	selectMultiple=FALSE;
+	if (isDollarDefined(&quot;$selectMultiple&quot;)) {
+		if ($selectMultiple==&quot;TRUE&quot; || $selectMultiple==1 || $selectMultiple==&quot;true&quot;)
+			selectMultiple=TRUE;
+	}
+	if (selectMultiple){
+		setValue(&quot;Table&quot;,&quot;tableMode&quot;,TABLE_SELECT_MULTIPLE);
+	} else {
+		setValue(&quot;Table&quot;,&quot;tableMode&quot;,TABLE_SELECT_BROWSE);
+		setValue(&quot;SelectAll&quot;,&quot;visible&quot;,FALSE);
+		setValue(&quot;UnselectAll&quot;,&quot;visible&quot;,FALSE);
+		setValue(&quot;InvertSelection&quot;,&quot;visible&quot;,FALSE);
+	}
+
+	setValue(&quot;Table&quot;,&quot;selectByClick&quot;,TABLE_SELECT_LINE);
+	
+	PopulateDeviceTypesLists();
+	int i;
+
+	if (isDollarDefined(&quot;$disabledItems&quot;)) {
+	disabledItems=strsplit($disabledItems,&quot;|&quot;);
+		for (i=1;i&lt;=dynlen(disabledItems);i++) {
+			disabledItems[i]=strrtrim(strltrim(disabledItems[i]));
+		}
+	}
+
+	if (isDollarDefined(&quot;$selectedItems&quot;)) {
+		selectedItems=strsplit($selectedItems,&quot;|&quot;);
+		for (i=1;i&lt;=dynlen(selectedItems);i++) {
+			selectedItems[i]=strrtrim(strltrim(selectedItems[i]));
+		}
+	}
+
+
+ShowNonFw.state(0)=1;
+ShowInternalDPT.state(0)=0;
+RedisplayTable(FALSE);
+
+}
+
+
+void PopulateDeviceTypesLists()
+{
+	dyn_string exceptionInfo;
+
+	// make the list of dpNames and Framework DP Names;
+
+	DPTs=dpTypes();
+	int i;
+	for (int i=1;i&lt;=dynlen(DPTs);i++) {
+		fwDevs[i]=&quot;&quot;;
+	}
+
+	dyn_dyn_string fwDevices;
+	fwDevice_getAllTypes(fwDevices,exceptionInfo);
+	if (dynlen(exceptionInfo)) {
+		fwExceptionHandling_display(exceptionInfo);
+		return;
+	}	
+	for (int i=1;i&lt;=dynlen(fwDevices[1]);i++) {
+		int idx=dynContains(DPTs, fwDevices[2][i]);
+		if (idx&gt;0) fwDevs[idx]=fwDevices[1][i];
+	}
+
+}
+
+void SelectAll()
+{
+	dyn_int selectedlines;
+	for (int i=1;i&lt;=dynlen(items);i++){
+		if (!dynContains(disabledItems,items[i])) 
+			dynAppend(selectedlines,i-1);
+	}
+	SelectNone();
+
+	setValue(&quot;Table&quot;,&quot;addSelectLines&quot;,selectedlines);
+}
+
+void SelectNone()
+{
+	setValue(&quot;Table&quot;,&quot;deleteSelection&quot;);
+}
+
+void InvertSelection()
+{
+	dyn_int selectedlines,newSelectedLines;
+	getValue(&quot;Table&quot;,&quot;getSelectedLines&quot;,selectedlines);
+	for (int i=1;i&lt;=dynlen(items);i++) {
+
+		if (dynContains(selectedlines,i-1)) continue;
+
+		if (dynContains(disabledItems,items[i])) continue;
+		dynAppend(newSelectedLines,i-1);
+	}
+
+	SelectNone();
+	setValue(&quot;Table&quot;,&quot;addSelectLines&quot;,newSelectedLines);
+}
+
+void ResetSelection()
+{
+
+	dyn_int selectedLines;
+
+	for (int i=1;i&lt;=dynlen(selectedItems);i++) {
+		if (dynContains(disabledItems,selectedItems[i])) continue;
+		int idx=dynContains(items,selectedItems[i]);
+		if (idx&gt;0) dynAppend(selectedLines,idx-1);
+	}
+
+	SelectNone();
+
+	if (dynlen(selectedLines)) {
+
+	   if (selectMultiple) {
+		setValue(&quot;Table&quot;,&quot;addSelectLines&quot;,selectedLines);
+	   } else {
+		setValue(&quot;Table&quot;,&quot;selectLineN&quot;,selectedLines[1]);
+	   }
+	}
+
+	setValue(&quot;Table&quot;,&quot;lineVisible&quot;,1);
+
+
+}
+
+
+
+void RedisplayTable(bool preserve=TRUE)
+{
+
+
+bool nonFw=(ShowNonFw.state(0)==1);
+bool internal=(ShowInternalDPT.state(0)==1);
+
+if (nonFw) {
+	ShowInternalDPT.enabled=TRUE;
+} else {
+	ShowInternalDPT.enabled=FALSE;
+	internal=FALSE;
+}
+
+// at first: preserve current selection:
+if (preserve) {
+	dynClear(selectedItems);
+
+	dyn_int lines;
+	dyn_string line;
+	getValue(&quot;Table&quot;,&quot;getSelectedLines&quot;,lines);
+	for (int i=1;i&lt;=dynlen(lines);i++) {
+		getValue(&quot;Table&quot;,&quot;getLineN&quot;,lines[i],line);
+		dynAppend(selectedItems,line[1]);
+	}
+}
+
+
+Table.stop(TRUE);
+Table.deleteAllLines;
+dynClear(items);
+	for (int i=1;i&lt;=dynlen(DPTs);i++) {
+
+		if (!nonFw) { if (fwDevs[i]==&quot;&quot;) continue;}
+		if (!internal) { if (substr(DPTs[i],0,1)==&quot;_&quot;) continue;}
+
+		Table.appendLine(&quot;Name&quot;,DPTs[i],
+				 &quot;FwName&quot;,fwDevs[i]);
+		dynAppend(items,DPTs[i]);
+		if (dynContains(disabledItems,DPTs[i])) {
+			setValue(&quot;Table&quot;,&quot;cellBackColRC&quot;,i-1,&quot;Name&quot;,&quot;lightgrey&quot;);
+		}
+	}
+
+ResetSelection();
+Table.stop(FALSE);
+
+}
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	PopulatePanel();	
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="Text" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">11 12</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Select Datapoint Types:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="FRAME1" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 400</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">black</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Display Filter</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 400</prop>
+    <prop name="Size">280 80</prop>
+   </properties>
+  </shape>
+  <shape Name="OKButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">373 510</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">375 512</prop>
+    <prop name="Size">77 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Ok</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string selectedItems;
+
+
+	dyn_int lines;
+	dyn_string line;
+	getValue(&quot;Table&quot;,&quot;getSelectedLines&quot;,lines);
+	for (int i=1;i&lt;=dynlen(lines);i++) {
+		getValue(&quot;Table&quot;,&quot;getLineN&quot;,lines[i],line);
+		dynAppend(selectedItems,line[1]);
+	};
+
+	PanelOffReturn(makeDynFloat(dynlen(selectedItems)),selectedItems);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="CancelButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">460 510</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">462 512</prop>
+    <prop name="Size">77 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+PanelOffReturn(makeDynFloat(0.0),makeDynString());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Table" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 60</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">white</prop>
+    <prop name="TabOrder">49</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">12 62</prop>
+    <prop name="Size">527 297</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">17</prop>
+    <prop name="RowHeaderWidth">84</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">Name</prop>
+     <prop name="Width">250</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">DP Type</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">FwName</prop>
+     <prop name="Width">250</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">Fw Device</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+
+// lines that are greyed-out should not be selectable...
+	string color;
+	getValue(&quot;Table&quot;,&quot;cellBackColRC&quot;,row,&quot;Name&quot;,color);
+	if (color==&quot;lightgrey&quot;) {
+		setValue(&quot;Table&quot;,&quot;removeSelectLines&quot;,makeDynInt(row));
+	}
+
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="SelectAll" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">420 360</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Select all items</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">422 362</prop>
+    <prop name="Size">37 28</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">+</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+SelectAll();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="UnselectAll" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">460 360</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Unselect all items</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">462 362</prop>
+    <prop name="Size">37 28</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">-</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+SelectNone();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="InvertSelection" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">500 360</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Invert selection</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">502 362</prop>
+    <prop name="Size">37 28</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">*</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+InvertSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="ResetButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 510</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Reset to original selection</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">12 512</prop>
+    <prop name="Size">77 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Reset</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+PopulateDeviceTypesLists();
+ResetSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="ShowNonFw" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">40 420</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">48</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">42 422</prop>
+    <prop name="Size">230 25</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.iso88591">Show Non-Framework DP Types</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+RedisplayTable();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="ShowInternalDPT" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">40 450</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">49</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">42 452</prop>
+    <prop name="Size">177 25</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.iso88591">Show internal DP Types</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+RedisplayTable();
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

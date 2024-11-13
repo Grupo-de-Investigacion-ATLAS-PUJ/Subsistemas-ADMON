@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">348 400</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 10</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="StartZoomPoint">0 0</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+dyn_string g_sysNames;]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int i;
+	dyn_string selectedSysNames;
+	dyn_uint sysIds;
+	dyn_int selectedPositions;
+  string systemName;
+	  
+  getSystemNames(g_sysNames, sysIds);
+  dynSortAsc(g_sysNames);
+	
+  systemList.appendLines(dynlen(g_sysNames),&quot;#1&quot;,g_sysNames);
+  
+	fwGeneral_stringToDynString($dsSelectedSystems, selectedSysNames, &quot;|&quot;, TRUE);
+ if(dynContains(selectedSysNames,&quot;*&quot;))//all systems selected
+   selectedSysNames = g_sysNames;
+  
+  systemList.tableMode (TABLE_SELECT_MULTIPLE);
+  systemList.selectByClick(TABLE_SELECT_LINE);
+  for(i=0; i&lt;systemList.lineCount; i++)
+  {
+      getValue(&quot;systemList&quot;,&quot;cellValueRC&quot;,i,&quot;#1&quot;,systemName);
+      if(dynContains(selectedSysNames,systemName))
+        systemList.selectLineN(i);
+  }
+
+}
+
+
+
+
+
+
+
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="Text1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">System List</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 42</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select the systems you want to view
+(hold Ctrl for multi-select):</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Button1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">90 360</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 360</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string systems, exceptionInfo, onlineSystems;
+	dyn_uint sysIds;
+  dyn_int selectedLineIndex;
+  int i;
+  string cellVal;
+  
+	
+  getSystemNames(onlineSystems,sysIds);
+  
+ selectedLineIndex = systemList.getSelectedLines;
+ dynClear(systems);
+ for(i=1 ; i&lt;=dynlen(selectedLineIndex) ; i++)
+ {
+  getValue(&quot;systemList&quot;,&quot;cellValueRC&quot;,selectedLineIndex[i],&quot;#1&quot;,cellVal); 
+  dynAppend(systems,cellVal);
+ }
+            
+	if(dynlen(systems) == 0)
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;You must select at least one system to view&quot;, &quot;&quot;);
+  if(dynlen(systems)==dynlen(onlineSystems))
+	
+	dynSortAsc(systems);
+	
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+	else
+   if(dynlen(systems)==dynlen(onlineSystems))//iff all selected systems, the asterisk
+  		PanelOffReturn(makeDynFloat(1), makeDynString(&quot;*&quot;));
+   else     
+  		PanelOffReturn(makeDynFloat(1), systems);
+}
+
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="Button2" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">180 360</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Esc</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">180 360</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOffReturn(makeDynFloat(0), makeDynString());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Button3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">250 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">250 80</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  for(int i=0 ; i&lt;systemList.lineCount ; i++)
+    systemList.selectLineN(i);    
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="Button4" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">250 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">250 120</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Deselect All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  systemList.tableMode (TABLE_SELECT_NOTHING);
+  systemList.tableMode (TABLE_SELECT_MULTIPLE);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="fontSample" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">250 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">250 220</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">fontsample</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  for(int i=0 ; i&lt;systemList.lineCount ; i++)
+    systemList.selectLineN(i);  
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="systemList" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 80</prop>
+    <prop name="Size">221 261</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">18</prop>
+    <prop name="RowHeaderWidth">20</prop>
+    <prop name="GridType">None</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">#1</prop>
+     <prop name="Width">600</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

@@ -1,0 +1,1343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.iso88591"></prop>
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">690 400</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 10</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[// --------------------------------------------------------------------------------------------- //
+// ------------------------------------- USER INSTRUCTIONS ------------------------------------- //
+// --------------------------------------------------------------------------------------------- //
+// 
+// This widget is intended to be used via &quot;addSymbol()&quot;
+// 
+// A list of $-parameters are at hand during initialization:
+// 1. sStartDate    Custom start date (dd/mm/yyyy) - Default: Current date minus iTimePeriod
+// 2. sEndDate      Custom end date (dd/mm/yyyy) - Default: Current date
+// 3. sStartTime    Custom start time (hh:mm:ss) - Default: Current time minus iTimePeriod
+// 4. sEndTime      Custom end time (hh:mm:ss) - Default: Current time
+// 5. bDateAndTime  TRUE: Date and time is visible; FALSE: Only dates can be chosen - Default: Only dates
+// 6. bShowTimeZone TRUE: Shows time zone; FALSE: Hides time zone - Default: Timezone shown
+// 7. bEnabled      TRUE: Enable UI elements at startup; FALSE: Disable them - Default: Enabled
+// 8. sTimeZone     Timezone for the widget's times (constants provided in fwGeneral) - Default: FW_GENERAL_TIMEZONE_LOCAL
+// 9. iTimePeriod   Custom time period (seconds) between start/end - Default: 7 days[604800s]; if no custom dates/times provided
+//
+// (&quot;Default&quot; means no data provided via $-parameter)
+//
+// --------------------------------------------------------------------------------------------- //
+//
+// !!! Attention !!! 
+// Please use one of the following methods ...
+//
+// - fwGeneral_hasCorrectFormat(string sDateTime)
+// - fwGeneral_hasCorrectDateFormat(string sDate)
+// - fwGeneral_hasCorrectTimeFormat(string sTime)
+//
+// ... to make sure the provided dates and times have the correct format.
+//
+//
+// Following functions give back the user's input for start and end date/times. For convenience reasons,
+//
+// - fwGeneral_dateTimeWidget_getEndDateTime(bool &amp;bOk, dyn_string exceptionInfo)
+//
+// and
+//
+// - fwGeneral_dateTimeWidget_getStartDateTime(bool &amp;bOk, dyn_string exceptionInfo)
+//
+// do not only give back the asked start and end time, but perform a conformity check at the same time. But it is you who
+// has to catch it later on in your code.
+//
+// --------------------------------------------------------------------------------------------- //
+//
+// !!! Additional functions !!!
+// 1. Convert a string in &quot;natural&quot; date/time format into a WinCC-compatible &quot;time&quot; variable by calling
+//
+// - fwGeneral_stringToDate(string sDateTime)
+//
+//
+// 2. You can set start and end date/time after the initialization of the widget by calling
+//
+// - fwGeneral_dateTimeWidget_setEndDateTime(time tDateTime)
+// - fwGeneral_dateTimeWidget_setStartDateTime(time tDateTime)
+//
+//
+// 3. You can alter the timezone after the initialization of the widget by calling
+//
+// - fwGeneral_dateTimeWidget_setTimeZone(string sTimeZone)
+//
+// and read it by calling
+//
+// - fwGeneral_dateTimeWidget_getTimeZone()
+//
+//
+// 4. You can as well enable or disable the functionalities of the date/time widget after its init by calling
+//
+// - fwGeneral_dateTimeWidget_setEnabled(bool bState)
+//
+//
+// 5. If you need to check whether a selected period is positive or negative, use
+//
+// - fwGeneral_dateTimeWidget_positivePeriodSelected(dyn_string exceptionInfo)
+//
+//    It checks if the start time is later than the end time and also handles wrong formats.
+//
+// --------------------------------------------------------------------------------------------- //
+// --------------------------------------------------------------------------------------------- //
+
+int g_iTimePeriod;
+
+// ------------------------------------------------------------------------------------------------
+
+time getTimeZoneConformCurrentTime()
+{
+  time tNow;
+  
+  tNow = getCurrentTime(); 
+  if(fwGeneral_dateTimeWidget_getTimeZone() == FW_GENERAL_TIMEZONE_UTC)
+  {
+    tNow = formatTimeUTC(FW_GENERAL_GENERIC_TIME_FORMAT, tNow);
+  }
+  
+  return tNow;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/* sStartOrEnd (string) has to be &quot;START&quot; if the given time is the start time, 
+ or &quot;END&quot; if it represents the end time. */
+void setTimeToSpinButton(string sTime, string sStartOrEnd)
+{
+  dyn_string timeElements;
+  int iTime = 0;
+  
+  timeElements = strsplit(sTime, &quot;:&quot;);
+  
+  if(dynlen(timeElements) == 3)
+  {
+    iTime = ((int)timeElements[1]*60)+((int)timeElements[2]);
+  }
+  
+  if(sStartOrEnd == &quot;START&quot;)
+  {
+    startTimeSpin.text(iTime);
+  }
+  else
+  {
+    endTimeSpin.text(iTime);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+dyn_string showDateTimeChooser(string sSelectedDate)
+{
+  int iX, iY;
+  dyn_float dfResult;
+  dyn_string dsResult = makeDynString();
+  time tChoosenDate, tSelectedDate;
+  bool bOk;
+  
+  bOk = fwGeneral_hasCorrectFormat(sSelectedDate);
+
+  if(bOk)
+  {
+    tSelectedDate = fwGeneral_stringToDate(sSelectedDate);
+    getCursorPosition(iX, iY);
+    ChildPanelOnCentralModalReturn(&quot;fwGeneral/fwGeneralGenericDateChooser.pnl&quot;, &quot;DATE_TIME_CHOOSER&quot;, 
+                            makeDynString(&quot;$sSelectedDate:&quot;+(string) tSelectedDate,
+                                          &quot;$sTimeZone:&quot;+selectedTimeZone.text), dfResult, dsResult);
+
+    if(dynlen(dsResult) &gt; 0)
+    {
+      tChoosenDate = dsResult[1];
+      dsResult[1] = formatTime(&quot;%d/%m/%Y&quot;, tChoosenDate);
+      dsResult[2] = formatTime(&quot;%H:%M:%S&quot;, tChoosenDate);
+    }
+  }
+  else
+  {
+     ChildPanelOnCentralModal(
+        &quot;vision/MessageInfo1&quot;, 
+        &quot;Error&quot;,
+        makeDynString(&quot;$1:Wrong date or time format.\nPlease correct.&quot;)
+     );
+  }
+  
+  return dsResult;
+}
+
+
+
+
+
+
+
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  dyn_int di_panelSize; 
+  
+  // set size and position of background that is shown while the calendar chooser is in use  
+  busyBackground.position(0,0);
+  // di_panelSize = getPanelSize(panelFileName(myModuleName(), myPanelName()));
+  // if panel size changed during runtime, the previous call does not return the correct size.
+  // Therefore, the background is set to immense size to surely cover everything:
+  busyBackground.size(3000, 3000);
+  
+  // process dollar parameters
+  arrangeWidgetElements(&quot;$bDateAndTime&quot;);
+  enableWidget(&quot;$bEnabled&quot;);
+  showTimeZone(&quot;$bShowTimeZone&quot;);  
+  setTimeZone(&quot;$sTimeZone&quot;);
+  setTimePeriod(&quot;$iTimePeriod&quot;);
+  setInitialDate(&quot;$sStartDate&quot;, &quot;$sEndDate&quot;);
+  setInitialTime(&quot;$sStartTime&quot;, &quot;$sEndTime&quot;);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+arrangeWidgetElements(string sDollarParam)
+{
+  int iX, iY;
+  bool bDateAndTime;
+  
+  if(isDollarDefined(sDollarParam)
+    &amp;&amp; (getDollarValue(sDollarParam) == &quot;TRUE&quot; || getDollarValue(sDollarParam) == &quot;true&quot;
+        || getDollarValue(sDollarParam) == &quot;1&quot;))
+  {
+    bDateAndTime = $bDateAndTime; 
+    dateAndTimeShownField.text = bDateAndTime;   
+
+    startDateButton.visible(FALSE);
+    endDateButton.visible(FALSE);
+    
+    getValue(&quot;dateTimeSeparator&quot;, &quot;position&quot;, iX, iY);
+    dateTimeSeparator.position(iX-27, iY);
+    getValue(&quot;startTimeField&quot;, &quot;position&quot;, iX, iY);
+    startTimeField.position(iX-26, iY);
+    getValue(&quot;endTimeField&quot;, &quot;position&quot;, iX, iY);
+    endTimeField.position(iX-26, iY);
+    getValue(&quot;startTimeSpin&quot;, &quot;position&quot;, iX, iY);
+    startTimeSpin.position(iX-26, iY);
+    getValue(&quot;endTimeSpin&quot;, &quot;position&quot;, iX, iY);
+    endTimeSpin.position(iX-26, iY);
+    getValue(&quot;startDateChooserButton&quot;, &quot;position&quot;, iX, iY);
+    startDateChooserButton.position(iX-26, iY);
+    getValue(&quot;endDateChooserButton&quot;, &quot;position&quot;, iX, iY);
+    endDateChooserButton.position(iX-26, iY);
+    getValue(&quot;startNowButton&quot;, &quot;position&quot;, iX, iY);
+    startNowButton.position(iX-26, iY);
+    getValue(&quot;endNowButton&quot;, &quot;position&quot;, iX, iY);
+    endNowButton.position(iX-26, iY);
+    getValue(&quot;timeZoneLabel&quot;, &quot;position&quot;, iX, iY);
+    timeZoneLabel.position(iX-26, iY);
+    getValue(&quot;selectedTimeZone&quot;, &quot;position&quot;, iX, iY);
+    selectedTimeZone.position(iX-26, iY);
+  }
+  else
+  {
+    dateAndTimeShownField.text = FALSE;
+    
+    startDateChooserButton.visible(FALSE);
+    endDateChooserButton.visible(FALSE);
+    startNowButton.visible(FALSE);
+    endNowButton.visible(FALSE);
+    startTimeField.visible(FALSE);
+    endTimeField.visible(FALSE);
+    startTimeSpin.visible(FALSE);
+    endTimeSpin.visible(FALSE);
+    dateTimeSeparator.visible(FALSE);
+    
+    getValue(&quot;timeZoneLabel&quot;, &quot;position&quot;, iX, iY);
+    timeZoneLabel.position(iX-214, iY);
+    getValue(&quot;selectedTimeZone&quot;, &quot;position&quot;, iX, iY);
+    selectedTimeZone.position(iX-214, iY);
+    
+    // set position of date choosers
+    getValue(&quot;startDateButton&quot;, &quot;position&quot;, iX, iY);
+    calendarChooser.position(iX+27,iY+2);
+    calendarChooser2.position(iX+27,iY+31);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+enableWidget(string sDollarParam)
+{
+  if(isDollarDefined(sDollarParam) &amp;&amp; 
+     (getDollarValue(sDollarParam) == &quot;TRUE&quot; || getDollarValue(sDollarParam) == &quot;true&quot;
+      || getDollarValue(sDollarParam) == &quot;FALSE&quot; || getDollarValue(sDollarParam) == &quot;false&quot;
+      || getDollarValue(sDollarParam) == &quot;1&quot; || getDollarValue(sDollarParam) == &quot;0&quot;))
+  {
+    fwGeneral_dateTimeWidget_setEnabled($bEnabled);
+  }
+  else
+  {
+    fwGeneral_dateTimeWidget_setEnabled(TRUE);   
+  }   
+}
+
+// ------------------------------------------------------------------------------------------------
+
+showTimeZone(string sDollarParam)
+{
+  if(isDollarDefined(sDollarParam) &amp;&amp; 
+     (getDollarValue(sDollarParam) == &quot;FALSE&quot; || getDollarValue(sDollarParam) == &quot;false&quot;
+      || getDollarValue(sDollarParam) == &quot;0&quot;))
+  {
+    timeZoneLabel.visible($bShowTimeZone);
+    selectedTimeZone.visible($bShowTimeZone);
+    timeZoneShownField.text = $bShowTimeZone;
+  }
+  else
+  {
+    timeZoneLabel.visible(TRUE);
+    selectedTimeZone.visible(TRUE); 
+    timeZoneShownField.text = TRUE;
+  }  
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setTimeZone(string sDollarParam)
+{
+  if(isDollarDefined(sDollarParam) &amp;&amp; getDollarValue(sDollarParam) != &quot;&quot;)
+  {
+    selectedTimeZone.text = $sTimeZone;
+  }
+  else
+  {
+    selectedTimeZone.text = FW_GENERAL_TIMEZONE_LOCAL;
+  }    
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setTimePeriod(string sDollarParam)
+{
+  if(isDollarDefined(sDollarParam) &amp;&amp; getDollarValue(sDollarParam) != &quot;&quot;)
+  {
+    g_iTimePeriod = $iTimePeriod;
+  }
+  else
+  {
+    g_iTimePeriod = 86400*7;
+  } 
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setInitialDate(string sStartDollarParam, string sEndDollarParam)
+{
+  string sStartDate, sEndDate, sEndTime;
+  dyn_string dsEndDate, dsEndTime;
+  time tNow;
+  long qNow, qBegin;
+  
+  tNow = getTimeZoneConformCurrentTime();
+  sEndDate = formatTime(&quot;%d/%m/%Y&quot;, tNow);
+  sEndTime = formatTime(&quot;%H:%M:%S&quot;, tNow);
+  
+  if(isDollarDefined(sEndDollarParam) &amp;&amp; (getDollarValue(sEndDollarParam) != &quot;&quot;)
+    &amp;&amp; fwGeneral_hasCorrectDateFormat(getDollarValue(sEndDollarParam)))
+  {
+    sEndDate = $sEndDate;    
+  } 
+  if(isDollarDefined(&quot;$sEndTime&quot;) &amp;&amp; (getDollarValue(&quot;$sEndTime&quot;) != &quot;&quot;) 
+    &amp;&amp; fwGeneral_hasCorrectTimeFormat(getDollarValue(&quot;$sEndTime&quot;)))
+  {
+    sEndTime = $sEndTime;   
+  }
+  
+  dsEndDate = strsplit(sEndDate, &quot;/&quot;);
+  dsEndTime = strsplit(sEndTime, &quot;:&quot;);
+  qNow = makeTime(dsEndDate[3], dsEndDate[2], dsEndDate[1], dsEndTime[1], dsEndTime[2], dsEndTime[3]);
+  qBegin = qNow - g_iTimePeriod;
+  sStartDate = formatTime(&quot;%d/%m/%Y&quot;, (time)qBegin); 
+
+  if(isDollarDefined(sStartDollarParam) &amp;&amp; (getDollarValue(sStartDollarParam) != &quot;&quot;)
+    &amp;&amp; fwGeneral_hasCorrectDateFormat(getDollarValue(sStartDollarParam)))
+  {
+    sStartDate = $sStartDate;
+  }
+    
+  startDateField.text = sStartDate;
+  endDateField.text = sEndDate;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setInitialTime(string sStartDollarParam, string sEndDollarParam)
+{
+  string sStartTime, sEndTime, sEndDate;
+  dyn_string dsEndTime, dsEndDate;
+  time tNow;
+  long qNow, qBegin;
+
+  tNow = getTimeZoneConformCurrentTime();  
+  sEndTime = formatTime(&quot;%H:%M:%S&quot;, tNow);
+  sEndDate = formatTime(&quot;%d/%m/%Y&quot;, tNow);
+ 
+  if(isDollarDefined(sEndDollarParam) &amp;&amp; (getDollarValue(sEndDollarParam) != &quot;&quot;) 
+    &amp;&amp; fwGeneral_hasCorrectTimeFormat(getDollarValue(sEndDollarParam)))
+  {
+    sEndTime = $sEndTime;   
+  }
+  if(isDollarDefined(&quot;$sEndDate&quot;) &amp;&amp; (getDollarValue(&quot;$sEndDate&quot;) != &quot;&quot;)
+    &amp;&amp; fwGeneral_hasCorrectDateFormat(getDollarValue(&quot;$sEndDate&quot;)))
+  {
+    sEndDate = $sEndDate;    
+  } 
+  
+  dsEndTime = strsplit(sEndTime, &quot;:&quot;);
+  dsEndDate = strsplit(sEndDate, &quot;/&quot;);
+  qNow = makeTime(dsEndDate[3], dsEndDate[2], dsEndDate[1], dsEndTime[1], dsEndTime[2], dsEndTime[3]);
+  qBegin = qNow - g_iTimePeriod;
+  sStartTime = formatTime(&quot;%H:%M:%S&quot;, (time)qBegin);
+
+  if(isDollarDefined(sStartDollarParam) &amp;&amp; (getDollarValue(sStartDollarParam) != &quot;&quot;) 
+    &amp;&amp; fwGeneral_hasCorrectTimeFormat(getDollarValue(sStartDollarParam)))
+  {
+    sStartTime = $sStartTime;
+  } 
+  
+  startTimeField.text = sStartTime;  
+  endTimeField.text = sEndTime;
+
+}
+
+
+
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="selectedTimeZone" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">413 40</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Current selected time zone</prop>
+     <prop name="en_US.utf8">Current selected time zone</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">413 40</prop>
+    <prop name="Size">80 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="startNowButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">343 9</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Set start date/time to now</prop>
+     <prop name="en_US.utf8">Set start date/time to now</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">343 9</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Now</prop>
+     <prop name="en_US.utf8">Now</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  time tNow;
+
+  tNow = getTimeZoneConformCurrentTime();
+
+  startDateField.text = formatTime(&quot;%d/%m/%Y&quot;, tNow);
+  startTimeField.text = formatTime(&quot;%H:%M:%S&quot;, tNow); 
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="endNowButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">343 39</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Set end date/time to now</prop>
+     <prop name="en_US.utf8">Set end date/time to now</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">343 39</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Now</prop>
+     <prop name="en_US.utf8">Now</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  time tNow;
+
+  tNow = getTimeZoneConformCurrentTime();
+
+  endDateField.text = formatTime(&quot;%d/%m/%Y&quot;, tNow);
+  endTimeField.text = formatTime(&quot;%H:%M:%S&quot;, tNow);
+
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="startDateChooserButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">297 9</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Open date/time chooser</prop>
+     <prop name="en_US.utf8">Open date/time chooser</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">297 9</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Calendar_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string dsDateTime;
+  string sSelectedDate;
+
+  busyBackground.visible(TRUE);
+  
+  sSelectedDate = startDateField.text + &quot; &quot; + startTimeField.text;
+  dsDateTime = showDateTimeChooser(sSelectedDate);
+  if(dynlen(dsDateTime) == 2)
+  {
+    startDateField.text = dsDateTime[1];
+    startTimeField.text = dsDateTime[2];
+  }
+  
+  busyBackground.visible(FALSE);
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="endDateChooserButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">297 38</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Open date/time chooser</prop>
+     <prop name="en_US.utf8">Open date/time chooser</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">297 38</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Calendar_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string dsDateTime;
+  string sSelectedDate;
+  
+  busyBackground.visible(TRUE);
+  
+  sSelectedDate = endDateField.text + &quot; &quot; + endTimeField.text;
+  dsDateTime = showDateTimeChooser(sSelectedDate);
+  if(dynlen(dsDateTime) == 2)
+  {
+    endDateField.text = dsDateTime[1];
+    endTimeField.text = dsDateTime[2];
+  }
+  
+  busyBackground.visible(FALSE);
+}
+
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="startTimeSpin" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">171 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">257 10</prop>
+    <prop name="Size">30 23</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">1439</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{  
+  int iHour, iMinute;
+  string sHour, sMinute;
+  int iTime = this.text();
+  
+  iHour = iTime / 60;
+  iMinute = iTime - (iHour * 60);
+  
+  // add leading 0
+  if(iHour &lt; 10)
+  {
+    sHour = &quot;0&quot; + iHour;
+  }
+  else
+  {
+    sHour = (string)iHour;
+  }
+  if(iMinute &lt; 10)
+  {
+    sMinute = &quot;0&quot; + iMinute;
+  }
+  else
+  {
+    sMinute = (string)iMinute;
+  }
+  
+  startTimeField.text(sHour + &quot;:&quot; + sMinute + &quot;:00&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="startDateButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">153 9</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Choose start date</prop>
+     <prop name="en_US.utf8">Choose start date</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">153 9</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Calendar_20.png</prop>
+    </prop>
+    <prop name="IsToggle">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  if(this.toggleState())
+  {
+    calendarChooser.visible(TRUE);
+    calendarChooser.showSelectedDate();
+    calendarChooser2.visible(FALSE);
+    endDateButton.toggleState(FALSE);
+    
+    busyBackground.visible(TRUE);   
+  }
+  else
+  {
+    calendarChooser.visible(FALSE);    
+    busyBackground.visible(FALSE);
+  }
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="endDateButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">153 38</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Choose end date</prop>
+     <prop name="en_US.utf8">Choose end date</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">153 38</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Calendar_20.png</prop>
+    </prop>
+    <prop name="IsToggle">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  if(this.toggleState())
+  {
+    calendarChooser2.visible(TRUE);
+    calendarChooser2.showSelectedDate();
+    calendarChooser.visible(FALSE);
+    startDateButton.toggleState(FALSE);
+    
+    busyBackground.visible(TRUE);
+  }
+  else
+  {
+    calendarChooser2.visible(FALSE);    
+    busyBackground.visible(FALSE);
+  }
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="startTimeLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 14</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 14</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Start:</prop>
+     <prop name="en_US.utf8">Start:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="endTimeLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 44</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 44</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">End:</prop>
+     <prop name="en_US.utf8">End:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="startTimeField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">64 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Edit to change time</prop>
+     <prop name="en_US.utf8">Edit to change time</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 10</prop>
+    <prop name="Size">70 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  if(fwGeneral_hasCorrectTimeFormat(newText))
+  {
+    this.backCol(&quot;_Window&quot;);
+    setTimeToSpinButton(newText, &quot;START&quot;);
+  }
+  else
+  {
+    this.backCol(&quot;FwBackgroundUserAttention&quot;);
+  }
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="startDateField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Edit to change date</prop>
+     <prop name="en_US.utf8">Edit to change date</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 10</prop>
+    <prop name="Size">100 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  if(fwGeneral_hasCorrectDateFormat(newText))
+  {
+    this.backCol(&quot;_Window&quot;);
+  }
+  else
+  {
+    this.backCol(&quot;FwBackgroundUserAttention&quot;);
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="endDateField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Edit to change date</prop>
+     <prop name="en_US.utf8">Edit to change date</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 40</prop>
+    <prop name="Size">100 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  if(fwGeneral_hasCorrectDateFormat(newText))
+  {
+    this.backCol(&quot;_Window&quot;);
+  }
+  else
+  {
+    this.backCol(&quot;FwBackgroundUserAttention&quot;);
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="endTimeSpin" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">78 210</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">257 40</prop>
+    <prop name="Size">30 23</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">1439</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{  
+  int iHour, iMinute;
+  string sHour, sMinute;
+  int iTime = this.text();
+  
+  iHour = iTime / 60;
+  iMinute = iTime - (iHour * 60);
+  
+  // add leading 0
+  if(iHour &lt; 10)
+  {
+    sHour = &quot;0&quot; + iHour;
+  }
+  else
+  {
+    sHour = (string)iHour;
+  }
+  if(iMinute &lt; 10)
+  {
+    sMinute = &quot;0&quot; + iMinute;
+  }
+  else
+  {
+    sMinute = (string)iMinute;
+  }
+  
+  endTimeField.text(sHour + &quot;:&quot; + sMinute + &quot;:00&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="endTimeField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">48 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Edit to change time</prop>
+     <prop name="en_US.utf8">Edit to change time</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 40</prop>
+    <prop name="Size">70 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  if(fwGeneral_hasCorrectTimeFormat(newText))
+  {
+    this.backCol(&quot;_Window&quot;);
+    setTimeToSpinButton(newText, &quot;END&quot;);
+  }
+  else
+  {
+    this.backCol(&quot;FwBackgroundUserAttention&quot;);
+  }
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="dateTimeSeparator" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">184 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">189 10</prop>
+    <prop name="End">189 63</prop>
+   </properties>
+  </shape>
+  <shape Name="busyBackground" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{0,0,0,148}</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">15 15</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Button used as background pane</prop>
+     <prop name="en_US.utf8">Button used as background pane</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  startDateButton.toggleState(FALSE);
+  endDateButton.toggleState(FALSE);
+  calendarChooser.visible(FALSE);
+  calendarChooser2.visible(FALSE);
+  busyBackground.visible(FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="calendarChooser" shapeType="Calendar" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 80</prop>
+    <prop name="Size">325 200</prop>
+    <extended>
+     <prop type="ENUM" name="firstDayOfWeek">1</prop>
+     <script name="clicked" isEscaped="1"><![CDATA[clicked(time date)
+{
+  this.visible(FALSE);
+  startDateButton.toggleState(FALSE);
+  busyBackground.visible(FALSE);
+
+  startDateField.text = formatTime(&quot;%d/%m/%Y&quot;, date);
+}]]></script>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="calendarChooser2" shapeType="Calendar" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">350 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">350 80</prop>
+    <prop name="Size">325 200</prop>
+    <extended>
+     <prop type="ENUM" name="inputMethodHints">0</prop>
+     <prop type="ENUM" name="contextMenuPolicy">1</prop>
+     <prop type="ENUM" name="selectionMode">1</prop>
+     <prop type="ENUM" name="verticalHeaderFormat">1</prop>
+     <prop type="ENUM" name="layoutDirection">0</prop>
+     <prop type="ENUM" name="horizontalHeaderFormat">2</prop>
+     <prop type="ENUM" name="firstDayOfWeek">1</prop>
+     <script name="clicked" isEscaped="1"><![CDATA[clicked(time date)
+{
+  this.visible(FALSE);
+  endDateButton.toggleState(FALSE);
+  busyBackground.visible(FALSE);
+
+  endDateField.text = formatTime(&quot;%d/%m/%Y&quot;, date);
+}]]></script>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="timeZoneLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">413 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">413 20</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Time zone:</prop>
+     <prop name="en_US.utf8">Time zone:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="timeZoneShownField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">650 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">650 10</prop>
+    <prop name="Size">23 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="dateAndTimeShownField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">620 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">620 10</prop>
+    <prop name="Size">23 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

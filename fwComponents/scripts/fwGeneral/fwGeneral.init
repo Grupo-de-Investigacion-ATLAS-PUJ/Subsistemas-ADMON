@@ -1,0 +1,222 @@
+main()
+{
+	fwInstallation_throw("fwGeneral.init: Start","INFO");
+	Cleanup();
+
+	bool ok=SetupDefaultUsernameInConfigFile();
+	if(!ok) fwInstallation_throw("fwGeneral.init: default username/password still not set in the config file. Please fix manually to avoid problems with Fw panels","ERROR");
+
+	ok=CheckDisableMXProxyInConfigFile();
+	if(!ok) fwInstallation_throw("fwGeneral.init: could not disable mxProxy in the config file. Please fix manually to avoid problems with dist connections to 3.11 projects","ERROR");
+
+	CreateCtrlDbgDatapoints("CTRL");
+	CreateCtrlDbgDatapoints("UI");
+
+	fwInstallation_throw("fwGeneral.init: Finished","INFO");
+}
+
+void Cleanup()
+{
+  fwInstallation_cleanupObsoleteFiles("fwGeneral", makeDynString("bin/fwLinuxSetup.bashrc"));
+  
+  // remove the following in directory-recursive way
+  fwInstallation_cleanupObsoleteFiles("fwGeneral",
+                                        makeDynString("data/fwGeneral/fwWebBrowser/pdfjs",
+                                                      "panels/fwGeneral/fwTabView.pnl",   // FWCORE-3382, moved to fwViewer
+                                                      "panels/fwGeneral/fwWebBrowser.pnl",
+                                                      "panels/fwGeneral/fwExceptionHandle.pnl",   // moved to fwStdLib
+                                                      "panels/examples/fwGeneral/fwWebBrowserExamples.pnl", // FWCORE-3512 cleanup
+                                                      "panels/objects/fwGeneral/fwWebBrowser.pnl",
+                                                      "panels/objects_parampanels/fwGeneral/fwWebBrowser_param.pnl",
+                                                      "scripts/libs/fwGeneral/fwExceptionDeprecated.ctl"
+                                        ),
+                                     true);
+
+  
+  // for safety, remove parent folders without recursion - would signal problem if there is any content left
+  fwInstallation_cleanupObsoleteFiles("fwGeneral", makeDynString("data/fwGeneral/fwWebBrowser",
+                                                                 "data/fwGeneral")
+                                     );
+  // old location of help files
+  fwInstallation_cleanupObsoleteFiles("fwGeneral", makeDynString("help/en_US.iso88591/fwGeneral"),true);
+  // and deprecated msg files
+  fwInstallation_cleanupObsoleteFiles("fwGeneral", makeDynString("msg/en_US.iso88591/fwGeneral.cat",
+                                                                 "msg/en_US.iso88591/fwException.cat"));
+  // old deprecated test file:
+  fwInstallation_cleanupObsoleteFiles("fwGeneral", makeDynString("scripts/libs/test/fwGeneral/test_fwGeneral_getDynDpeTypes.ctl"));
+
+  // we do not distribute the HTML help files anymore
+  fwInstallation_cleanupObsoleteFiles("fwGeneral", makeDynString("help/en_US.utf8/fwGeneral/panels"),true);
+  fwInstallation_cleanupObsoleteFiles("fwGeneral", makeDynString("help/en_US.utf8/fwGeneral/scripts"),true);
+  fwInstallation_cleanupObsoleteFiles("fwGeneral", makeDynString("help/en_US.utf8/fwGeneral.htm"));
+}
+
+
+void CreateCtrlDbgDatapoints(string whichManager)
+{
+	fwInstallation_throw("fwGeneral.init script: check/create missing CtrlDebug datapoints for "+whichManager,"INFO");
+	for (int i=1;i<=99;i++) {
+	    string ctrlDbgDP="_CtrlDebug_"+whichManager+"_"+i;
+	    if (!dpExists(ctrlDbgDP)) {
+		dpCreate(ctrlDbgDP,"_CtrlDebug");
+		dyn_errClass err=getLastError();
+		if (dynlen(err)){
+		    fwInstallation_throw("fwGeneral.init script: Could not create datapoint "+ctrlDbgDP,"ERROR");
+		    break;
+		}
+	    }
+	}
+}
+
+bool SetupDefaultUsernameInConfigFile()
+{
+    int result;
+    bool applyModification=false;
+    string userName, password;
+
+    dyn_string candidateUsernames=makeDynString("root","monitor","operator");
+    dyn_string candidatePasswords=makeDynString("","","");
+
+
+    fwInstallation_throw("fwGeneral.init: Checking if default username in the project config file is defined","INFO");
+    dyn_string dsConfig;
+    result=fwInstallation_getSection("general", dsConfig);
+    if (result < 0) {
+	fwInstallation_throw("fwGeneral.init: could not get the [general] section of the config file","ERROR");
+	return false;
+    }
+
+
+
+    // note that due to FWCORE-3293 we might have gotten the "username" keyword, ie. with improper spelling; 
+    // as well as its corresponding "password" keyword, *IN ADDITION* to the "userName"
+    dyn_string foundWrongSpellings = dynPatternMatch("username*",dsConfig);
+    bool needCorrectWrongKeyword=false;
+    if (dynlen(foundWrongSpellings)) {
+	fwInstallation_throw("fwGeneral.init: Will remove the \"username\" keyword with wrond spelling","INFO");
+	int idx=dynContains(dsConfig,foundWrongSpellings[1]);
+	if (idx>0) {
+	    dynRemove(dsConfig,idx);
+	    needCorrectWrongKeyword=true;
+	}
+	// now also check if the next line contains "password=" thing, and remove if necessary
+	// yet be careful not to remove the other "password" line!
+	// the one we should remove should be exactly where the "username" was a moment ago
+	if (patternMatch("password*",dsConfig[idx])) {
+	    dynRemove(dsConfig,idx);
+	}
+    }
+
+
+    dyn_string foundUserNames = dynPatternMatch("userName*",dsConfig);
+    dyn_string foundPasswords = dynPatternMatch("password*",dsConfig);
+    if (dynlen(foundUserNames)) {
+	if (dynlen(foundPasswords)<1) {
+	    fwInstallation_throw("fwGeneral.init: found default username in the config file, yet no password.","WARNING");
+	    return false;
+	} else {
+	    fwInstallation_throw("fwGeneral.init: OK: found default username in the config file:("+foundUserNames[1]+")","INFO");
+	    if (needCorrectWrongKeyword) {
+		result = fwInstallation_setSection("general", dsConfig);
+		if (result < 0) {
+		    fwInstallation_throw("fwGeneral.init: could not correct the [general] section of the config file","ERROR");
+		    return false;
+		}
+	    }
+	    return true;
+	}
+    }
+
+    fwInstallation_throw("fwGeneral.init: default username in the config file not found","INFO");
+
+    // determine which username to use
+    for (int i=1;i<=dynlen(candidateUsernames);i++) {
+	unsigned uid=getUserId(candidateUsernames[i]);
+	// check that password is OK
+	if (uid!=DEFAULT_USERID) {
+	    bool ok=checkPassword(uid,candidatePasswords[i]);
+	    if (ok) {
+		userName=candidateUsernames[i];
+		password=candidatePasswords[i];
+		break;
+	    } else {
+		fwInstallation_throw("fwGeneral.init: username not suitable for being set as default in the config file:"+candidateUsernames[i],"INFO");
+	    }
+	} else {
+	    fwInstallation_throw("fwGeneral.init: username not suitable for being set as default in the config file:"+candidateUsernames[i],"INFO");
+	}
+    }
+
+    if (userName=="") {
+	fwInstallation_throw("fwGeneral.init: Cannot propose a default username/password for the config file.","WARNING");
+	applyModification=false;
+	return false;
+    }
+
+
+    if (myManType() == UI_MAN) {
+	dyn_string ds;
+	dyn_float df;
+	ChildPanelOnCentralReturn("fwInstallation/fwInstallation_messageInfo3", 
+					"Warning", 
+					makeDynString("$1:Default username not set in config file\n"+
+					             "Do you want to set it to "+userName+"?\n"+
+					             "More info at icecontrols.support"),
+					df, ds);
+	if (dynlen(df) && df[1]>=1) applyModification=true;
+		    
+    } else {
+	// non-UI case. We force-do it
+	applyModification=true;
+    }
+
+    if (applyModification) {
+	fwInstallation_throw("fwGeneral.init: setting default username("+userName+") and password in the config file","INFO");
+	dynAppend(dsConfig,"userName=\""+userName+"\"");
+	dynAppend(dsConfig,"password=\""+password+"\"");
+	result = fwInstallation_setSection("general", dsConfig);
+	if (result < 0) {
+	    fwInstallation_throw("fwGeneral.init: could not set the [general] section of the config file","ERROR");
+	    return false;
+	}
+	return true;
+    
+    } else if (needCorrectWrongKeyword) {
+	// changes already prepared above; apply them
+	result = fwInstallation_setSection("general", dsConfig);
+	if (result < 0) {
+	    fwInstallation_throw("fwGeneral.init: could not correct the [general] section of the config file","ERROR");
+	    return false;
+	}
+    }
+
+    return false;
+
+}
+
+bool CheckDisableMXProxyInConfigFile()
+{
+
+    dyn_string dsConfig;
+    int result=fwInstallation_getSection("general", dsConfig);
+    if (result < 0) {
+	fwInstallation_throw("fwGeneral.init: could not get the [general] section of the config file","ERROR");
+	return false;
+    }
+
+    dyn_string foundMxProxyLine = dynPatternMatch("mxProxy*",dsConfig);
+
+    if (dynlen(foundMxProxyLine)) return true;// line already there; no need to do anything
+
+    fwInstallation_throw("fwGeneral.init: disabling mxProxy in the config file","INFO");
+    dynAppend(dsConfig,"mxProxy = \"none\"");
+
+    result = fwInstallation_setSection("general", dsConfig);
+    if (result < 0) {
+	fwInstallation_throw("fwGeneral.init: could not set the [general] section of the config file","ERROR");
+	return false;
+    }
+
+    return true;
+
+}

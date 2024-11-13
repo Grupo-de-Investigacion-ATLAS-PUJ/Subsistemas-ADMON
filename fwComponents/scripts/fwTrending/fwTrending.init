@@ -1,0 +1,32 @@
+main()
+{
+  int iCount;
+  string sFwTrendingVersion;
+
+
+  DebugN("fwTrending: initialization script");
+
+  // check is the component is not already installed, i.e. if this is not an upgrade
+  if( !fwInstallation_isComponentInstalled("fwTrending", sFwTrendingVersion) )
+  {
+	DebugN("fwTrending: Detected fresh installation of fwTrending. Flagging post-install job to import DPs for runnning.");
+
+    // wait if DPs are not yet available
+    iCount = 0;
+    while( (!dpExists("FwTrendingPlotInfo.type") && (iCount <= 10)) )
+    {
+      delay(1);
+      iCount++;
+    }
+
+	// Config FwTrendingPlotInfo.type:_general.._string_01 holds info whether this is a fresh install or not
+
+    dpSetWait("FwTrendingPlotInfo.type:_general.._type", DPCONFIG_GENERAL); /*set the config to hold the fresh install info*/
+	dpSetWait("FwTrendingPlotInfo.type:_general.._string_01", "FreshInstall");
+  }
+  else
+  {
+    DebugN("fwTrending: Detected existing installation of fwTrending --> this is an upgrade.");
+  }
+}
+

@@ -1,0 +1,569 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">selectionList</prop>
+  </prop>
+  <prop name="Size">168 213</prop>
+  <prop name="BackColor">_Transparent</prop>
+  <prop name="RefPoint">19.99999999999999 30</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">106.9473684210526</prop>
+  <prop name="PDPI">106.9473684210526</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">4</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;classes/fwStdLib/FwException.ctl&quot;
+
+#event itemSelected(mixed selectedKey)
+#event itemDblClicked(mixed selectedKey)
+#event itemRightClicked(mixed selectedKey)
+
+#property string title
+#property color bgColor
+#property color fgColor
+#property color listColor
+#property bool legendVisible
+
+public string getSelectedKey()
+{
+	dyn_int selLines = TheTable.getSelectedLines();
+	mixed selectedKey=&quot;&quot;; // marker for unselection...
+	if (!selLines.isEmpty()) {
+		dyn_mixed line = TheTable.getLineN(selLines.first());
+		selectedKey=line[1];
+	}
+	return selectedKey;
+}
+
+public string getSelectedText()
+{
+	dyn_int selLines = TheTable.getSelectedLines();
+	mixed selectedKey=&quot;&quot;; // marker for unselection...
+	if (!selLines.isEmpty()) {
+		dyn_mixed line = TheTable.getLineN(selLines.first());
+		selectedKey=line[2];
+	}
+	return selectedKey;
+}
+
+public void selectByKey(mixed key)
+{
+	dyn_string columnKeys=TheTable.getColumnN(0);
+	int idx = columnKeys.indexOf(key);
+	if (idx&gt;=0) {
+		TheTable.selectLineN(idx);
+		TheTable.lineVisible(idx);
+	} else {
+			TheTable.selectLineN(-1);
+			TheTable.lineVisible(0);
+	}
+	updateLegend();
+}
+
+void updateLegend()
+{
+	 int nItems=TheTable.lineCount;
+		string selText=getSelectedText();
+		string filterText=TheFilter.text;
+		string txt = nItems+&quot; items;&quot;;
+		if (selText==&quot;&quot;) txt+=&quot;nothing selected&quot;; else txt+=&quot;selected:&quot;+selText;
+		if (filterText!=&quot;&quot;) txt+=&quot;;Filter:&quot;+filterText;
+		TheLegend.text=txt;
+}
+
+public void setData(mixed data)
+{
+  switch(getTypeName(data)) {
+    case &quot;dyn_string&quot;: setDataWithDynString(data);break;
+    case &quot;mapping&quot;: setDataWithMapping(data);break;
+    default: FwException::raise(&quot;FwSelectionList::setData unsupported data type &quot;+getTypeName(data));
+  }
+}
+
+public void setDataWithDynString(dyn_string data)
+{
+  // preserve the currently selected key
+  mixed previouslySelected=getSelectedKey();
+
+  TheTable.deleteAllLines();
+  dyn_string valsCaps;
+  for (int i=0; i&lt;data.count(); i++) {
+      valsCaps.append(data.at(i));
+  }
+
+  TheTable.appendLines(data.count(), &quot;KEY&quot;, data, &quot;VALUE&quot;, data, &quot;_VALUECAPS&quot;, valsCaps);
+  TheTable.sort(&quot;VALUE&quot;);
+  TheTable.adjustColumn(1);
+
+  TheFilter.text=&quot;&quot;; // clear the filter
+  selectByKey(previouslySelected);
+  updateLegend();
+}
+
+public void setDataWithMapping(mapping data)
+{
+  // preserve the currently selected key
+  mixed previouslySelected=getSelectedKey();
+
+  TheTable.deleteAllLines();
+  dyn_mixed keys=mappingKeys(data);
+  dyn_string vals, valsCaps;
+  for (int i=0; i&lt;data.count(); i++) {
+      vals.append(data.valueAt(i));
+      valsCaps.append(strtoupper(data.valueAt(i)));
+  }
+
+  TheTable.appendLines(data.count(), &quot;KEY&quot;, keys, &quot;VALUE&quot;, vals, &quot;_VALUECAPS&quot;, valsCaps);
+  TheTable.sort(&quot;VALUE&quot;);
+  TheTable.adjustColumn(1);
+
+
+  TheFilter.text=&quot;&quot;; // clear the filter
+  selectByKey(previouslySelected);
+  updateLegend();
+}
+
+public synchronized void   setTitle(string title) 	{ Title.text=title; Title.visible=((title!=&quot;&quot;) &amp;&amp; (title!=&quot;Title&quot;));}
+public string getTitle() 				{ return Title.text;}
+
+public void   setBgColor(string color) { BackgroundRect.backCol=color; TheFilter.backCol=color; }
+public string getBgColor()             { return BackgroundRect.backCol;}
+public void   setFgColor(string color) { TheTable.foreCol=color; TheFilter.foreCol=color;}
+public string getFgColor()             { return TheTable.foreCol;}
+public void   setListColor(string color) { TheTable.backCol=color; }
+public string getListColor()             { return TheTable.backCol;}
+public void   setLegendVisible(bool b)
+{
+    TheLegend.visible=b;
+    if (!b) TheFilter.visible=false;
+    UnselectButton.visible=b;
+    FilterButton.visible=b;
+}
+public bool   getLegendVisible() { return UnselectButton.visible;}
+
+
+void filterChanged(string txt)
+{
+	dyn_int selLines = TheTable.getSelectedLines(); // selected lines before filtering
+	string filterText=strtoupper(txt);
+	if (txt==&quot;&quot;) filterText=&quot;*&quot;;
+	if (!filterText.startsWith(&quot;*&quot;)) filterText=&quot;*&quot;+filterText;
+	if (!filterText.endsWith(&quot;*&quot;))   filterText=filterText+&quot;*&quot;;
+	TheFilter.toolTipText=&quot;Filter:&quot;+filterText;
+	TheFilter.backCol = (filterText==&quot;*&quot;)? &quot;_Window&quot;:&quot;FwAlarmWarnAck&quot;;
+	FilterButton.backCol= (filterText==&quot;*&quot;)? &quot;_Button&quot;:&quot;FwAlarmWarnAck&quot;;
+	TheTable.filterRows(makeDynString(&quot;_VALUECAPS&quot;),makeDynString(filterText),true);
+	if (selLines.count()&gt;0) {
+		// disable the selection if it is not visible anymore...
+		if (TheTable.isRowHidden(selLines.first())) {
+			TheTable.selectLineN(-1);
+		} else {
+		// or make sure that the selected one is visible in the list
+			delay(0,100); // need the view to stabilize...
+			TheTable.lineVisible(selLines.first());
+		}
+	}
+		updateLegend();
+}
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="BackgroundRect" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 340</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="TransparentForMouseInGedi">True</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[none,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.6086183438084188 0 0 0.6424242424242578 0 -6.424242424242578</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">0 340</prop>
+    <prop name="Size">275.3919924512884 -331</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="TheTable" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{148,148,148,32}</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">50 -1</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Liberation Sans,-1,16,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">1 30</prop>
+    <prop name="Size">166 131</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">KEY</prop>
+     <prop name="Width">20</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">VALUE</prop>
+     <prop name="Width">500</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8"> [Sort]</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">_VALUECAPS</prop>
+     <prop name="Width">0</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="SelectionChanged" isEscaped="1"><![CDATA[synchronized main()
+{
+	triggerEvent(&quot;itemSelected&quot;,getSelectedKey());
+	updateLegend();
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	this.tableMode=TABLE_SELECT_BROWSE;
+	this.selectByClick=TABLE_SELECT_LINE;
+    this.blankNonExistingRows=true;
+	this.columnStretchable(1,true);
+	this.columnStretchable(0,false);
+}
+]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[main(int row, string column)
+{
+	dyn_string line=this.getLineN(row);
+	mixed objectKey=line.at(0);
+	triggerEvent(&quot;itemDblClicked&quot;,objectKey);
+}]]></script>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+	dyn_string line=this.getLineN(row);
+	mixed objectKey=line.at(0);
+	triggerEvent(&quot;itemRightClicked&quot;,objectKey);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="layoutAlignment">AlignLeading|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">4.48428609544757 0 0 1.000000000000009 -86.90287162700778 -7.000000000000087</prop>
+    <prop name="Location">20 10</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,16,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Title</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	if (this.text==&quot;Title&quot;) self.setTitle(&quot;&quot;);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="UnselectButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">151 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Unselect (Ctrl-U)</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+U</prop>
+    <prop name="maximumSize">14 14</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Liberation Sans,-1,10,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">151 167</prop>
+    <prop name="Size">14 14</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">U</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  TheTable.selectLineN(-1);
+		updateLegend();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="FilterButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">147 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Filter (Ctrl-F)</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+F</prop>
+    <prop name="maximumSize">14 14</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Liberation Sans,-1,10,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">136 167</prop>
+    <prop name="Size">14 14</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">F</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  TheFilter.visible=!TheFilter.visible;
+		if (TheFilter.visible) {
+			setInputFocus(myModuleName(),myPanelName(),TheFilter.name);
+		} else {
+			setInputFocus(myModuleName(),myPanelName(),TheTable.name);
+		}
+		updateLegend();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="TheLegend" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">5 169</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">5 169</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Liberation Sans,-1,10,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">0 items</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">44 167</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">44 167</prop>
+    <prop name="Size">91 17</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="TheFilter" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">3 189</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">3 185</prop>
+    <prop name="Size">162 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  	filterChanged(newText);
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="1" Name="LAYOUT_GROUP8" serial="0">
+   <properties>
+    <prop idx="0" name="shapeSerial">9</prop>
+    <prop idx="1" name="shapeSerial">10</prop>
+    <prop idx="2" name="shapeSerial">8</prop>
+    <prop idx="3" name="shapeSerial">7</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutSpacing">1</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="2" Name="LAYOUT_GROUP12" serial="1">
+   <properties>
+    <prop idx="1" name="shapeSerial">11</prop>
+    <prop idx="0" name="groupSerial">0</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">2</prop>
+    <prop name="layoutRightMargin">2</prop>
+    <prop name="layoutTopMargin">2</prop>
+    <prop name="layoutBottomMargin">2</prop>
+    <prop name="layoutSpacing">1</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP13" serial="2">
+   <properties>
+    <prop name="shapeSerial">6</prop>
+    <prop idx="1" name="shapeSerial">0</prop>
+    <prop idx="0" name="shapeSerial">2</prop>
+    <prop idx="2" name="groupSerial">1</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">0</prop>
+    <prop name="layoutRightMargin">0</prop>
+    <prop name="layoutTopMargin">0</prop>
+    <prop name="layoutBottomMargin">0</prop>
+    <prop name="layoutSpacing">4</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

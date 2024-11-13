@@ -1,0 +1,659 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">685 450</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[// ------------------------------------- ScopeLib -------------------------------------------------
+
+// Constants to access the columns in the tables
+int CONFIG_COLUMN		  = 1;
+int ELEMENT_COLUMN		= 2;
+int DIRECTION_COLUMN	= 3;
+int ITEM_COLUMN			  = 4;
+int MODE_COLUMN			  = 5;
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Loads all necessary information to be shown in the table and populates the table with it.
+*/
+void initialiseTable()
+{
+	int iConfigType;
+	string sConfig, sDeviceModel, sDefinitionDp, sLabel;
+	dyn_bool dbAdressAllowed, dbDefaultsAllowed;
+	dyn_int diModes;
+	dyn_string dsElements, dsAddressParameters, exceptionInfo;
+  
+  elementTable.tableMode(TABLE_SELECT_MULTIPLE); 
+	elementTable.selectByClick(TABLE_SELECT_LINE);
+  
+  elementTable.deleteAllLines();
+	
+	fwDevice_canHaveDefaults(makeDynString($sDpName), dbDefaultsAllowed, exceptionInfo);
+	fwDevice_getDefinitionDp(makeDynString($sDpName), sDefinitionDp, exceptionInfo);
+
+	if(dbDefaultsAllowed[fwDEVICE_DEFAULT_CONFIGS])
+	{
+		fwDevice_getModel(makeDynString($sDpName), sDeviceModel, exceptionInfo);
+		fwDevice_getAddressDefaultParams(dpTypeName($sDpName), dsAddressParameters, exceptionInfo, sDeviceModel);
+		// skip the error on empty default address...
+		if ( (dynlen(exceptionInfo)&gt;=2) &amp;&amp; (strpos(exceptionInfo[2],&quot;Default address type is undefined in Device Definition&quot;)==0) ) dynClear(exceptionInfo);
+
+		if (dynlen(exceptionInfo)) {fwExceptionHandling_display(exceptionInfo); return;}		
+		
+		if (dsAddressParameters[fwDevice_ADDRESS_TYPE] != fwDevice_ADDRESS_NONE) {
+			dpGet(sDefinitionDp + &quot;.configuration.address.&quot; + dsAddressParameters[fwDevice_ADDRESS_TYPE] + &quot;.direction&quot;, diModes);
+		}
+	}
+		
+	dpGet(sDefinitionDp + &quot;.properties.dpes&quot;, dsElements,	
+			  sDefinitionDp + &quot;.configuration.address.canHave&quot;, dbAdressAllowed);
+
+	for (int elementIndex = 1; elementIndex &lt;= dynlen(dsElements); elementIndex++)
+	{
+		if(dbAdressAllowed[elementIndex])
+		{
+			dpGet($sDpName + dsElements[elementIndex] + &quot;:_address.._type&quot;, iConfigType);
+
+			if(iConfigType == DPCONFIG_NONE)
+      {
+				sConfig = &quot;No&quot;;
+      }
+			else
+      {
+				sConfig = &quot;Yes&quot;;
+      }
+						
+			if(dynlen(diModes) &lt; elementIndex)
+      {
+				diModes[elementIndex] = fwDevice_DPCONFIG_NONE;
+      }
+			
+			fwDevice_getAddressModeLabel(diModes[elementIndex], sLabel, exceptionInfo);
+			
+			elementTable.appendLine(&quot;config&quot;, sConfig, 
+								              &quot;element&quot;, dsElements[elementIndex],    
+								              &quot;direction&quot;, sLabel);
+		}
+	}
+	
+	elementTable.lineVisible(0);
+	
+	enableApplyButtons(TRUE);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Everythime the address of a DPE was altered, the information in the table needs to be updated.
+
+@param [in] sTableName       string, name of the table shape
+@param [in] iRow             int, number of the current row
+@param [in] sDpe             string, DPE name
+*/
+void updateRow(string sTableName, int iRow, string sDpe)
+{
+	int iConfigType;
+	
+	dpGet(sDpe + &quot;:_address.._type&quot;, iConfigType);					
+
+	if(iConfigType == DPCONFIG_NONE)
+  {
+		setValue(sTableName, &quot;cellValueRC&quot;, iRow, &quot;config&quot;, &quot;No&quot;);
+  }
+	else
+  {
+		setValue(sTableName, &quot;cellValueRC&quot;, iRow, &quot;config&quot;, &quot;Yes&quot;);
+  }
+			
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Shows modal dialog allowing the user to change address information for the selected DPE.
+
+@param [in] iRow             int, number of the current row
+@param [in] sColumnName      string, name of the current column
+@param [in] sValue           string, value of the current cell
+*/
+void configureElementAddress(int iRow, string sColumnName, string sValue)
+{
+	dyn_float dfReturn;
+	dyn_string dsReturn, exceptionInfo;
+  string sPanelName = &quot;fwConfigs/fwPeriphAddressPopup.pnl&quot;;
+
+	if (sColumnName == &quot;element&quot;)
+	{
+		if(getPath(PANELS_REL_PATH, sPanelName) != &quot;&quot;)
+		{
+			ChildPanelOnCentralModalReturn(sPanelName,
+										                 &quot;Peripheral Address Configuration for &quot; + $sDpName + sValue,
+										                 makeDynString(&quot;$sDpName:&quot; + $sDpName,
+														                       &quot;$sDpe:&quot; + $sDpName + sValue,
+														                       &quot;$dsAddressTypes:&quot;),
+                										 dfReturn, dsReturn);
+									
+		  updateRow(&quot;elementTable&quot;, iRow, $sDpName + sValue);
+		}
+    else
+    {     
+      fwException_raise(exceptionInfo, &quot;WARNING&quot;, &quot;The panel \&quot;&quot; + sPanelName + &quot;\&quot; could not be found.&quot;, &quot;&quot;);
+			fwExceptionHandling_display(exceptionInfo);
+    }	
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Sets the address for the selected dpes (or all dpes).
+
+@param [in] sReferenceName   string, the string to be prepared
+*/
+void setAddress(string sSelection)
+{
+	dyn_int diLines;
+	dyn_float dfReturn;
+	dyn_string dsAddressParameters, dsDpes, dsRow, exceptionInfo;
+
+	enableApplyButtons(FALSE);
+
+	// get which lines to work on 	
+	if(sSelection == fwDevice_ADDRESS_DPES_ALL)
+	{
+		for(int elementIndex = 1; elementIndex &lt;= elementTable.lineCount(); elementIndex++)
+		{
+			diLines[elementIndex] = elementIndex - 1;
+		}	
+	}
+	else
+	{
+		diLines = elementTable.getSelectedLines();
+	}
+	
+	// if no lines were selected raise an exception an return
+	if(dynlen(diLines) &lt; 1)
+	{
+		fwException_raise(	exceptionInfo, 
+							&quot;WARNING&quot;, 
+							&quot;Select at least one element.&quot;,
+							&quot;&quot;);
+		fwExceptionHandling_display(exceptionInfo);
+		enableApplyButtons(TRUE);
+		return;
+	}
+	
+	// get list of selected dpes	
+	for(int lineIndex = 1; lineIndex &lt;= dynlen(diLines); lineIndex++)
+	{
+		dsRow = elementTable.getLineN(diLines[lineIndex]);
+		dsDpes[lineIndex] = dsRow[ELEMENT_COLUMN];
+	}	
+
+	ChildPanelOnCentralModalReturn(	&quot;fwDevice/fwDeviceAddressCommonSettings.pnl&quot;,
+									&quot;Choose the address common settings for all elements&quot;,
+									makeDynString(&quot;$sDpName:&quot; + $sDpName),
+									dfReturn, dsAddressParameters);
+							
+	// check if operation was cancelled
+	if(dynlen(dsAddressParameters) == 0)
+	{
+		enableApplyButtons(TRUE);
+		return;
+	}
+
+	string itemPrefix;
+	if (dynlen(dsAddressParameters)&gt;=fwDevice_ADDRESS_ROOT_NAME) itemPrefix=dsAddressParameters[fwDevice_ADDRESS_ROOT_NAME];
+	
+	fwOpenProgressBar(&quot;Address configuration&quot;, &quot;Setting addresses...&quot;, 1, 10);
+	
+	fwDevice_setAddress($sDpName, dsAddressParameters, exceptionInfo, itemPrefix, dsDpes);
+	
+	// update table information
+	for(int k = 1; k &lt;= dynlen(diLines); k++)
+	{
+		updateRow(&quot;elementTable&quot;, diLines[k], $sDpName + dsDpes[k]);	
+	}
+
+	enableApplyButtons(TRUE);
+
+	if(dynlen(exceptionInfo) &gt; 0)
+	{
+		fwCloseProgressBar(&quot;There were problems setting the addresses.&quot;);
+		fwExceptionHandling_display(exceptionInfo);
+	}
+	else
+	{
+		fwCloseProgressBar(&quot;Addresses configured successfully.&quot;);
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Enables or disables the apply buttons.
+
+@param [in] bEnabled         bool, intended state of the buttons
+*/
+void enableApplyButtons(bool bEnabled)
+{
+	applySelectedButton.enabled(bEnabled);
+	applyAllButton.enabled(bEnabled);	
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Adjust action buttons depending on the context the panel is opened from.
+  
+@param [in] bEmbeddedPanel   bool, panel is embedded or stand-alone
+*/
+void showCloseButton(bool bEmbeddedPanel)
+{
+  if(bEmbeddedPanel)
+	{
+		closeButton.visible = FALSE;
+    positionApplyButtons();
+	}
+	else
+	{
+		closeButton.visible = TRUE;
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Re-positioning of some buttons is necessary depending on the context the panel is opened from.
+*/
+void positionApplyButtons()
+{
+  int xPos, yPos;
+	
+  getValue(&quot;applySelectedButton&quot;, &quot;position&quot;, xPos, yPos);
+  applySelectedButton.position(xPos+83, yPos);
+  getValue(&quot;applyAllButton&quot;, &quot;position&quot;, xPos, yPos);
+  applyAllButton.position(xPos+83, yPos);
+}
+
+// --------------------------------- End of ScopeLib ----------------------------------------------
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	dyn_bool dbDefaultsAllowed;
+	dyn_string exceptionInfo;
+  
+	initialiseTable();
+	
+	fwDevice_canHaveDefaults(makeDynString($sDpName), dbDefaultsAllowed, exceptionInfo);
+  enableApplyButtons(dbDefaultsAllowed[fwDEVICE_DEFAULT_CONFIGS]);
+  
+  if(isDollarDefined(&quot;$bHierarchyBrowser&quot;))
+	{
+    showCloseButton($bHierarchyBrowser);
+  }
+    
+  dpname.text = $sDpName;
+}
+
+
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">210</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">154</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">100</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">49</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Address Configuration</prop>
+     <prop name="en_US.iso88591">Address Configuration</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="applyAllButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">477 415</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">477 415</prop>
+    <prop name="Size">115 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Configure all ...</prop>
+     <prop name="en_US.iso88591">Configure all ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	setAddress(fwDevice_ADDRESS_DPES_ALL);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="applySelectedButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">189</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">320 415</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">128</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">320 415</prop>
+    <prop name="Size">150 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Configure selected ...</prop>
+     <prop name="en_US.iso88591">Configure selected ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	setAddress(&quot;&quot;);	
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="elementTable" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">203</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 73</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">139</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 73</prop>
+    <prop name="Size">665 332</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">config</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Configured</prop>
+      <prop name="en_US.iso88591">Configured</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">element</prop>
+     <prop name="Width">485</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Element</prop>
+      <prop name="en_US.iso88591">Element</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">direction</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Direction</prop>
+      <prop name="en_US.iso88591">Direction</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int iRow, string sColumnName, string value)
+{
+	configureElementAddress(iRow, sColumnName, value);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">205</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">584 420</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">140</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">600 415</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}
+]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="" referenceId="13">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">370 20</prop>
+    <prop name="Geometry">1 0 0 1 280 -18</prop>
+    <prop name="TabOrder">151</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwDevice/fwDeviceAddress</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="dpname" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">208</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">153</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Device name</prop>
+     <prop name="en_US.iso88591">Device name</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">665 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

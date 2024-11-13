@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">750 528</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">630 497</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+<events>
+	<script name="ScopeLib" isEscaped="1"><![CDATA[
+
+#uses &quot;fwElmb/fwElmbUtils.ctl&quot;
+		#uses &quot;fwElmb/fwElmbUtils.ctl&quot;
+	]]></script>
+</events>
+
+ <shapes>
+  <shape Name="PUSH_BUTTON1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">630 497</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">630 490</prop>
+    <prop name="Size">111 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Validate names</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[#uses &quot;fwElmb/fwElmbUtils.ctl&quot;
+
+main()
+{
+  dyn_dyn_string result;
+  fwElmbUtils_validateNames(result);
+  int l = dynlen(result);
+  TEXT_OUTPUT.plainText(&quot;&quot;);
+  TEXT_OUTPUT.append(&quot;Validation finished with &quot;+l+&quot; error messages&quot;);
+  for (int i=1; i&lt;=l; i++)
+  {
+    TEXT_OUTPUT.append(result[i][1]+&quot; &quot;+result[i][2]);
+  }
+
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="TEXT_OUTPUT" shapeType="TEXT_EDIT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Size">731 471</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

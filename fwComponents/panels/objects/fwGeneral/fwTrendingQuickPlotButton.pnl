@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">94 50</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName">objects_parampanels\fwTrending\fwTrendingDpeSelector.pnl</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="PlotOpenButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">2345 788</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,15,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,15,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">51 51</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">trendButton.bmp</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	int i, length;
+	string templateParameters;
+	dyn_string dpesList, dollarParameters, exceptionInfo;
+	dyn_dyn_string plotData;
+
+	fwTrending_getPlotExtended(&quot;_FwTrendingQuickPlotDefaults&quot;, &quot;&quot;, plotData, exceptionInfo, TRUE);
+	plotData[fwTrending_PLOT_OBJECT_TITLE][1] = &quot;TrendingPlot&quot;;
+	_fwTrending_convertPlotDataToDollars(plotData, dollarParameters, exceptionInfo);	
+
+	fwTrending_convertStringToDyn($sDpesToPlot, dpesList, exceptionInfo);
+	length = dynlen(dpesList);
+	for(i=1; i&lt;=fwTrending_MAX_NUM_CURVES; i++)
+	{
+		if(i&lt;=length)
+			templateParameters += &quot;dpe&quot; + i + &quot;=&quot; + dpesList[i] + &quot;,&quot;;
+		else
+			templateParameters += &quot;dpe&quot; + i + &quot;= ,&quot;;
+	}
+
+	dynAppend(dollarParameters, &quot;$sDpName:&quot;);
+	dynAppend(dollarParameters, &quot;$sRefName:&quot;);
+	dynAppend(dollarParameters, &quot;$templateParameters:&quot; + templateParameters);
+
+	ChildPanelOnCentral(fwTrending_PANEL_PLOT_ZOOMED, &quot;Trending Plot&quot;, dollarParameters);
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int result;
+
+	fwInstallation_componentInstalled(&quot;fwTrending&quot;, &quot;2.3.4&quot;, result);
+	if(result == 1)
+	{
+		this.toolTipText = &quot;Click to view the trend&quot;;
+		this.enabled = TRUE;
+	}
+	else
+	{
+		this.toolTipText = &quot;The fwTrending framework component is not installed.&quot;;
+		this.enabled = FALSE;
+	}
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

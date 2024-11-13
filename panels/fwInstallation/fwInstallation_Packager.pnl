@@ -1,0 +1,5681 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">JCOP Framework Installation Packager</prop>
+  </prop>
+  <prop name="Size">900 679</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">130 50</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">True</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwInstallation/fwInstallation.ctl&quot;
+
+// keys for component content mapping
+const string KEY_NAME = &quot;name&quot;;
+const string KEY_VERSION = &quot;version&quot;;
+const string KEY_DATE = &quot;date&quot;;
+const string KEY_SUBCOMP = &quot;isSubComponent&quot;;
+const string KEY_RESTART = &quot;noRestartRequired&quot;;
+const string KEY_REQUIRED = &quot;requiredComponents&quot;;
+const string KEY_PREINIT = &quot;preInitScriptsTable&quot;;
+const string KEY_INIT = &quot;initScript&quot;;
+const string KEY_DELETE = &quot;deleteScript&quot;;
+const string KEY_POSTINSTALL = &quot;postInstallScript&quot;;
+const string KEY_POSTDELETE = &quot;postDeleteScript&quot;;
+const string KEY_CONFIG = &quot;configFiles&quot;;
+const string KEY_DPLIST = &quot;asciiFiles&quot;;
+const string KEY_PANEL = &quot;panelFiles&quot;;
+const string KEY_SCRIPT = &quot;scriptFiles&quot;;
+const string KEY_LIBRARY = &quot;libraryFiles&quot;;
+const string KEY_OTHER = &quot;otherFiles&quot;;
+const string KEY_BIN = &quot;binFiles&quot;;
+const string KEY_HELP = &quot;helpFiles&quot;;
+const string KEY_PICTURE = &quot;pictureFiles&quot;;
+
+const string NAME_REQUEST_TEXT = &quot;Please provide a name ...&quot;;
+
+string g_sSlash;
+dyn_string g_dsXmlDescription;
+string g_sXmlFileContent;
+mapping g_mComponentContent;
+
+bool g_bEnforcePath = TRUE;
+bool g_bXmlLoaded = FALSE;
+bool g_bInit = TRUE;
+
+// ------------------------------------------------------------------------------------------------
+
+applySelection(int row, string column, string value)
+{
+  bool bSelected = !this.cellValueRC(row, &quot;inSelection&quot;);
+
+  this.cellValueRC(row, &quot;inSelection&quot;, bSelected);
+
+  setRowBackgroundColor(this.name, row, bSelected);
+
+  reloadButton.enabled(TRUE);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setRowBackgroundColor(string tableName, int row, bool bSelected)
+{
+  string columnName;
+  shape table = getShape(tableName);
+
+  for(int i = 0; i &lt; table.columnCount; i++)
+  {
+    columnName = table.columnName(i);
+
+    if(bSelected)
+    {
+      table.cellBackColRC(row, columnName, &quot;FwInstallationTableSelection&quot;);
+    }
+    else
+    {
+      table.cellBackColRC(row, columnName, &quot;_Window&quot;);
+    }
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+initPanel()
+{
+  dyn_string tempDynString, tempDynString2;
+  string tempString;
+  dyn_string projPaths;
+  string tempPath;
+  bool bEnabled = FALSE;
+  string sComponentName = componentName.text();
+
+  // wait for file system init
+  while(g_sSlash == &quot;&quot;)
+    delay(0,100);
+
+  // init table behaviour
+  requiredComponents.tableMode(TABLE_SELECT_BROWSE);
+  requiredComponents.selectByClick(TABLE_SELECT_LINE);
+  asciiFiles.tableMode(TABLE_SELECT_BROWSE);
+  asciiFiles.selectByClick(TABLE_SELECT_LINE);
+  libraryFiles.tableMode(TABLE_SELECT_BROWSE);
+  libraryFiles.selectByClick(TABLE_SELECT_LINE);
+  panelFiles.tableMode(TABLE_SELECT_BROWSE);
+  panelFiles.selectByClick(TABLE_SELECT_LINE);
+  scriptFiles.tableMode(TABLE_SELECT_BROWSE);
+  scriptFiles.selectByClick(TABLE_SELECT_LINE);
+  preInitScriptsTable.tableMode(TABLE_SELECT_BROWSE);
+  preInitScriptsTable.selectByClick(TABLE_SELECT_LINE);
+  initScript.tableMode(TABLE_SELECT_BROWSE);
+  initScript.selectByClick(TABLE_SELECT_LINE);
+  postInstallScript.tableMode(TABLE_SELECT_BROWSE);
+  postInstallScript.selectByClick(TABLE_SELECT_LINE);
+  deleteScript.tableMode(TABLE_SELECT_BROWSE);
+  deleteScript.selectByClick(TABLE_SELECT_LINE);
+  postDeleteScript.tableMode(TABLE_SELECT_BROWSE);
+  postDeleteScript.selectByClick(TABLE_SELECT_LINE);
+  helpFiles.tableMode(TABLE_SELECT_BROWSE);
+  helpFiles.selectByClick(TABLE_SELECT_LINE);
+  pictureFiles.tableMode(TABLE_SELECT_BROWSE);
+  pictureFiles.selectByClick(TABLE_SELECT_LINE);
+  binFiles.tableMode(TABLE_SELECT_BROWSE);
+  binFiles.selectByClick(TABLE_SELECT_LINE);
+  otherFiles.tableMode(TABLE_SELECT_BROWSE);
+  otherFiles.selectByClick(TABLE_SELECT_LINE);
+
+  // init sourcepath dropdown
+  fwInstallation_getProjPaths(projPaths);
+
+  if(strpos(projPaths[1], &quot;fwComponents&quot;) &gt;= 0) // Switch to have project path selected by default instead of component path
+  {
+    tempPath = projPaths[1];
+    projPaths[1] = projPaths[2];
+    projPaths[2] = tempPath;
+  }
+
+  sourcePath.items = projPaths;
+  currentDirectoryLabel.text = &quot;Current directory: &quot; + sourcePath.selectedText();
+
+  dynClear(tempDynString);
+
+  // panels
+  if(g_bEnforcePath)
+  {
+    dyn_string panelsDirs = makeDynString(&quot;&quot;, sComponentName,
+                                         &quot;objects&quot;, &quot;objects&quot; + g_sSlash + sComponentName,
+                                         &quot;fwFSMUser&quot;, &quot;fwFSMUser&quot; + g_sSlash + sComponentName);
+    dyn_string panelFilesExt = makeDynString(&quot;.pnl&quot;, &quot;.xml&quot;);
+    for(int i=1;i&lt;=dynlen(panelsDirs);i++){
+      dynAppendConst(tempDynString, getPanelFilesFromDir(panelsDirs[i], panelFilesExt));
+    }
+  }
+  else
+  {
+    dynAppendConst(tempDynString, getFiles(sourcePath.selectedText+g_sSlash + &quot;panels&quot;, &quot;*.pnl&quot;));
+    dynAppendConst(tempDynString, getFiles(sourcePath.selectedText+g_sSlash + &quot;panels&quot;, &quot;*.xml&quot;));
+  }
+  fillTable(KEY_PANEL, tempDynString);
+
+
+  // config files
+  tempDynString = getFileNames(sourcePath.selectedText+g_sSlash + &quot;config&quot;, sComponentName + &quot;.&quot; + &quot;config&quot;);
+  dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;config&quot;, sComponentName + &quot;.&quot; + &quot;config.windows&quot;));
+  dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;config&quot;, sComponentName + &quot;.&quot; + &quot;config.linux&quot;));
+  fillTable(KEY_CONFIG, tempDynString);
+  bEnabled = configFiles.lineCount &gt; 0;
+  newConfigButton.enabled(!bEnabled);
+  editConfigButton.enabled(bEnabled);
+  deleteConfigButton.enabled(bEnabled);
+
+  // installation/deletion scripts
+  tempDynString = getFileNames(sourcePath.selectedText+g_sSlash + &quot;config&quot;, &quot;*.preInit&quot;);
+  dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;scripts&quot;, &quot;*.preInit&quot;));
+  dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;scripts/&quot; + sComponentName, &quot;*.preInit&quot;));
+  fillTable(KEY_PREINIT, tempDynString);
+  bEnabled = preInitScriptsTable.lineCount &gt; 0;
+  preInitScriptEditButton.enabled(bEnabled);
+  preInitScriptDeleteButton.enabled(bEnabled);
+
+  tempDynString = getFileNames(sourcePath.selectedText+g_sSlash + &quot;config&quot;, &quot;*.init&quot;);
+  dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;scripts&quot;, &quot;*.init&quot;));
+  dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;scripts/&quot; + sComponentName, &quot;*.init&quot;));
+  fillTable(KEY_INIT, tempDynString);
+  bEnabled = initScript.lineCount &gt; 0;
+  initScriptEditButton.enabled(bEnabled);
+  initScriptDeleteButton.enabled(bEnabled);
+
+   tempDynString = getFileNames(sourcePath.selectedText+g_sSlash + &quot;config&quot;, &quot;*.postInstall&quot;);
+   dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;scripts&quot;, &quot;*.postInstall&quot;));
+   dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;scripts/&quot; + sComponentName, &quot;*.postInstall&quot;));
+  fillTable(KEY_POSTINSTALL, tempDynString);
+  bEnabled = postInstallScript.lineCount &gt; 0;
+  postInstallScriptEditButton.enabled(bEnabled);
+  postInstallScriptDeleteButton.enabled(bEnabled);
+
+  tempDynString = getFileNames(sourcePath.selectedText+g_sSlash + &quot;config&quot;, &quot;*.delete&quot;);
+  dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;scripts&quot;, &quot;*.delete&quot;));
+  dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;scripts/&quot; + sComponentName, &quot;*.delete&quot;));
+  fillTable(KEY_DELETE, tempDynString);
+  bEnabled = deleteScript.lineCount &gt; 0;
+  deleteScriptEditButton.enabled(bEnabled);
+  deleteScriptDeleteButton.enabled(bEnabled);
+
+  tempDynString = getFileNames(sourcePath.selectedText+g_sSlash + &quot;config&quot;, &quot;*.postDelete&quot;);
+  dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;scripts&quot;, &quot;*.postDelete&quot;));
+  dynAppend(tempDynString, getFileNames(sourcePath.selectedText+g_sSlash + &quot;scripts/&quot; + sComponentName, &quot;*.postDelete&quot;));
+  fillTable(KEY_POSTDELETE, tempDynString);
+  bEnabled = postDeleteScript.lineCount &gt; 0;
+  postDeleteScriptEditButton.enabled(bEnabled);
+  postDeleteScriptDeleteButton.enabled(bEnabled);
+
+
+  // required components
+  dynClear(tempDynString);
+  tempDynString2 = dpNames(&quot;fwInstallation_*&quot;, FW_INSTALLATION_DPT_COMPONENTS);
+    if(dynlen(tempDynString2) &gt; 0)
+      for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      {
+        dpGet(tempDynString2[i]+&quot;.componentVersionString&quot;, tempString);
+        strreplace(tempDynString2[i], getSystemName(), &quot;&quot;);
+        dynAppend(tempDynString, substr(tempDynString2[i], strpos(tempDynString2[i], &quot;_&quot;)+1)+FW_INSTALLATION_REQUIRED_COMPONENT_NAME_VERSION_SEPARATOR+tempString);
+      }
+  fillTable(KEY_REQUIRED, tempDynString);
+
+
+  // ASCII files
+  tempDynString2 = getFileNames(sourcePath.selectedText+g_sSlash + &quot;dplist&quot;, &quot;*.dpl&quot;);
+  dyn_string tempDynString22 = getFileNames(sourcePath.selectedText+g_sSlash + &quot;dplist/&quot; + sComponentName, &quot;*.dpl&quot;);
+      for(int i=1; i&lt;=dynlen(tempDynString22); i++)
+        tempDynString22[i] = sComponentName + &quot;/&quot; + tempDynString22[i];
+
+  dynAppend(tempDynString2, tempDynString22);
+  fillTable(KEY_DPLIST, tempDynString2);
+
+
+  // scripts
+  if(g_bEnforcePath)
+  {
+    tempDynString2 = getFiles(sourcePath.selectedText+g_sSlash + &quot;scripts&quot; + g_sSlash + sComponentName);
+    if(dynlen(tempDynString2) &gt; 0)
+    {
+      for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      {
+        tempDynString2[i] = /*&quot;scripts/libs/&quot;*/ +  sComponentName + g_sSlash + tempDynString2[i];
+      }
+    }
+  }
+  else
+  {
+    tempDynString2 = getFiles(sourcePath.selectedText+g_sSlash + &quot;scripts&quot;);
+    if(dynlen(tempDynString2) &gt; 0)
+    {
+      for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      {
+        tempDynString2[i] = /*&quot;scripts/libs/&quot; + */tempDynString2[i];
+      }
+    }
+  }
+
+  if(dynlen(tempDynString2) &gt; 0)
+    for(int i=dynlen(tempDynString2); i&gt;=1; i--)
+      if(strpos(tempDynString2[i], &quot;/libs&quot;) == 0)
+        dynRemove(tempDynString2, i);
+      else {
+        dynInsertAt(tempDynString2, strltrim(tempDynString2[i], &quot;/&quot;), i);
+        dynRemove(tempDynString2, i+1);
+      }
+
+         if(dynlen(tempDynString2) &gt; 0){
+           for(int i=dynlen(tempDynString2); i&gt;=1; i--){
+       if(patternMatch(&quot;*.init&quot;, tempDynString2[i]) || patternMatch(&quot;*.postInstall&quot;, tempDynString2[i]))
+               dynRemove(tempDynString2, i);
+           }
+         }
+
+  fillTable(KEY_SCRIPT, tempDynString2);
+
+
+  // libraries
+  if(g_bEnforcePath)
+  {
+    tempDynString2 = getFiles(sourcePath.selectedText+g_sSlash + &quot;scripts&quot; + g_sSlash + &quot;libs&quot;+ g_sSlash + sComponentName);
+    if(dynlen(tempDynString2) &gt; 0)
+    {
+      for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      {
+        tempDynString2[i] = /*&quot;scripts/libs/&quot; + */ sComponentName + g_sSlash + tempDynString2[i];
+      }
+    }
+  }
+  else
+  {
+    tempDynString2 = getFiles(sourcePath.selectedText+g_sSlash + &quot;scripts&quot; + g_sSlash + &quot;libs&quot;);
+    if(dynlen(tempDynString2) &gt; 0)
+    {
+      for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      {
+        tempDynString2[i] = /*&quot;scripts/libs/&quot; + */strltrim(tempDynString2[i], &quot;/&quot;);
+      }
+    }
+  }
+
+  if(dynlen(tempDynString2) &gt; 0)
+    for(int i=dynlen(tempDynString2); i&gt;=1; i--)
+    {
+      dynInsertAt(tempDynString2, strltrim(tempDynString2[i], &quot;/&quot;), i);
+      dynRemove(tempDynString2, i+1);
+    }
+  fillTable(KEY_LIBRARY, tempDynString2);
+
+
+  // Other files for this component (from ./, ./bin, ./colorDB, ./images, ./pictures, ./source).
+  dynClear(tempDynString);
+
+  tempDynString2 = getFileNames(sourcePath.selectedText);
+  if(dynlen(tempDynString2) &gt; 0)
+    for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      tempDynString2[i] = tempDynString2[i];
+  dynAppend(tempDynString, tempDynString2);
+
+  tempDynString2 = getFileNames(sourcePath.selectedText + g_sSlash + &quot;colorDB&quot;);
+  if(dynlen(tempDynString2) &gt; 0)
+    for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      tempDynString2[i] = &quot;colorDB/&quot; + tempDynString2[i];
+  dynAppend(tempDynString, tempDynString2);
+
+  if(!g_bEnforcePath)
+  {
+    tempDynString2 = getFiles(sourcePath.selectedText + g_sSlash + &quot;images&quot;);
+    if(dynlen(tempDynString2) &gt; 0)
+      for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+        tempDynString2[i] = &quot;images/&quot; + tempDynString2[i];
+    dynAppend(tempDynString, tempDynString2);
+  }
+
+  tempDynString2 = getFiles(sourcePath.selectedText + g_sSlash + &quot;source&quot;);
+  if(dynlen(tempDynString2) &gt; 0)
+    for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      tempDynString2[i] = &quot;source/&quot; + tempDynString2[i];
+  dynAppend(tempDynString, tempDynString2);
+
+  fillTable(KEY_OTHER, tempDynString);
+
+  if(g_bEnforcePath)
+  {
+    tempDynString2 = getFiles(sourcePath.selectedText + g_sSlash + &quot;help&quot; + g_sSlash + sComponentName);
+    if(dynlen(tempDynString2) &gt; 0)
+    {
+      for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      {
+        tempDynString2[i] = &quot;help/&quot; + tempDynString2[i];
+      }
+    }
+  }
+  else
+  {
+    tempDynString2 = getFiles(sourcePath.selectedText + g_sSlash + &quot;help&quot;);
+    if(dynlen(tempDynString2) &gt; 0)
+    {
+      for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      {
+        tempDynString2[i] = &quot;help/&quot; + tempDynString2[i];
+      }
+    }
+  }
+  fillTable(KEY_HELP, tempDynString2);
+
+  tempDynString2 = getFiles(sourcePath.selectedText + g_sSlash + &quot;bin&quot;);
+  if(dynlen(tempDynString2) &gt; 0)
+    for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      tempDynString2[i] = &quot;bin/&quot; + tempDynString2[i];
+  fillTable(KEY_BIN, tempDynString2);
+
+  tempDynString2 = getFileNames(sourcePath.selectedText + g_sSlash + &quot;pictures&quot;);
+  if(dynlen(tempDynString2) &gt; 0)
+    for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+      tempDynString2[i] = &quot;pictures/&quot; + tempDynString2[i];
+  fillTable(KEY_PICTURE, tempDynString2);
+
+  applyXMLSelection();
+}
+
+/** Get list of panel files in given directory (relative path inside panels/) and given extensions
+  */
+dyn_string getPanelFilesFromDir(string panelsDir, const dyn_string &amp;panelFileExt){
+  string panelsDirPath = sourcePath.selectedText+g_sSlash + &quot;panels&quot;;
+  if(panelsDir != &quot;&quot;){
+    panelsDirPath += g_sSlash + panelsDir;
+  }
+  dyn_string panelFiles;
+  for(int i=1;i&lt;=dynlen(panelFileExt);i++){
+    dynAppendConst(panelFiles, getFileNames(panelsDirPath, &quot;*&quot; + panelFileExt[i]));
+  }
+  if(panelsDir != &quot;&quot;){
+    for(int i=1;i&lt;=dynlen(panelFiles);i++){
+      panelFiles[i] = panelsDir + &quot;/&quot; + panelFiles[i];
+    }
+  }
+  return panelFiles;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setInitialComponentName(string sName)
+{
+  sName = strrtrim(sName, &quot; &quot;);
+  sName = strltrim(sName, &quot; &quot;);
+
+  if(sName != &quot;&quot; &amp;&amp; sName != NAME_REQUEST_TEXT)
+  {
+    showStartScreen(FALSE);
+    componentName.text = sName;
+  }
+  else
+  {
+    startNameInputField.backCol(&quot;{255,160,160}&quot;);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+showStartScreen(bool bState)
+{
+  showInitialMenu();
+
+  busyBackground.visible(bState);
+
+  startNameInputField.visible(bState);
+  startNameCommitButton.visible(bState);
+  startNameInputLabel.visible(bState);
+
+  separator1.visible(bState);
+  separator2.visible(bState);
+  orLabel.visible(bState);
+
+  xmlFileOpenLabel.visible(bState);
+  xmlFileOpenButton.visible(bState);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+bool openExistingXml()
+{
+  string xmlFileName = &quot;&quot;;
+
+  fileSelector(xmlFileName, PROJ_PATH, FALSE, &quot;*.xml&quot;);
+
+  if(xmlFileName != &quot;&quot;)
+  {
+    loadXMLFromFile(xmlFileName);
+
+    // XML and UI store now the exact same information --&gt; disable refresh
+    reloadButton.enabled(FALSE);
+  }
+
+  return xmlFileName != &quot;&quot;;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+reloadPanel()
+{
+  g_bInit = TRUE;
+  componentName.text = g_mComponentContent[KEY_NAME];
+  g_bInit = FALSE;
+
+  applyXMLSelection();
+
+  reloadButton.enabled(FALSE);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+resetPanel()
+{
+  dyn_string dsEmpty = makeDynString();
+
+  // SETUP
+  g_bInit = TRUE;
+  componentName.text = &quot;&quot;;
+  g_bInit = FALSE;
+  componentVersion.text = &quot;1.0.0&quot;;
+  componentDate.text = formatTime(&quot;%d/%m/%Y&quot;, getCurrentTime());
+
+  loadSelection(KEY_CONFIG, dsEmpty);
+  newConfigButton.enabled(TRUE);
+
+  loadSelection(KEY_REQUIRED, dsEmpty);
+
+  // DATAPOINTS
+  loadSelection(KEY_DPLIST, dsEmpty);
+
+  // SCRIPTS
+  loadSelection(KEY_PREINIT, dsEmpty);
+  loadSelection(KEY_INIT, dsEmpty);
+  loadSelection(KEY_DELETE, dsEmpty);
+   loadSelection(KEY_POSTINSTALL, dsEmpty);
+  loadSelection(KEY_POSTDELETE, dsEmpty);
+  loadSelection(KEY_SCRIPT, dsEmpty);
+
+  // PANELS
+  loadSelection(KEY_PANEL, dsEmpty);
+
+  // LIBRARIES
+  loadSelection(KEY_LIBRARY, dsEmpty);
+
+  // OTHER FILES
+  loadSelection(KEY_OTHER, dsEmpty);
+  loadSelection(KEY_BIN, dsEmpty);
+  loadSelection(KEY_HELP, dsEmpty);
+  loadSelection(KEY_PICTURE, dsEmpty);
+
+  // PACKAGE GENERATION
+  isSubComponent.state(0, FALSE);
+  cbRestart.state(0, FALSE);
+
+  clearComponentContent();
+  showStartScreen(TRUE);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+dyn_string writeXmlFile()
+{
+  dyn_string exceptionInfo;
+  dyn_string dsOtherFiles;
+
+  dynClear(g_dsXmlDescription);
+
+  dsOtherFiles = getSelectedLines(KEY_OTHER);
+  dynAppend(dsOtherFiles, getSelectedLines(KEY_BIN));
+  dynAppend(dsOtherFiles, getSelectedLines(KEY_HELP));
+  dynAppend(dsOtherFiles, getSelectedLines(KEY_PICTURE));
+
+  fwInstallationXml_create(PROJ_PATH,
+            componentName.text, componentVersion.text, componentDate.text,
+            getSelectedLines(KEY_REQUIRED),
+            isSubComponent.state(0),
+            getSelectedLines(KEY_PREINIT),
+            getSelectedLines(KEY_INIT),
+            getSelectedLines(KEY_DELETE),
+            getSelectedLines(KEY_POSTINSTALL),
+            getSelectedLines(KEY_POSTDELETE),
+            getSelectedLines(KEY_CONFIG),
+            getSelectedLines(KEY_DPLIST),
+            getSelectedLines(KEY_PANEL),
+            getSelectedLines(KEY_SCRIPT),
+            getSelectedLines(KEY_LIBRARY),
+            dsOtherFiles,
+            cbRestart.state(0),
+            g_dsXmlDescription);
+
+  // Update global component data
+  g_mComponentContent[KEY_NAME] = componentName.text;
+  g_mComponentContent[KEY_VERSION] = componentVersion.text;
+  g_mComponentContent[KEY_DATE] = componentDate.text;
+  g_mComponentContent[KEY_SUBCOMP] = isSubComponent.state(0);
+  g_mComponentContent[KEY_RESTART] = cbRestart.state(0);
+  g_mComponentContent[KEY_REQUIRED] = getSelectedLines(KEY_REQUIRED);
+  g_mComponentContent[KEY_PREINIT] = getSelectedLines(KEY_PREINIT);
+  g_mComponentContent[KEY_INIT] = getSelectedLines(KEY_INIT);
+  g_mComponentContent[KEY_DELETE] = getSelectedLines(KEY_DELETE);
+  g_mComponentContent[KEY_POSTINSTALL] = getSelectedLines(KEY_POSTINSTALL);
+  g_mComponentContent[KEY_POSTDELETE] = getSelectedLines(KEY_POSTDELETE);
+  g_mComponentContent[KEY_CONFIG] = getSelectedLines(KEY_CONFIG);
+  g_mComponentContent[KEY_DPLIST] = getSelectedLines(KEY_DPLIST);
+  g_mComponentContent[KEY_PANEL] = getSelectedLines(KEY_PANEL);
+  g_mComponentContent[KEY_SCRIPT] = getSelectedLines(KEY_SCRIPT);
+  g_mComponentContent[KEY_LIBRARY] = getSelectedLines(KEY_LIBRARY);
+  g_mComponentContent[KEY_OTHER] = getSelectedLines(KEY_OTHER);
+  g_mComponentContent[KEY_BIN] = getSelectedLines(KEY_BIN);
+  g_mComponentContent[KEY_HELP] = getSelectedLines(KEY_HELP);
+  g_mComponentContent[KEY_PICTURE] = getSelectedLines(KEY_PICTURE);
+
+  g_bXmlLoaded = TRUE;
+  newXmlButton.enabled = TRUE;
+
+  return exceptionInfo;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+fillTable(string shapeName, dyn_string dsItems)
+{
+  shape table = getShape(shapeName);
+
+  table.deleteAllLines();
+
+  if(dynlen(dsItems) &gt; 0)
+  {
+    for(int i=1; i&lt;=dynlen(dsItems); i++)
+    {
+      table.appendLine(&quot;items&quot;, dsItems[i], &quot;inSelection&quot;, FALSE);
+    }
+  }
+
+  table.sort(&quot;items&quot;);
+  table.lineVisible(0);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+applyXMLSelection()
+{
+  componentVersion.text = g_mComponentContent[KEY_VERSION];
+  componentDate.text = g_mComponentContent[KEY_DATE];
+  isSubComponent.state(0, g_mComponentContent[KEY_SUBCOMP]);
+  cbRestart.state(0, g_mComponentContent[KEY_RESTART]);
+
+  loadSelection(KEY_REQUIRED, g_mComponentContent[KEY_REQUIRED]);
+  loadSelection(KEY_CONFIG, g_mComponentContent[KEY_CONFIG]);
+  loadSelection(KEY_DPLIST, g_mComponentContent[KEY_DPLIST]);
+  loadSelection(KEY_PREINIT, g_mComponentContent[KEY_PREINIT]);
+  loadSelection(KEY_INIT, g_mComponentContent[KEY_INIT]);
+  loadSelection(KEY_DELETE, g_mComponentContent[KEY_DELETE]);
+  loadSelection(KEY_POSTINSTALL, g_mComponentContent[KEY_POSTINSTALL]);
+  loadSelection(KEY_POSTDELETE, g_mComponentContent[KEY_POSTDELETE]);
+  loadSelection(KEY_PANEL, g_mComponentContent[KEY_PANEL]);
+  loadSelection(KEY_SCRIPT, g_mComponentContent[KEY_SCRIPT]);
+  loadSelection(KEY_LIBRARY, g_mComponentContent[KEY_LIBRARY]);
+  loadSelection(KEY_OTHER, g_mComponentContent[KEY_OTHER]);
+  loadSelection(KEY_BIN, g_mComponentContent[KEY_BIN]);
+  loadSelection(KEY_HELP, g_mComponentContent[KEY_HELP]);
+  loadSelection(KEY_PICTURE, g_mComponentContent[KEY_PICTURE]);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+loadSelection(string shapeName, dyn_string xmlItems)
+{
+  string sItem;
+  bool bSelected;
+  shape table = getShape(shapeName);
+
+  if(table.lineCount &gt; 0)
+  {
+    for(int row = 0; row &lt; table.lineCount; row++)
+    {
+      sItem = table.cellValueRC(row, &quot;items&quot;);
+      bSelected = dynContains(xmlItems, sItem);
+
+      table.cellValueRC(row, &quot;inSelection&quot;, bSelected);
+      setRowBackgroundColor(shapeName, row, bSelected);
+    }
+  }
+
+  table.lineVisible(0);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+dyn_string getSelectedLines(string shapeName)
+{
+  shape table = getShape(shapeName);
+  dyn_string dsItems;
+  string sItem;
+
+  if(table.lineCount &gt; 0)
+  {
+    for(int i = 0; i &lt; table.lineCount; i++)
+    {
+      sItem = table.cellValueRC(i, &quot;inSelection&quot;);
+      if(sItem == TRUE)
+      {
+        dynAppend(dsItems, table.cellValueRC(i, &quot;items&quot;));
+      }
+    }
+  }
+
+  return dsItems;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+loadXMLFromFile(string xmlFileName)
+{
+  clearComponentContent();
+
+  dyn_dyn_mixed componentInfo;
+  if(fwInstallationXml_load(xmlFileName, componentInfo) != 0){
+    reloadButton.enabled(FALSE);
+    return;
+  }
+
+  g_bXmlLoaded = TRUE;
+  newXmlButton.enabled = TRUE;
+
+  g_mComponentContent[KEY_NAME]        =  componentInfo[FW_INSTALLATION_XML_COMPONENT_NAME][1];
+  g_mComponentContent[KEY_VERSION]     =  componentInfo[FW_INSTALLATION_XML_COMPONENT_VERSION][1];
+  g_mComponentContent[KEY_DATE]        =  componentInfo[FW_INSTALLATION_XML_COMPONENT_DATE][1];
+  g_mComponentContent[KEY_REQUIRED]    =  componentInfo[FW_INSTALLATION_XML_COMPONENT_REQUIRED_COMPONENTS];
+  g_mComponentContent[KEY_SUBCOMP]     = (componentInfo[FW_INSTALLATION_XML_COMPONENT_IS_SUBCOMPONENT][1] == 1);
+  g_mComponentContent[KEY_RESTART]     = (componentInfo[FW_INSTALLATION_XML_COMPONENT_DONT_RESTART] == &quot;yes&quot;);
+
+  g_mComponentContent[KEY_PREINIT] = removeProjectStructureDirectoryFromMultipleFiles(
+      componentInfo[FW_INSTALLATION_XML_COMPONENT_PREINIT_SCRIPTS], KEY_PREINIT);
+  g_mComponentContent[KEY_INIT] = removeProjectStructureDirectoryFromMultipleFiles(
+      componentInfo[FW_INSTALLATION_XML_COMPONENT_INIT_SCRIPTS], KEY_INIT);
+  g_mComponentContent[KEY_DELETE] = removeProjectStructureDirectoryFromMultipleFiles(
+      componentInfo[FW_INSTALLATION_XML_COMPONENT_DELETE_SCRIPTS], KEY_DELETE);
+  g_mComponentContent[KEY_POSTINSTALL] = removeProjectStructureDirectoryFromMultipleFiles(
+      componentInfo[FW_INSTALLATION_XML_COMPONENT_POST_INSTALL_SCRIPTS], KEY_POSTINSTALL);
+  g_mComponentContent[KEY_POSTDELETE] = removeProjectStructureDirectoryFromMultipleFiles(
+      componentInfo[FW_INSTALLATION_XML_COMPONENT_POST_DELETE_SCRIPTS], KEY_POSTDELETE);
+  g_mComponentContent[KEY_DPLIST] = removeProjectStructureDirectoryFromMultipleFiles(
+      componentInfo[FW_INSTALLATION_XML_COMPONENT_DPLIST_FILES], KEY_DPLIST);
+  g_mComponentContent[KEY_PANEL] = removeProjectStructureDirectoryFromMultipleFiles(
+      componentInfo[FW_INSTALLATION_XML_COMPONENT_PANEL_FILES], KEY_PANEL);
+  g_mComponentContent[KEY_SCRIPT] = removeProjectStructureDirectoryFromMultipleFiles(
+      componentInfo[FW_INSTALLATION_XML_COMPONENT_SCRIPT_FILES], KEY_SCRIPT);
+  g_mComponentContent[KEY_LIBRARY] = removeProjectStructureDirectoryFromMultipleFiles(
+      componentInfo[FW_INSTALLATION_XML_COMPONENT_LIBRARY_FILES], KEY_LIBRARY);
+
+  g_mComponentContent[KEY_BIN] = componentInfo[FW_INSTALLATION_XML_COMPONENT_BIN_FILES];
+
+
+  dynAppend(g_mComponentContent[KEY_CONFIG], componentInfo[FW_INSTALLATION_XML_COMPONENT_CONFIG_FILES]);
+  dynAppend(g_mComponentContent[KEY_CONFIG], componentInfo[FW_INSTALLATION_XML_COMPONENT_CONFIG_FILES_WINDOWS]);
+  dynAppend(g_mComponentContent[KEY_CONFIG], componentInfo[FW_INSTALLATION_XML_COMPONENT_CONFIG_FILES_LINUX]);
+  g_mComponentContent[KEY_CONFIG] =
+      removeProjectStructureDirectoryFromMultipleFiles(g_mComponentContent[KEY_CONFIG], KEY_CONFIG);
+
+  dyn_string otherFiles = componentInfo[FW_INSTALLATION_XML_COMPONENT_OTHER_FILES];
+  int otherFilesLen = dynlen(otherFiles);
+  for(int i=1;i&lt;=otherFilesLen;i++){
+    if(strpos(otherFiles[i], &quot;bin/&quot;) &gt;= 0){
+      dynAppend(g_mComponentContent[KEY_BIN], removeProjectStructureDirectoryFromFilePath(otherFiles[i], KEY_BIN));
+    }else if(strpos(otherFiles[i], &quot;help/&quot;) &gt;= 0){
+      dynAppend(g_mComponentContent[KEY_HELP], removeProjectStructureDirectoryFromFilePath(otherFiles[i], KEY_HELP));
+    }else if(strpos(otherFiles[i], &quot;pictures/&quot;) &gt;= 0){
+      dynAppend(g_mComponentContent[KEY_PICTURE], removeProjectStructureDirectoryFromFilePath(otherFiles[i], KEY_PICTURE));
+    }else{
+      dynAppend(g_mComponentContent[KEY_OTHER], removeProjectStructureDirectoryFromFilePath(otherFiles[i], KEY_OTHER));
+    }
+  }
+
+  componentName.text = g_mComponentContent[KEY_NAME];
+
+  applyXMLSelection();
+
+  fileToString(xmlFileName, g_sXmlFileContent);
+  g_dsXmlDescription = strsplit(g_sXmlFileContent, &quot;\n&quot;);
+DebugTN(g_mComponentContent);
+  reloadButton.enabled(FALSE);
+}
+
+const dyn_string COMPONENT_INSTALLATION_SCRIPTS_DIRECTORIES = makeDynString(CONFIG_REL_PATH, SCRIPTS_REL_PATH);
+
+const mapping FILE_TYPE_DIRECTORIES = makeMapping(
+    KEY_LIBRARY, makeDynString(LIBS_REL_PATH),
+    KEY_SCRIPT, makeDynString(SCRIPTS_REL_PATH),
+    KEY_PANEL, makeDynString(PANELS_REL_PATH),
+    KEY_CONFIG, makeDynString(CONFIG_REL_PATH),
+    KEY_PREINIT, COMPONENT_INSTALLATION_SCRIPTS_DIRECTORIES,
+    KEY_INIT, COMPONENT_INSTALLATION_SCRIPTS_DIRECTORIES,
+    KEY_POSTINSTALL, COMPONENT_INSTALLATION_SCRIPTS_DIRECTORIES,
+    KEY_DELETE, COMPONENT_INSTALLATION_SCRIPTS_DIRECTORIES,
+    KEY_POSTDELETE, COMPONENT_INSTALLATION_SCRIPTS_DIRECTORIES,
+    KEY_DPLIST, makeDynString(DPLIST_REL_PATH)
+    );
+
+dyn_string REMOVE_COMPONENT_DIRECTORY_FOR_FILE_TYPE = makeDynString(KEY_PREINIT, KEY_INIT, KEY_POSTINSTALL,
+                                                                    KEY_DELETE, KEY_POSTDELETE);
+
+string removeProjectStructureDirectoryFromFilePath(string fileRelativePath, string fileType)
+{
+  if(strpos(fileRelativePath, &quot;./&quot;) == 0){
+    fileRelativePath = substr(fileRelativePath, 2);
+  }
+  string componentDirectory;
+  if(dynContains(REMOVE_COMPONENT_DIRECTORY_FOR_FILE_TYPE, fileType) &gt; 0){
+    componentDirectory = g_mComponentContent[KEY_NAME] + &quot;/&quot;;
+    DebugTN(componentDirectory);
+  }
+  if(mappingHasKey(FILE_TYPE_DIRECTORIES, fileType)){
+    int dirsLen = dynlen(FILE_TYPE_DIRECTORIES[fileType]);
+    for(int i=1;i&lt;=dirsLen;i++){
+      string projectStructureDirectory = FILE_TYPE_DIRECTORIES[fileType][i] + componentDirectory;
+      if(strpos(fileRelativePath, projectStructureDirectory) == 0){
+        fileRelativePath = substr(fileRelativePath, strlen(projectStructureDirectory));
+        break;
+      }
+    }
+  }
+  return fileRelativePath;
+}
+
+dyn_string removeProjectStructureDirectoryFromMultipleFiles(dyn_string filePathList, string fileType = &quot;&quot;)
+{
+  dyn_string modifiedFilePathList;
+  int filePathListLen = dynlen(filePathList);
+  for(int i=1;i&lt;=filePathListLen;i++){
+    dynAppend(modifiedFilePathList,
+              removeProjectStructureDirectoryFromFilePath(filePathList[i], fileType));
+  }
+  return modifiedFilePathList;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+clearComponentContent()
+{
+  mappingClear(g_mComponentContent);
+
+  g_mComponentContent[KEY_NAME] = &quot;&quot;;
+  g_mComponentContent[KEY_VERSION] = &quot;1.0.0&quot;;
+  g_mComponentContent[KEY_DATE] = formatTime(&quot;%d/%m/%Y&quot;, getCurrentTime());
+  g_mComponentContent[KEY_SUBCOMP] = FALSE;
+  g_mComponentContent[KEY_RESTART] = FALSE;
+  g_mComponentContent[KEY_REQUIRED] = makeDynString();
+  g_mComponentContent[KEY_PREINIT] = makeDynString();
+  g_mComponentContent[KEY_INIT] = makeDynString();
+  g_mComponentContent[KEY_DELETE] = makeDynString();
+  g_mComponentContent[KEY_POSTINSTALL] = makeDynString();
+  g_mComponentContent[KEY_POSTDELETE] = makeDynString();
+  g_mComponentContent[KEY_CONFIG] = makeDynString();
+  g_mComponentContent[KEY_DPLIST] = makeDynString();
+  g_mComponentContent[KEY_PANEL] = makeDynString();
+  g_mComponentContent[KEY_SCRIPT] = makeDynString();
+  g_mComponentContent[KEY_LIBRARY] = makeDynString();
+  g_mComponentContent[KEY_OTHER] = makeDynString();
+  g_mComponentContent[KEY_BIN] = makeDynString();
+  g_mComponentContent[KEY_HELP] = makeDynString();
+  g_mComponentContent[KEY_PICTURE] = makeDynString();
+}
+
+// ------------------------------------------------------------------------------------------------
+
+editScript(string sTableName)
+{
+  shape tableShape = getShape(sTableName);
+  string sFileName;
+  string script;
+  file editedFile;
+  string path;
+  int selectedRow = tableShape.getSelectedLines()[1];
+
+  sFileName = tableShape.cellValueRC(selectedRow, &quot;items&quot;);
+
+  if(sFileName != &quot;&quot;)
+  {
+    if(access(sourcePath.text +&quot;/config/&quot; + sFileName, W_OK) == 0)
+    {
+      path = sourcePath.text +&quot;/config/&quot;;
+    }
+    else if(access(sourcePath.text +&quot;/scripts/&quot; + sFileName, W_OK) == 0)
+    {
+      path = sourcePath.text +&quot;/scripts/&quot;;
+    }
+    else if(access(sourcePath.text +&quot;/scripts/&quot; + componentName.text + &quot;/&quot; + sFileName, W_OK) == 0)
+    {
+      path = sourcePath.text +&quot;/scripts/&quot; + componentName.text + &quot;/&quot;;
+    }
+
+    editedFile = fopen(path + sFileName, &quot;r&quot;);
+
+    if(ferror(editedFile) == 0)
+    {
+      fileEditor(path + sFileName);
+    }
+    else
+    {
+      showUserFeedback(&quot;No file created. Error reading file.&quot;, 3);
+    }
+
+    fclose(editedFile);
+    showUserFeedback(&quot;File edited.&quot;, 3);
+  }
+  else
+  {
+    componentName.backCol = &quot;FwBackgroundUserAttention&quot;;
+    showUserFeedback(&quot;Please provide a component name.&quot;, 3);
+    componentName.backCol = &quot;_Window&quot;;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+dyn_string getFiles(string dir = &quot;.&quot;, string pattern = &quot;*&quot;)
+{
+  dyn_string tempDynString;
+  dyn_string allFileNames;
+  string newDir = &quot;/*&quot;;
+
+  getFileNamesRecursive(dir, &quot;*&quot;, allFileNames);
+
+  if(dynlen(allFileNames) &gt; 0)
+    for(int i=1; i&lt;=dynlen(allFileNames); i++)
+      {
+         strreplace(allFileNames[i], dir + &quot;/&quot;, &quot;&quot;);
+         strreplace(allFileNames[i], &quot;//&quot;, &quot;/&quot;);
+      }
+
+  for(int i=1; i&lt;=dynlen(allFileNames); i++)
+    if(patternMatch(pattern, allFileNames[i]))
+      dynAppend(tempDynString, allFileNames[i]);
+
+  return tempDynString;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+getFileNamesRecursive(string dir, string pattern, dyn_string &amp; fileNames)
+{
+  dyn_string tempDynString = getFileNames(dir, pattern, FILTER_DIRS);
+  dyn_string tempDynString2 = getFileNames(dir, pattern);
+
+  for(int i=1; i&lt;=dynlen(tempDynString2); i++)
+  {
+    tempDynString2[i] = dir +&quot;/&quot;+ tempDynString2[i];
+    if(!patternMatch(&quot;*.svn&quot;, tempDynString2[i]))
+      dynAppend(fileNames, tempDynString2[i]);
+    else
+      DebugN(&quot;Packager: Skipping SVN folder: &quot; + tempDynString2[i]);
+  }
+
+  for(int i=1; i&lt;=dynlen(tempDynString); i++)
+  {
+    string nextDir = tempDynString[i];
+    if(nextDir == &quot;.&quot; || nextDir == &quot;..&quot;){
+      continue;
+    }
+    if(!patternMatch(&quot;*.svn&quot;, nextDir)){
+      getFileNamesRecursive(dir + &quot;/&quot; + nextDir + &quot;/&quot;, pattern, fileNames);
+    }else{
+      DebugN(&quot;Packager: Skipping SVN folder: &quot; + dir + &quot;/&quot; + tempDynString[i]);
+    }
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+showUserFeedback(string sFeedback, int iDelay)
+{
+  resultTextArrow.visible(TRUE);
+  resultText.visible(TRUE);
+  resultText.text(sFeedback);
+
+  delay(iDelay);
+
+  resultTextArrow.visible(FALSE);
+  resultText.visible(FALSE);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+createNewFile(string sFilePath, string sFileName)
+{
+  file newFile;
+  int ferr;
+
+  if(componentName.text != &quot;&quot;)
+  {
+    ferr = access(sFilePath, F_OK);
+
+    // if folder does not exist, create it and try opening again
+    if(ferr != 0)
+    {
+      mkdir(sFilePath);
+    }
+
+    newFile = fopen(sFilePath + sFileName, &quot;a&quot;);
+    ferr = ferror(newFile);
+
+    fclose(newFile);
+
+    if(ferr == 0)
+    {
+      fileEditor(sFilePath + sFileName);
+
+      initPanel();
+      showUserFeedback(&quot;New file created.&quot;, 3);
+    }
+    else
+    {
+      showUserFeedback(&quot;No file created. Error reading file.&quot;, 3);
+    }
+  }
+  else
+  {
+    componentName.backCol = &quot;FwBackgroundUserAttention&quot;;
+    showUserFeedback(&quot;Please provide a component name.&quot;, 3);
+    componentName.backCol = &quot;_Window&quot;;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+removeFile(string sFilePath)
+{
+  int iRes;
+
+  iRes = remove(sFilePath);
+
+  if(iRes == 0)
+  {
+    initPanel();
+    showUserFeedback(&quot;File deleted.&quot;, 3);
+  }
+  else
+  {
+    showUserFeedback(&quot;File not deleted. Error during removal.&quot;, 3);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+selectAllLines(string shapeName, bool bAll)
+{
+  shape table = getShape(shapeName);
+  int length = table.lineCount();
+
+  for(int rowIndex = 0; rowIndex &lt; length; rowIndex++)
+  {
+    table.cellValueRC(rowIndex, &quot;inSelection&quot;, bAll);
+    setRowBackgroundColor(shapeName, rowIndex, bAll);
+  }
+
+  reloadButton.enabled(TRUE);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+showInitialMenu()
+{
+  contentTab.activeRegister(0);
+
+  LayerOn(2);
+  LayerOff(3);
+  LayerOff(4);
+  LayerOff(5);
+  LayerOff(6);
+  LayerOff(7);
+  LayerOff(8);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+showModalNameInput()
+{
+  dyn_int di_panelSize;
+
+  busyBackground.position(0,0);
+  di_panelSize = getPanelSize(panelFileName(myModuleName(), myPanelName()));
+  busyBackground.size(di_panelSize[1], di_panelSize[2]);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+initGlobalVariables()
+{
+  g_mComponentContent[KEY_NAME] = &quot;&quot;;
+  g_mComponentContent[KEY_VERSION] = &quot;1.0.0&quot;;
+  g_mComponentContent[KEY_DATE] = formatTime(&quot;%d/%m/%Y&quot;, getCurrentTime());
+  g_mComponentContent[KEY_SUBCOMP] = FALSE;
+  g_mComponentContent[KEY_RESTART] = FALSE;
+  g_mComponentContent[KEY_REQUIRED] = getSelectedLines(&quot;requiredComponents&quot;);
+  g_mComponentContent[KEY_PREINIT] = getSelectedLines(&quot;preInitScriptsTable&quot;);
+  g_mComponentContent[KEY_INIT] = getSelectedLines(&quot;initScript&quot;);
+  g_mComponentContent[KEY_DELETE] = getSelectedLines(&quot;deleteScript&quot;);
+  g_mComponentContent[KEY_POSTINSTALL] = getSelectedLines(&quot;postInstallScript&quot;);
+  g_mComponentContent[KEY_POSTDELETE] = getSelectedLines(&quot;postDeleteScript&quot;);
+  g_mComponentContent[KEY_CONFIG] = getSelectedLines(&quot;configFiles&quot;);
+  g_mComponentContent[KEY_DPLIST] = getSelectedLines(&quot;asciiFiles&quot;);
+  g_mComponentContent[KEY_PANEL] = getSelectedLines(&quot;panelFiles&quot;);
+  g_mComponentContent[KEY_SCRIPT] = getSelectedLines(&quot;scriptFiles&quot;);
+  g_mComponentContent[KEY_LIBRARY] = getSelectedLines(&quot;libraryFiles&quot;);
+  g_mComponentContent[KEY_OTHER] = getSelectedLines(&quot;otherFiles&quot;);
+  g_mComponentContent[KEY_BIN] = getSelectedLines(&quot;binFiles&quot;);
+  g_mComponentContent[KEY_HELP] = getSelectedLines(&quot;helpFiles&quot;);
+  g_mComponentContent[KEY_PICTURE] = getSelectedLines(&quot;pictureFiles&quot;);
+}
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[/** fwInstallation_Packager.pnl
+  *
+  * @reviewed 2018-06-21 @whitelisted{StandaloneTool}
+  */
+main()
+{
+  g_bInit = TRUE;
+  g_sSlash = (_WIN32) ? &quot;/&quot; : &quot;/&quot;;
+
+  initGlobalVariables();
+  showInitialMenu();
+  initPanel();
+
+  showModalNameInput();
+
+  g_bInit = FALSE;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="contentTab" shapeType="TAB" layerId="0">
+   <properties>
+    <prop name="serialId">138</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20.68646474872743 172.6952789699571</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">140</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 75</prop>
+    <prop name="Size">880 560</prop>
+    <prop name="TabBarAutoHide">False</prop>
+    <prop name="Page">
+     <prop name="Name">setup</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Setup</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">datapoints</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Datapoints</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">libraries</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Libraries</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">panels</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Panels</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">scripts</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Scripts</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">other</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Other files</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">creation</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Package creation</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="SelectionChanged" isEscaped="1"><![CDATA[main()
+{
+  setLayerVisible(this.activeRegister()+2);
+}
+
+//-------------------------------------------------------------------------------------------------
+
+setLayerVisible(int layerId)
+{
+  switch(layerId)
+  {
+    case 2:
+      LayerOn(2);
+      LayerOff(3);
+      LayerOff(4);
+      LayerOff(5);
+      LayerOff(6);
+      LayerOff(7);
+      LayerOff(8);
+      nextButton.enabled(TRUE);
+      backButton.enabled(FALSE);
+      break;
+    case 3:
+      LayerOff(2);
+      LayerOn(3);
+      LayerOff(4);
+      LayerOff(5);
+      LayerOff(6);
+      LayerOff(7);
+      LayerOff(8);
+      nextButton.enabled(TRUE);
+      backButton.enabled(TRUE);
+      break;
+    case 4:
+      LayerOff(2);
+      LayerOff(3);
+      LayerOn(4);
+      LayerOff(5);
+      LayerOff(6);
+      LayerOff(7);
+      LayerOff(8);
+      nextButton.enabled(TRUE);
+      backButton.enabled(TRUE);
+      break;
+    case 5:
+      LayerOff(2);
+      LayerOff(3);
+      LayerOff(4);
+      LayerOn(5);
+      LayerOff(6);
+      LayerOff(7);
+      LayerOff(8);
+      nextButton.enabled(TRUE);
+      backButton.enabled(TRUE);
+      break;
+    case 6:
+      LayerOff(2);
+      LayerOff(3);
+      LayerOff(4);
+      LayerOff(5);
+      LayerOn(6);
+      LayerOff(7);
+      LayerOff(8);
+      nextButton.enabled(TRUE);
+      backButton.enabled(TRUE);
+      break;
+    case 7:
+      LayerOff(2);
+      LayerOff(3);
+      LayerOff(4);
+      LayerOff(5);
+      LayerOff(6);
+      LayerOn(7);
+      LayerOff(8);
+      nextButton.enabled(TRUE);
+      backButton.enabled(TRUE);
+      break;
+    case 8:
+      LayerOff(2);
+      LayerOff(3);
+      LayerOff(4);
+      LayerOff(5);
+      LayerOff(6);
+      LayerOff(7);
+      LayerOn(8);
+      backButton.enabled(TRUE);
+      nextButton.enabled(FALSE);
+      break;
+    default:
+      LayerOff(2);
+      LayerOff(3);
+      LayerOff(4);
+      LayerOff(5);
+      LayerOff(6);
+      LayerOff(7);
+      LayerOff(8);
+      break;
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">98</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">98</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">3.026578073089701 0 0 1 -61.53156146179402 -531</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 530</prop>
+    <prop name="Size">302 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 2</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">JCOP Component Packager</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="saveButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">640 105</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Save XML file</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">75 40</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Save_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// wait for file system init
+  while(g_sSlash == &quot;&quot;)
+    delay(0,100);
+
+  if((componentName.text != &quot;&quot;))
+  {
+    writeXmlFile();
+    showUserFeedback(&quot;XML file saved.&quot;, 3);
+  }
+  else
+  {
+    showUserFeedback(&quot;XML file not saved. Name missing.&quot;, 3);
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">82</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">966 585</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">85</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">815 645</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="reloadButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">90</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">404 1274</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">99</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Reload XML file. Current changes will be lost.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 644</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/refresh_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  reloadPanel();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="backButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">102</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">722 597</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">105</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Left</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">722 597</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Back</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  switch(contentTab.activeRegister())
+  {
+    case 1:
+      contentTab.activeRegister(0);
+      break;
+    case 2:
+      contentTab.activeRegister(1);
+      break;
+    case 3:
+      contentTab.activeRegister(2);
+      break;
+    case 4:
+      contentTab.activeRegister(3);
+      break;
+    case 5:
+      contentTab.activeRegister(4);
+      break;
+    case 6:
+      contentTab.activeRegister(5);
+      break;
+    case 7:
+      contentTab.activeRegister(6);
+      break;
+    default:
+      break;
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="nextButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">103</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">804 597</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">106</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Right</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">804 597</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Next</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  switch(contentTab.activeRegister())
+  {
+    case 0:
+      contentTab.activeRegister(1);
+      break;
+    case 1:
+      contentTab.activeRegister(2);
+      break;
+    case 2:
+      contentTab.activeRegister(3);
+      break;
+    case 3:
+      contentTab.activeRegister(4);
+      break;
+    case 4:
+      contentTab.activeRegister(5);
+      break;
+    case 5:
+      contentTab.activeRegister(6);
+      break;
+    case 6:
+      contentTab.activeRegister(7);
+      break;
+    default:
+      break;
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="editButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">117</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">666 679</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">121</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Edit the XML file (saves it first)</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">104 40</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/open_script_editor_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// wait for file system init
+  while(g_sSlash == &quot;&quot;)
+    delay(0,100);
+
+  if((componentName.text != &quot;&quot;))
+  {
+    writeXmlFile();
+
+    file xmlText = fopen(PROJ_PATH + g_sSlash +componentName.text+ &quot;.xml&quot;, &quot;r&quot;);
+    int ferr = ferror(xmlText);
+    fclose(xmlText);
+    if(ferr == 0)
+    {
+      fileEditor(PROJ_PATH+ g_sSlash +componentName.text+ &quot;.xml&quot;);
+
+      loadXMLFromFile(PROJ_PATH+ g_sSlash +componentName.text+ &quot;.xml&quot;);
+      showUserFeedback(&quot;XML file edited.&quot;, 3);
+    }
+    else
+    {
+      showUserFeedback(&quot;XML file not edited. Error reading file.&quot;, 3);
+    }
+  }
+  else
+  {
+    showUserFeedback(&quot;XML file could not be opened. Name missing.&quot;, 3);
+  }
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="resultText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">118</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">166 647</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">118</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,2]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">168 649</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Feedback</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="resultTextArrow" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">119</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">_3DText</prop>
+    <prop name="TabOrder">119</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.7259259259259259 0 0 0.6825000000000002 148.7407407407407 124.4749999999998</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+     <prop name="Location">20 780</prop>
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="newXmlButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">68</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-212 650</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">74</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Clear panel for new component</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/new_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string dsReturn;
+  dyn_float dfReturn;
+
+  g_bXmlLoaded = FALSE;
+  g_sXmlFileContent = &quot;&quot;;
+
+  ChildPanelOnCentralModalReturn(&quot;vision/MessageInfo&quot;, &quot;Confirm&quot;,
+          makeDynString(&quot;$1:Clear panel for new component?&quot;,
+          &quot;$2:OK&quot;, &quot;$3:Cancel&quot;),
+          dfReturn, dsReturn);
+
+  if (dynlen(dfReturn) &gt;= 1 &amp;&amp; dfReturn[1] == 1)
+  {
+    resetPanel();
+  }
+
+  // XML and UI store now the exact same information --&gt; disable refresh
+  reloadButton.enabled(FALSE);
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="openXmlButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">137</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-183 650</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">139</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Open existing XML file</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">39 40</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Open_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  openExistingXml();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="currentDirectoryLabel" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">161</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-604 -190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">163</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">190 42</prop>
+    <prop name="Size">700 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Current directory:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="exportFsmTree" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">83</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-450 539</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">86</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Creates files to be selectable in packager</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">46 645</prop>
+    <prop name="Size">100 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Add FSM ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_float dfReturn;
+  dyn_string dsSelectedNode;
+
+  ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallation_Packager_AddFsm.pnl&quot;, &quot;Add FSM node ...&quot;,
+          makeDynString(&quot;$sComponentName:&quot;+componentName.text, &quot;$sSourcePath:&quot;+sourcePath.text),
+          dfReturn, dsSelectedNode);
+
+  if(dynlen(dfReturn) &gt; 0 &amp;&amp; dfReturn[1] == 0)
+  {
+    initPanel();
+    showUserFeedback(&quot;FSM node &quot; + dsSelectedNode[1] + &quot; successfully added.&quot;, 3);
+  }
+  else
+  {
+    showUserFeedback(&quot;No FSM node added.&quot;, 3);
+  }
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="componentName" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-150 125</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Component name. Also sub-directories of the source path with this name will be displayed.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 223</prop>
+    <prop name="Size">404 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  if(!g_bInit)
+  {
+    initPanel();
+    nextButton.enabled(newText != &quot;&quot;);
+    contentTab.enabled(newText != &quot;&quot;);
+    showUserFeedback(&quot;Data reloaded.&quot;, 3);
+  }
+
+  reloadButton.enabled(TRUE);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="configFiles" shapeType="TABLE" layerId="1">
+   <properties>
+    <prop name="serialId">58</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-2150 34.40000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 423</prop>
+    <prop name="Size">317 23</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">21</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">None</prop>
+    <prop name="VScrollBarMode">AlwaysOff</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">285</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">fromFile</prop>
+     <prop name="Width">40</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">XML</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="requiredComponents" shapeType="TABLE" layerId="1">
+   <properties>
+    <prop name="serialId">57</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-812 -189</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">475 136</prop>
+    <prop name="Size">404 433</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">355</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  this.deleteSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="componentVersion" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-411 179</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Component version. REQUIRED. (#.#.#)</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 280</prop>
+    <prop name="Size">404 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  if(!g_bInit)
+  {
+    reloadButton.enabled(TRUE);
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="componentDate" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-411 233</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Version date of the component. (dd/mm/yyyy)</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 337</prop>
+    <prop name="Size">404 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  if(!g_bInit)
+  {
+    reloadButton.enabled(TRUE);
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="editConfigButton" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">111</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">987 2342</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">117</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Edit config file</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">370 422</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/open_script_editor_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  editScript(&quot;configFiles&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="newConfigButton" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">112</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">341 422</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">120</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Create new config file</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">341 422</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/new_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFilePath = sourcePath.selectedText + g_sSlash + &quot;config&quot; + g_sSlash;
+  string sFileName = componentName.text + &quot;.config&quot;;
+
+  createNewFile(sFilePath, sFileName);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deleteConfigButton" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">120</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1016 2342</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">122</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Delete config file</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">399 422</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/delete_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFilePath = sourcePath.selectedText + g_sSlash + &quot;config&quot; + g_sSlash;
+  string sFileName = componentName.text + &quot;.config&quot;;
+
+  removeFile(sFilePath + sFileName);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="allButton1" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">125</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">777 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">127</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">777 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;requiredComponents&quot;, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="noneButton1" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">126</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">830 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">128</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">830 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">None</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;requiredComponents&quot;, FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="componentNameLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">139</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 48</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">141</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 199</prop>
+    <prop name="Size">150 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Name:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="componentVersionLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">140</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 72</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">142</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 256</prop>
+    <prop name="Size">150 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Version:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="componentDateLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">141</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 96</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">143</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 313</prop>
+    <prop name="Size">150 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Date:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="configLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">142</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 129</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">145</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 399</prop>
+    <prop name="Size">150 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Config file:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="dependencyLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">143</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">339 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">146</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">472 112</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Required components:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="pathLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">159</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 -39</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">162</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 112</prop>
+    <prop name="Size">150 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Source path:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="sourcePath" shapeType="COMBO_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-177.7473903966597 205</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Project path, the component should be built from.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 136</prop>
+    <prop name="Size">404 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  currentDirectoryLabel.text = &quot;Current directory: &quot; + this.selectedText();
+  initPanel();
+  showUserFeedback(&quot;Data reloaded.&quot;, 3);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="enforcePaths" shapeType="CHECK_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">91</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">16 111</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">101</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Creates the directory structure as specified in the guidelines wherever the source files are stored</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 490</prop>
+    <prop name="Size">200 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Enforce packaging guidelines</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  g_bEnforcePath = state;
+  initPanel();
+  showUserFeedback(&quot;Data reloaded.&quot;, 3);
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="isSubComponent" shapeType="CHECK_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-226 580</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Sub-components will not be shown in standard list of installation</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 520</prop>
+    <prop name="Size">300 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Sub-component</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  reloadButton.enabled(TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cbRestart" shapeType="CHECK_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">97</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-226 610</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">102</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 550</prop>
+    <prop name="Size">300 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">No project restart required</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  reloadButton.enabled(TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="busyBackground" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">176</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{0,0,0,200}</prop>
+    <prop name="TabOrder">178</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">15 15</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="startNameInputField" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">177</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">360 274</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">350 274</prop>
+    <prop name="Size">174 24</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[main()
+{
+  setInitialComponentName(startNameInputField.text);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  // dummy
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="startNameCommitButton" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">178</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">546 284</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="HoverBackCol">{220,220,220}</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Submit name</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">526 274</prop>
+    <prop name="Size">24 24</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">wf/buttons/next.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  setInitialComponentName(startNameInputField.text);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="startNameInputLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">179</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 -46</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">179</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">346 249</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Choose a name:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="xmlFileOpenLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">187</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 78</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">187</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">346 373</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Open XML file:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="xmlFileOpenButton" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">188</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">453 408</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="HoverBackCol">{220,220,220}</prop>
+    <prop name="TabOrder">188</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Open XML file</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">433 398</prop>
+    <prop name="Size">24 24</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">wf/buttons/openfile_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  bool bValid;
+
+  bValid = openExistingXml();
+
+  if(bValid)
+  {
+    showStartScreen(FALSE);
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="separator1" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">192</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">252 322</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">white</prop>
+    <prop name="TabOrder">192</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">127 340</prop>
+    <prop name="Size">300 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="separator2" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">193</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">243 330</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">white</prop>
+    <prop name="TabOrder">193</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">463 340</prop>
+    <prop name="Size">300 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="orLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">194</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 -30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">194</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">425 327</prop>
+    <prop name="Size">40 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;or&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="asciiFiles" shapeType="TABLE" layerId="2">
+   <properties>
+    <prop name="serialId">59</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-1959 -952</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 136</prop>
+    <prop name="Size">404 433</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">355</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  this.deleteSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdAscii" shapeType="PUSH_BUTTON" layerId="2">
+   <properties>
+    <prop name="serialId">71</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">107 194</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">81</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Launch ASCII Manager</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">475 136</prop>
+    <prop name="Size">53 53</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">SysMgm/40x40/AsciiManager.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_float tempDynFloat;
+  dyn_string tempDynString;
+
+  if(access(&quot;vision/AsciiMan_fw.pnl&quot;, F_OK) == 0)
+    ChildPanelOnCentralModalReturn(&quot;vision/AsciiMan_fw.pnl&quot;, &quot;PVSS ASCII Manager for Component Packaging&quot;, makeDynString(), tempDynFloat, tempDynString);
+  else
+    ChildPanelOnCentralModalReturn(&quot;vision/AsciiMan.pnl&quot;, &quot;PVSS ASCII Manager for Component Packaging&quot;, makeDynString(), tempDynFloat, tempDynString);
+
+  initPanel();
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="noneButton2" shapeType="PUSH_BUTTON" layerId="2">
+   <properties>
+    <prop name="serialId">128</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">375 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">130</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">375 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">None</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;asciiFiles&quot;, FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="allButton2" shapeType="PUSH_BUTTON" layerId="2">
+   <properties>
+    <prop name="serialId">127</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">322 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">129</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">322 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;asciiFiles&quot;, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="asciiFilesLabel" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">146</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">148</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 112</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;ASCII files:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="asciiManagerLabel" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">147</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">339 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">149</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">472 112</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;ASCII manager:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="libraryFiles" shapeType="TABLE" layerId="3">
+   <properties>
+    <prop name="serialId">66</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-3953 -2483</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">69</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 136</prop>
+    <prop name="Size">404 433</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">355</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  this.deleteSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="allButton3" shapeType="PUSH_BUTTON" layerId="3">
+   <properties>
+    <prop name="serialId">130</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">322 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">132</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">322 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;libraryFiles&quot;, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="noneButton3" shapeType="PUSH_BUTTON" layerId="3">
+   <properties>
+    <prop name="serialId">129</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">375 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">131</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">375 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">None</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;libraryFiles&quot;, FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="librariesLabel" shapeType="TEXT_FIELD" layerId="3">
+   <properties>
+    <prop name="serialId">150</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">152</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 112</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Libraries:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="panelFiles" shapeType="TABLE" layerId="4">
+   <properties>
+    <prop name="serialId">64</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-3089 -5299</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 136</prop>
+    <prop name="Size">404 433</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">355</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  this.deleteSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="allButton4" shapeType="PUSH_BUTTON" layerId="4">
+   <properties>
+    <prop name="serialId">131</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">322 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">133</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">322 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;panelFiles&quot;, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="noneButton4" shapeType="PUSH_BUTTON" layerId="4">
+   <properties>
+    <prop name="serialId">132</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">375 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">134</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">375 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">None</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;panelFiles&quot;, FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="panelsLabel" shapeType="TEXT_FIELD" layerId="4">
+   <properties>
+    <prop name="serialId">151</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">153</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 112</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Panels:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="newPostDeleteScriptButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">106</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">853 483</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">112</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Create postDelete script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 483</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/new_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFilePath = sourcePath.selectedText + g_sSlash + &quot;scripts&quot; + g_sSlash + componentName.text + g_sSlash;
+  string sFileName = componentName.text + &quot;.postDelete&quot;;
+
+  createNewFile(sFilePath, sFileName);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="newDeleteScriptButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">105</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">853 367</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">111</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Create delete script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 367</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/new_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFilePath = sourcePath.selectedText + g_sSlash + &quot;scripts&quot; + g_sSlash + componentName.text + g_sSlash;
+  string sFileName = componentName.text + &quot;.delete&quot;;
+
+  createNewFile(sFilePath, sFileName);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="initScript" shapeType="TABLE" layerId="5">
+   <properties>
+    <prop name="serialId">60</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-1882 -212.4</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">475 136</prop>
+    <prop name="Size">375 85</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">326</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Add</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Tick to add to package</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">fromFile</prop>
+     <prop name="Width">40</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">XML</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="postInstallScript" shapeType="TABLE" layerId="5">
+   <properties>
+    <prop name="serialId">61</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-2022 -400</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">475 252</prop>
+    <prop name="Size">375 85</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">326</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">fromFile</prop>
+     <prop name="Width">40</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">XML</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deleteScript" shapeType="TABLE" layerId="5">
+   <properties>
+    <prop name="serialId">62</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-2022 -179.6</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">475 369</prop>
+    <prop name="Size">375 85</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">326</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">fromFile</prop>
+     <prop name="Width">40</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">XML</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="postDeleteScript" shapeType="TABLE" layerId="5">
+   <properties>
+    <prop name="serialId">63</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-2162 -493.6</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">36</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">475 485</prop>
+    <prop name="Size">375 85</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">326</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">fromFile</prop>
+     <prop name="Width">40</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">XML</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="scriptFiles" shapeType="TABLE" layerId="5">
+   <properties>
+    <prop name="serialId">65</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-4224 -2778</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">68</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 136</prop>
+    <prop name="Size">404 318</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">355</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  this.deleteSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="initScriptNewButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">74</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">193 544.173913043478</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">82</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Create init script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 134</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">wizard.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_float df;
+  dyn_string ds;
+
+  if(componentName.text != &quot;&quot;)
+  {
+    ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallation_packagerAppendManagerWizard.pnl&quot;,
+      &quot;Manager Wizard: Init Script&quot;,
+      makeDynString(&quot;$componentName:&quot; + componentName.text, &quot;$scriptFunction:init&quot;), df, ds);
+    initPanel();
+  }
+  else
+  {
+    showUserFeedback(&quot;Please provide a component name.&quot;, 3);
+  }
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="postInstallScriptNewButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">75</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">203 1140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">84</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Create postInstall script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 250</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">wizard.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_float df;
+  dyn_string ds;
+
+  if(componentName.text != &quot;&quot;)
+  {
+    ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallation_packagerAppendManagerWizard.pnl&quot;,
+      &quot;Manager Wizard: PostInstall Script&quot;,
+      makeDynString(&quot;$componentName:&quot; + componentName.text, &quot;$scriptFunction:postInstall&quot;), df, ds);
+    initPanel();
+  }
+  else
+  {
+    showUserFeedback(&quot;Please provide a component name.&quot;, 3);
+  }
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="initScriptEditButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">86</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">503 563</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">88</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Edit script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 163</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/open_script_editor_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  editScript(&quot;initScript&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="postInstallScriptEditButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">87</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">825 1129</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">89</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Edit script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 279</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/open_script_editor_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  editScript(&quot;postInstallScript&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deleteScriptEditButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">88</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1147 1746</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">90</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Edit script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 396</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/open_script_editor_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  editScript(&quot;deleteScript&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="postDeleteScriptEditButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">89</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1470 2432</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">97</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Edit script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 512</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/open_script_editor_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  editScript(&quot;postDeleteScript&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="postDeleteScriptDeleteButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">121</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1470 2461</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">123</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Delete script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 541</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/delete_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFilePath = sourcePath.selectedText + g_sSlash + &quot;scripts&quot; + g_sSlash + componentName.text + g_sSlash;
+  string sFileName = componentName.text + &quot;.postDelete&quot;;
+
+  removeFile(sFilePath + sFileName);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deleteScriptDeleteButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">122</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1470 2345</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">124</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Delete script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 425</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/delete_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFilePath = sourcePath.selectedText + g_sSlash + &quot;scripts&quot; + g_sSlash + componentName.text + g_sSlash;
+  string sFileName = componentName.text + &quot;.delete&quot;;
+
+  removeFile(sFilePath + sFileName);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="postInstallScriptDeleteButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">123</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1470 2228</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">125</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Delete script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 308</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/delete_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFilePath = sourcePath.selectedText + g_sSlash + &quot;scripts&quot; + g_sSlash + componentName.text + g_sSlash;
+  string sFileName = componentName.text + &quot;.postInstall&quot;;
+
+  removeFile(sFilePath + sFileName);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="initScriptDeleteButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">124</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1470 2112</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">126</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Delete script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 192</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/delete_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFilePath = sourcePath.selectedText + g_sSlash + &quot;scripts&quot; + g_sSlash + componentName.text + g_sSlash;
+  string sFileName = componentName.text + &quot;.init&quot;;
+
+  removeFile(sFilePath + sFileName);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="allButton5" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">133</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">322 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">135</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">322 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;scriptFiles&quot;, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="noneButton5" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">134</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">375 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">136</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">375 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">None</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;scriptFiles&quot;, FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="scriptsLabel" shapeType="TEXT_FIELD" layerId="5">
+   <properties>
+    <prop name="serialId">152</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">154</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 112</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Scripts:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="initLabel" shapeType="TEXT_FIELD" layerId="5">
+   <properties>
+    <prop name="serialId">153</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">339 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">155</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">472 112</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Initialisation scripts:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="postInstallLabel" shapeType="TEXT_FIELD" layerId="5">
+   <properties>
+    <prop name="serialId">154</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">339 -93</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">156</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">472 228</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;PostInstall scripts:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deleteLabel" shapeType="TEXT_FIELD" layerId="5">
+   <properties>
+    <prop name="serialId">155</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">339 24</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">157</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">472 345</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Delete scripts:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="postDeleteLabel" shapeType="TEXT_FIELD" layerId="5">
+   <properties>
+    <prop name="serialId">156</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">339 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">158</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">472 461</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;PostDelete scripts:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="preInitScriptsTable" shapeType="TABLE" layerId="5">
+   <properties>
+    <prop name="serialId">182</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-2476 -63.59999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">182</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 485</prop>
+    <prop name="Size">375 85</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">326</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">fromFile</prop>
+     <prop name="Width">40</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">XML</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="preInitLabel" shapeType="TEXT_FIELD" layerId="5">
+   <properties>
+    <prop name="serialId">185</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">185</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 461</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;PreInit scripts:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="newPreInitScriptButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">181</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">399 483</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">181</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Create delete script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">399 483</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/new_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFilePath = sourcePath.selectedText + g_sSlash + &quot;scripts&quot; + g_sSlash + componentName.text + g_sSlash;
+  string sFileName = componentName.text + &quot;.preInit&quot;;
+
+  createNewFile(sFilePath, sFileName);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="preInitScriptEditButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">183</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">693 1862</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">183</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Edit script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">399 512</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/open_script_editor_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  editScript(&quot;preInitScriptsTable&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="preInitScriptDeleteButton" shapeType="PUSH_BUTTON" layerId="5">
+   <properties>
+    <prop name="serialId">184</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1016 2461</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">184</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Delete script</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">399 541</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/delete_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFilePath = sourcePath.selectedText + g_sSlash + &quot;scripts&quot; + g_sSlash + componentName.text + g_sSlash;
+  string sFileName = componentName.text + &quot;.preInit&quot;;
+
+  removeFile(sFilePath + sFileName);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="helpFiles" shapeType="TABLE" layerId="6">
+   <properties>
+    <prop name="serialId">67</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-3953 -4374</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">73</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 136</prop>
+    <prop name="Size">404 198</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">355</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  this.deleteSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="noneButton6" shapeType="PUSH_BUTTON" layerId="6">
+   <properties>
+    <prop name="serialId">136</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">375 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">138</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">375 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">None</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;helpFiles&quot;, FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="allButton6" shapeType="PUSH_BUTTON" layerId="6">
+   <properties>
+    <prop name="serialId">135</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">322 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">137</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">322 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;helpFiles&quot;, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="helpFilesLabel" shapeType="TEXT_FIELD" layerId="6">
+   <properties>
+    <prop name="serialId">157</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">159</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 112</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Help files:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="otherFiles" shapeType="TABLE" layerId="6">
+   <properties>
+    <prop name="serialId">166</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-3499 -4344</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">168</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">475 372</prop>
+    <prop name="Size">404 198</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">355</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  this.deleteSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="noneButton9" shapeType="PUSH_BUTTON" layerId="6">
+   <properties>
+    <prop name="serialId">167</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">829 344</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">169</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">829 344</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">None</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;otherFiles&quot;, FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="allButton9" shapeType="PUSH_BUTTON" layerId="6">
+   <properties>
+    <prop name="serialId">168</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">776 344</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">170</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">776 344</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;otherFiles&quot;, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="otherFilesLabel" shapeType="TEXT_FIELD" layerId="6">
+   <properties>
+    <prop name="serialId">169</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">339 27</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">171</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">472 348</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Other files:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="binFiles" shapeType="TABLE" layerId="6">
+   <properties>
+    <prop name="serialId">170</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-3499 -4373</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">172</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">475 136</prop>
+    <prop name="Size">404 198</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">355</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  this.deleteSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="noneButton8" shapeType="PUSH_BUTTON" layerId="6">
+   <properties>
+    <prop name="serialId">171</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">829 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">173</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">829 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">None</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;binFiles&quot;, FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="allButton8" shapeType="PUSH_BUTTON" layerId="6">
+   <properties>
+    <prop name="serialId">172</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">776 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">176</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">776 108</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;binFiles&quot;, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="binFilesLabel" shapeType="TEXT_FIELD" layerId="6">
+   <properties>
+    <prop name="serialId">173</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">339 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">177</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">472 112</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Bin files:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="noneButton7" shapeType="PUSH_BUTTON" layerId="6">
+   <properties>
+    <prop name="serialId">163</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">375 344</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">165</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">375 344</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">None</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;pictureFiles&quot;, FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="allButton7" shapeType="PUSH_BUTTON" layerId="6">
+   <properties>
+    <prop name="serialId">164</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">322 344</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">166</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">322 344</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  selectAllLines(&quot;pictureFiles&quot;, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="pictureFiles" shapeType="TABLE" layerId="6">
+   <properties>
+    <prop name="serialId">162</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-3953 -4118</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">164</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 372</prop>
+    <prop name="Size">404 198</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">355</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Item</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">inSelection</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  applySelection(row, column, value);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  this.deleteSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="pictureFilesLabel" shapeType="TEXT_FIELD" layerId="6">
+   <properties>
+    <prop name="serialId">165</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-115 27</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">167</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 348</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Pictures:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="generationLog" shapeType="TEXT_EDIT" layerId="7">
+   <properties>
+    <prop name="serialId">101</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">396 84</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">103</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">147 136</prop>
+    <prop name="Size">704 433</prop>
+    <extended>
+     <prop type="ENUM" name="inputMethodHints">0</prop>
+     <prop type="ENUM" name="verticalScrollBarPolicy">0</prop>
+     <prop type="ENUM" name="contextMenuPolicy">1</prop>
+     <prop type="ENUM" name="textInteractionFlags">19</prop>
+     <prop type="ENUM" name="horizontalScrollBarPolicy">0</prop>
+     <prop type="ENUM" name="alignment">1</prop>
+     <prop type="ENUM" name="frameShadow">48</prop>
+     <prop type="ENUM" name="layoutDirection">0</prop>
+     <prop type="ENUM" name="wordWrap">1</prop>
+     <prop type="ENUM" name="autoFormatting">0</prop>
+     <prop type="ENUM" name="wrapPolicy">0</prop>
+     <prop type="ENUM" name="frameShape">6</prop>
+     <prop type="ENUM" name="textFormat">2</prop>
+    </extended>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  generationLog.readOnly(TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="XMLPackAndGoButton" shapeType="PUSH_BUTTON" layerId="7">
+   <properties>
+    <prop name="serialId">44</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">72 746</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Create a folder with the component's configuration</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 136</prop>
+    <prop name="Size">106 53</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Generate ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string tempDynString;
+  string destinationFolder = PROJ_PATH;
+
+  generationLog.text(&quot;&quot;);
+  btnClose.enabled  = false;
+
+  if(componentName.text != &quot;&quot;)
+  {
+    writeXmlFile();
+
+    generationLog.append(&quot;XML file created.&quot;);
+    generationLog.append(&quot;--------------------------------------------------------------------------------------------------&quot;);
+
+    if(dynlen(g_dsXmlDescription) &gt; 0)
+    {
+      folderSelector(destinationFolder);
+
+      if(destinationFolder != &quot;&quot;)
+      {
+        generationLog.append(&quot;Destination folder selected:&quot;);
+        generationLog.append(destinationFolder);
+        generationLog.append(&quot;--------------------------------------------------------------------------------------------------&quot;);
+        generationLog.append(&quot;Copying files started.&quot;);
+
+        destinationFolder += g_sSlash + componentName.text;
+        fwInstallationPackager_packNgo(destinationFolder, sourcePath.text, g_dsXmlDescription);
+
+        //closeProgressBar();
+        generationLog.append(&quot;Copying files ended.&quot;);
+        generationLog.append(&quot;--------------------------------------------------------------------------------------------------&quot;);
+        generationLog.append(&quot;Component folder successfully generated.&quot;);
+
+        showUserFeedback(&quot;Component folder successfully generated.&quot;, 3);
+      }
+      else
+      {
+        generationLog.append(&quot;Component folder not generated. No path provided.&quot;);
+        showUserFeedback(&quot;Component folder not generated. No path provided.&quot;, 3);
+      }
+    }
+    else
+    {
+      generationLog.append(&quot;Component folder not generated. No information provided.&quot;);
+      showUserFeedback(&quot;Component folder not generated. No information provided.&quot;, 3);
+    }
+  }
+  else
+  {
+    generationLog.append(&quot;Component folder not generated. Name missing.&quot;);
+    showUserFeedback(&quot;Component folder not generated. Name missing.&quot;, 3);
+  }
+
+  btnClose.enabled  = true;
+}
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="generationLogLabel" shapeType="TEXT_FIELD" layerId="7">
+   <properties>
+    <prop name="serialId">158</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">14 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">161</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">147 112</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Log:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="clearLogButton" shapeType="PUSH_BUTTON" layerId="7">
+   <properties>
+    <prop name="serialId">186</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1415 774</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">186</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Clear log</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">853 135</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/delete_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  generationLog.text(&quot;&quot;);
+}
+
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

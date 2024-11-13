@@ -1,0 +1,443 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Inactive Alarms</prop>
+   <prop name="en_US.iso88591">Inactive Alarms</prop>
+  </prop>
+  <prop name="Size">800 670</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">21 55</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+void update() {
+  mapping tab;
+  bool isJcopOnly = onlyFrameworkDevicesCheckButton.state(0);
+	 string deviceDpName, deviceType, deviceDpNameWithElement;
+	 dyn_string deviceDpNames, deviceTypes, elements, exceptionInfo;
+ 	dyn_dyn_anytype jcopTypes;
+ 	  
+ 	fwOpenProgressBar(&quot;Working on list of inactive alarms&quot;, &quot;Updating...&quot;, 2);
+  
+  if (isJcopOnly) {  
+    fwDevice_getAllTypes(jcopTypes, exceptionInfo);
+    tab = getInactiveAlarms(jcopTypes[2]);
+  } else {
+    tab = getInactiveAlarms(dpTypes(&quot;*&quot;));
+  }
+  
+  int tabLength = mappinglen(tab);  
+  for (int x = 1; x &lt;= tabLength; x++) {
+    string deviceType = mappingGetKey(tab, x);
+    if (isJcopOnly) {
+      //jcopTypes is only initialised if isJcopOnly = true
+   		 int index = dynContains(jcopTypes[2], deviceType);
+   		 if(index &gt; 0) {
+   			 deviceType = jcopTypes[1][index];
+   		 }
+    }
+    
+    dyn_dyn_anytype results = mappingGetValue(tab, x);
+    int max = dynlen(results);
+    for(int i = 1; i &lt;= max; i++) {
+   		deviceDpName = dpSubStr(results[i][1], DPSUB_SYS_DP);
+     if (strlen(deviceDpName) == 0) {
+       continue;
+     }
+
+  	 	dynAppend(deviceDpNames, deviceDpName);
+  	 	dynAppend(deviceTypes, deviceType);
+  			deviceDpNameWithElement = dpSubStr(results[i][1], DPSUB_SYS_DP_EL);
+  			dynAppend(elements, substr(deviceDpNameWithElement, strlen(deviceDpName)));	 			
+   	}
+  }
+	 inactiveAlarmsTable.deleteAllLines();
+  inactiveAlarmsTable.updatesEnabled = false;
+	 inactiveAlarmsTable.appendLines(
+      dynlen(deviceDpNames),
+      &quot;deviceDpName&quot;, deviceDpNames,
+      &quot;element&quot;, elements,
+      &quot;deviceType&quot;, deviceTypes
+  );
+  numberLabel.text = &quot;Total: &quot; + dynlen(deviceDpNames);
+  inactiveAlarmsTable.updatesEnabled = true;
+	 fwCloseProgressBar(&quot;List of inactive alarms displayed.&quot;);
+} 
+
+private mapping getInactiveAlarms(const dyn_string types) {
+   mapping tab;
+   int max = dynlen(types);
+   
+   for (unsigned i = 1; i &lt;= max; i++) {
+      dyn_dyn_anytype localTab;     
+      
+      dpQuery(
+          &quot;SELECT '_alert_hdl.._active' FROM '*' WHERE '_alert_hdl.._active' == 0 AND _DPT = \&quot;&quot; 
+              + types[i] + &quot;\&quot;&quot;,
+          localTab
+      ); 
+      
+      //remove header
+      if (dynlen(localTab) &gt; 0) {
+         dynRemove(localTab, 1);
+      }
+      tab[types[i]] = localTab;
+      fwShowProgressBar(&quot;Querying the database...&quot;, (float)i/(float)max*100.0);
+   }
+   return tab;
+}]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	update();
+} ]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="Text7" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">18 47</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Inactive Alarms</prop>
+     <prop name="en_US.iso88591">Inactive Alarms</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="inactiveAlarmsTable" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 60</prop>
+    <prop name="Size">780 555</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">deviceDpName</prop>
+     <prop name="Width">405</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device DP name</prop>
+      <prop name="en_US.iso88591">Device DP name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">element</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Element</prop>
+      <prop name="en_US.iso88591">Element</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">deviceType</prop>
+     <prop name="Width">155</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device type</prop>
+      <prop name="en_US.iso88591">Device type</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="Close" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">715 635</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">715 635</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="onlyFrameworkDevicesCheckButton" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">24 630</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 38</prop>
+    <prop name="Size">171 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Only JCOP devices</prop>
+       <prop name="en_US.iso88591">Only JCOP devices</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+	update();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Button1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">190 636</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 634</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/refresh_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	update();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="numberLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">790 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">790 40</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Total: 0</prop>
+     <prop name="en_US.iso88591">Total: 0</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

@@ -1,0 +1,791 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">181 81</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+
+displayPlotInfo(string plotName, dyn_string &amp;exceptionInfo)
+{
+	bool isConnected;
+	string title, color, model, currentParameters;
+	dyn_string parameters;
+	dyn_dyn_string plotData;
+
+	Text3.text = plotName;
+	
+	if(plotName == &quot;&quot;)
+	{
+		Text1.text = &quot;&quot;;					
+		setNullPlot();
+		return;
+	}
+        
+	if(dpExists(plotName))
+	{
+		if(dpTypeName(plotName) == fwTrending_PLOT)
+		{
+			_fwTrending_isSystemForDpeConnected(plotName, isConnected, exceptionInfo);
+			if(isConnected)
+			{
+//DebugN(&quot;HERE&quot;);
+
+				fwDevice_getModel(plotName, model, exceptionInfo);
+				fwTrending_getPlot(plotName, plotData, exceptionInfo);
+				fwTrending_getAllTemplateParametersForConfiguration(plotData, fwTrending_PLOT, parameters, exceptionInfo);
+				if(dynlen(parameters) &gt; 0)
+				{
+					ParameterButton.visible = TRUE;
+					ParameterBackground.visible = TRUE;
+				}
+				else
+				{
+					ParameterButton.visible = FALSE;
+					ParameterBackground.visible = FALSE;
+				}
+						
+				title = plotData[fwTrending_PLOT_OBJECT_TITLE][1];
+				if(title != &quot;&quot;)
+					Text1.text = title;
+				else
+					Text1.text = plotName;
+			
+				color = plotData[fwTrending_PLOT_OBJECT_BACK_COLOR][1];
+				Text1.backCol = color;
+		
+				color = plotData[fwTrending_PLOT_OBJECT_FORE_COLOR][1];
+				Text1.foreCol = color;
+				Polyline1.foreCol = color;
+				Polyline2.foreCol = color;
+				Polyline3.foreCol = color;
+				Border1.backCol = plotData[fwTrending_PLOT_OBJECT_COLORS][1];
+				Border2.backCol = plotData[fwTrending_PLOT_OBJECT_COLORS][1];
+				Border3.backCol = plotData[fwTrending_PLOT_OBJECT_COLORS][1];
+				Border4.backCol = plotData[fwTrending_PLOT_OBJECT_COLORS][1];
+				Border1.foreCol = plotData[fwTrending_PLOT_OBJECT_COLORS][1];
+				Border2.foreCol = plotData[fwTrending_PLOT_OBJECT_COLORS][1];
+				Border3.foreCol = plotData[fwTrending_PLOT_OBJECT_COLORS][1];
+				Border4.foreCol = plotData[fwTrending_PLOT_OBJECT_COLORS][1];
+							
+				switch(model)
+				{
+					case fwTrending_XY_PLOT_MODEL:
+						Polyline1.visible = FALSE;
+						Polyline2.visible = TRUE;
+						Polyline3.visible = FALSE;
+						Border1.visible = FALSE;
+						Border2.visible = FALSE;
+						Border3.visible = FALSE;
+						Border4.visible = FALSE;
+						break;
+					case fwTrending_HISTOGRAM_PLOT_MODEL:
+						Polyline1.visible = FALSE;
+						Polyline2.visible = FALSE;
+						Polyline3.visible = TRUE;
+						Border1.visible = TRUE;
+						Border2.visible = TRUE;
+						Border3.visible = TRUE;
+						Border4.visible = TRUE;
+						break;
+					default:
+						Polyline1.visible = TRUE;
+						Polyline2.visible = FALSE;
+						Polyline3.visible = FALSE;
+						Border1.visible = FALSE;
+						Border2.visible = FALSE;
+						Border3.visible = FALSE;
+						Border4.visible = FALSE;
+						break;
+				}
+			}
+			else
+			{
+				ParameterButton.visible = FALSE;
+				ParameterBackground.visible = FALSE;
+				Text1.backCol = &quot;_3DFace&quot;;
+				Text1.text = plotName + &quot;\n(System not connected)&quot;;					
+				Polyline1.visible = FALSE;
+				Polyline2.visible = FALSE;
+				Polyline3.visible = FALSE;
+				Border1.visible = FALSE;
+				Border2.visible = FALSE;
+				Border3.visible = FALSE;
+				Border4.visible = FALSE;
+			}
+		}
+		else
+		{
+			Text1.text = plotName + &quot;\n(Plot not existing)&quot;;					
+			setNullPlot();
+		}
+	}
+	else
+	{
+		Text1.text = plotName + &quot;\n(Plot not existing)&quot;;					
+		setNullPlot();
+	}
+}
+
+setNullPlot()
+{
+	ParameterButton.visible = FALSE;
+	ParameterBackground.visible = FALSE;
+	Text1.backCol = &quot;_3DFace&quot;;
+	Text1.foreCol = &quot;_3DText&quot;;
+	Text3.text = &quot;&quot;;
+	Polyline1.foreCol = &quot;_3DFace&quot;;
+	Polyline2.foreCol = &quot;_3DFace&quot;;
+	Polyline3.foreCol = &quot;_3DFace&quot;;
+	Border1.backCol = &quot;_3DFace&quot;;
+	Border2.backCol = &quot;_3DFace&quot;;
+	Border3.backCol = &quot;_3DFace&quot;;
+	Border4.backCol = &quot;_3DFace&quot;;
+	Border1.foreCol = &quot;_3DFace&quot;;
+	Border2.foreCol = &quot;_3DFace&quot;;
+	Border3.foreCol = &quot;_3DFace&quot;;
+	Border4.foreCol = &quot;_3DFace&quot;;
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int i,j;
+	dyn_dyn_string pageData;
+	dyn_string exceptionInfo;
+  
+	displayPlotInfo($plot, exceptionInfo);
+
+//DebugN($PageName);
+
+	if(dpExists($PageName))
+	{
+		fwTrending_getPage($PageName, pageData, exceptionInfo);
+		j = $Row;
+		i = $Col;
+	
+		if(dynlen(pageData[fwTrending_PAGE_OBJECT_PLOTS]) &gt;= (6 * (j - 1) + i))
+		{
+	//DebugN(pageData[fwTrending_PAGE_OBJECT_PLOTS][6 * (j - 1) + i]);
+	//DebugN(pageData[fwTrending_PAGE_OBJECT_PLOT_TEMPLATE_PARAMETERS][6 * (j - 1) + i]);
+			localParameterValues.text = pageData[fwTrending_PAGE_OBJECT_PLOT_TEMPLATE_PARAMETERS][6 * (j - 1) + i];
+		}
+	}
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="isNewPlot" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 22</prop>
+    <prop name="Size">47 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">FALSE</prop>
+     <prop name="en_US.iso88591">FALSE</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text3" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 20</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 22</prop>
+    <prop name="Size">47 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Courier New,-1,12,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Courier New,-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text1" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">2 2</prop>
+    <prop name="Size">177 77</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Polyline1" shapeType="POLYGON">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 69</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinRound,CapRound,4]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Closed">False</prop>
+    <prop name="Points">
+     <prop name="Location">11 69</prop>
+     <prop name="Location">31 44</prop>
+     <prop name="Location">51 44</prop>
+     <prop name="Location">108 34</prop>
+     <prop name="Location">129 44</prop>
+     <prop name="Location">169 19</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text2" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">150 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">152 52</prop>
+    <prop name="Size">17 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,16,5,75,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,16,5,75,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> ...</prop>
+     <prop name="en_US.iso88591"> ...</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string currentParameters;
+	dyn_float df;
+	dyn_string ds, exceptionInfo;
+	dyn_dyn_string plotData;
+	
+	Text2.foreCol = &quot;White&quot;;
+	Polyline4.foreCol = &quot;Black&quot;;
+
+	ChildPanelOnCentralModalReturn(&quot;fwTrending/fwTrendingChoose.pnl&quot;, &quot;Choose Plot&quot;,
+																	makeDynString(&quot;$sDpType:&quot; + fwTrending_PLOT, &quot;$sCurrentChoice:&quot; + Text3.text),
+																	df, ds);
+
+	if(ds[1] != &quot;Cancel&quot;)
+	{                
+		if(ds[1] == &quot;OK&quot;)
+		{
+			if(ds[2] != Text3.text)
+			{
+				localParameterValues.text = &quot;&quot;;
+				isNewPlot.text = &quot;TRUE&quot;;
+			}
+			else
+				isNewPlot.text = &quot;FALSE&quot;;
+
+			displayPlotInfo(ds[2], exceptionInfo);
+
+			fwTrending_getPlot(ds[2], plotData, exceptionInfo);		
+			currentParameters = localParameterValues.text;
+					
+			fwTrending_checkAndGetAllTemplateParameters(plotData[fwTrending_PLOT_OBJECT_TITLE][1],
+																									plotData, fwTrending_PLOT, currentParameters, exceptionInfo);
+			localParameterValues.text = currentParameters;
+		}
+		else
+		{
+			isNewPlot.text = &quot;FALSE&quot;;
+			displayPlotInfo(&quot;&quot;, exceptionInfo);
+			localParameterValues.text = &quot;&quot;;
+		}
+	}
+
+	Text2.foreCol = &quot;Black&quot;;
+	Polyline4.foreCol = &quot;White&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="Polyline4" shapeType="POLYGON">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">150 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{255,255,255}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Closed">False</prop>
+    <prop name="Points">
+     <prop name="Location">150 70</prop>
+     <prop name="Location">150 50</prop>
+     <prop name="Location">170 50</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="localParameterValues" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 52</prop>
+    <prop name="Size">97 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Text4</prop>
+     <prop name="en_US.iso88591">Text4</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="ParameterButton" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">120 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">122 52</prop>
+    <prop name="Size">17 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">{a}</prop>
+     <prop name="en_US.iso88591">{a}</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string plotName, currentParameters;
+	dyn_string exceptionInfo;
+	dyn_dyn_string plotData;
+        
+	ParameterButton.foreCol = &quot;White&quot;;
+	ParameterBackground.foreCol = &quot;Black&quot;;
+
+	plotName = Text3.text;
+	currentParameters = localParameterValues.text;
+		
+	fwTrending_getPlot(plotName, plotData, exceptionInfo);
+
+	fwTrending_modifyAllTemplateParameters(&quot;Plot&quot;, plotData, fwTrending_PLOT, currentParameters, exceptionInfo);
+
+	localParameterValues.text = currentParameters;
+	
+	ParameterButton.foreCol = &quot;Black&quot;;
+	ParameterBackground.foreCol = &quot;White&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ParameterBackground" shapeType="POLYGON">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">120 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,255,255}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Closed">False</prop>
+    <prop name="Points">
+     <prop name="Location">120 70</prop>
+     <prop name="Location">120 50</prop>
+     <prop name="Location">140 50</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Polyline2" shapeType="POLYGON">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">165 24</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,4]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">165 25</prop>
+     <prop name="Location">95 39</prop>
+     <prop name="Location">15 17</prop>
+     <prop name="Location">45 67</prop>
+     <prop name="Location">105 17</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Border1" shapeType="RECTANGLE">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">17 67</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,4]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">17 47</prop>
+    <prop name="Size">24 21</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Border2" shapeType="RECTANGLE">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">62 67</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,4]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">62 53</prop>
+    <prop name="Size">24 15</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Border3" shapeType="RECTANGLE">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">40 67</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">36</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,4]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">40 27</prop>
+    <prop name="Size">23 41</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Border4" shapeType="RECTANGLE">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">85 67</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,4]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">85 41</prop>
+    <prop name="Size">23 27</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Polyline3" shapeType="POLYGON">
+   <properties>
+    <prop name="serialId">41</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">16 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">40</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,3]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Closed">False</prop>
+    <prop name="Points">
+     <prop name="Location">16 20</prop>
+     <prop name="Location">16 68</prop>
+     <prop name="Location">116 68</prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

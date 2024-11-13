@@ -1,0 +1,573 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">624 480</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 10</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwElmb/fwElmb.ctl&quot;
+
+dyn_string nodeDpTypes;
+
+updateDeviceListTable()
+{
+// Local Variables
+// ---------------
+  int i;
+
+  string deviceType, deviceName;
+  string sType, sTypeTemp;
+  string sChannel, sChannelTemp;
+  string sDPType;
+
+  langString lsComment;
+
+  dyn_string dsChildren, dsExceptionInfo;
+
+// Executable Code
+// ---------------
+  // Delete all lines to start with
+  deviceListTable.deleteAllLines();
+
+  // Check DP exists
+  if (dpExists($sDpName)) {
+    // Check type
+    sDPType = dpTypeName($sDpName);
+    dyn_string AIs = dpNames($sDpName+&quot;/AI/*&quot;, &quot;FwElmbAi&quot;);
+    if (sDPType == ELMB_AI_CONFIG_TYPE_NAME) {
+      fwDevice_getChildren($sDpName,
+                           fwDevice_HARDWARE,
+                           dsChildren,
+                           dsExceptionInfo);
+    } else if (sDPType == ELMB_TYPE_NAME &amp;&amp; dynlen(AIs)&gt;0) {
+      fwDevice_getChildren($sDpName + fwDevice_HIERARCHY_SEPARATOR + ELMB_AI_CONFIG_NAME,
+                           fwDevice_HARDWARE,
+                           dsChildren,
+                           dsExceptionInfo);
+    }
+  }
+
+  // Get all channels defined for this node
+  for (i = 1; i &lt;= dynlen(dsChildren); i++) {
+
+    fwDevice_getName(dsChildren[i], deviceName, dsExceptionInfo);
+
+    if (dpTypeName(dsChildren[i]) == ELMB_AI_SDO_TYPE_NAME) {
+      sType = &quot;SDO Analog Input&quot;;
+    } else {
+      dpGet(dsChildren[i] + &quot;.type&quot;, sTypeTemp);
+      sType = sTypeTemp;
+    }
+
+    dpGet(dsChildren[i] + &quot;.channel&quot;, sChannelTemp);
+    sChannel = sChannelTemp;
+
+    lsComment = dpGetDescription(dsChildren[i] + &quot;.value&quot;);
+
+    // Populate data into the table
+    deviceListTable.appendLine(&quot;deviceName&quot;, deviceName,
+                               &quot;comment&quot;, lsComment,
+                               &quot;deviceType&quot;, deviceType,
+                               &quot;datapointName&quot;, dsChildren[i],
+                               &quot;type&quot;, sType,
+                               &quot;channelNr&quot;, sChannel);
+  }
+
+  // Return to calling routine
+  return;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="lblTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Manage Analog Inputs</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmShowColumns" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">470 77</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Show Columns</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">470 10</prop>
+    <prop name="Size">140 70</prop>
+   </properties>
+  </shape>
+  <shape Name="deviceListTable" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 90</prop>
+    <prop name="Size">605 341</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">26</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">deviceName</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Analog Channel</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">comment</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Comment</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">deviceType</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Device Type</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">datapointName</prop>
+     <prop name="Width">250</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Data Point Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">type</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Type</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">channelNr</prop>
+     <prop name="Width">100</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Channel Nr.</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"/>
+     <prop name="Label">
+	<prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	// Put table in multiple selection mode
+	deviceListTable.tableMode(TABLE_SELECT_MULTIPLE); 
+	deviceListTable.selectByClick(TABLE_SELECT_LINE);
+	updateDeviceListTable();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdDelete" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">487 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">487 440</prop>
+    <prop name="Size">60 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Delete</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int i;
+	
+	string sDpName;
+	
+	dyn_int diSelectedLines;
+	
+	dyn_float df;
+	
+	dyn_string dsExceptionInfo;
+	dyn_string ds;
+	
+// Executable Code
+// ---------------
+	// Get the selected lines from the tables
+	diSelectedLines = deviceListTable.getSelectedLines();
+	
+	if (dynlen(diSelectedLines) &gt; 0) {
+	
+		// Give user the chance to cancel
+		if (dynlen(diSelectedLines) == 1)
+			ChildPanelOnCentralReturn(&quot;vision/MessageInfo&quot;,
+																&quot;Confirm&quot;,
+																makeDynString(&quot;Are you sure you want delete this channel?&quot;, &quot;OK&quot;, &quot;Cancel&quot;),
+																df, ds);
+		else
+			ChildPanelOnCentralReturn(&quot;vision/MessageInfo&quot;,
+																&quot;Confirm&quot;,
+																makeDynString(&quot;Are you sure you want delete these &quot; + dynlen(diSelectedLines) + &quot; channels?&quot;, &quot;OK&quot;, &quot;Cancel&quot;),
+																df, ds);
+																
+		if (df[1]==1) {
+	
+			// Indicate system is busy
+			fwOpenProgressBar(&quot;Deleting Analog Inputs&quot;, &quot;In progress. Please wait...&quot;, 1);
+			
+			// Remove all required devices
+			for (i = 1; i &lt;= dynlen(diSelectedLines); i++) {
+				getValue(&quot;deviceListTable&quot;, &quot;cellValueRC&quot;, diSelectedLines[i], &quot;datapointName&quot;, sDpName);
+				fwDevice_delete(sDpName, dsExceptionInfo);
+			}
+			
+			// Check for errors																
+			if (dynlen(dsExceptionInfo) &gt; 0) {
+				fwCloseProgressBar(&quot;Analog Input deletion encountered errors&quot;);
+				fwExceptionHandling_display(dsExceptionInfo);
+			} else {
+				fwCloseProgressBar(&quot;Analog Input deletion completed successfully&quot;);
+			}	
+	
+			// Update the table information
+			updateDeviceListTable();
+		}
+	} else {
+		ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+												&quot;Nothing to delete&quot;,
+												makeDynString(&quot;No channels have been selected to be deleted&quot;));
+	}
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">554 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">554 440</prop>
+    <prop name="Size">60 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="chkShowDescription" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">480 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">480 30</prop>
+    <prop name="Size">121 41</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Analog Channel</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Comment</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+	switch (button) {
+		case 0:	// ELMB name
+			if (state)
+				deviceListTable.namedColumnVisibility(&quot;deviceName&quot;, true);
+			else
+				deviceListTable.namedColumnVisibility(&quot;deviceName&quot;, false);
+			break;
+		case 1:	// Comment
+			if (state)
+				deviceListTable.namedColumnVisibility(&quot;comment&quot;, true);
+			else
+				deviceListTable.namedColumnVisibility(&quot;comment&quot;, false);
+			break;
+	}
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdCreate" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">420 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">420 440</prop>
+    <prop name="Size">60 26</prop>
+    <prop name="PopupItemId"/>
+    <prop name="Text">
+	<prop name="en_US.utf8">Create</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1</prop>
+      <prop name="Text">
+	<prop name="en_US.utf8">Standard</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">2</prop>
+      <prop name="Text">
+	<prop name="en_US.utf8">Using SDO</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+// Local Variables
+// ---------------
+  dyn_float df;
+
+  string sSubDpName = dpSubStr($sDpName, DPSUB_DP);
+
+  dyn_string ds;
+  dyn_string dsTemp = strsplit(sSubDpName, fwDevice_HIERARCHY_SEPARATOR);
+  
+// Executable Code
+// ---------------
+  switch (id) {
+    case &quot;1&quot;:
+      // Display panel to allow creation of analog inputs
+      ChildPanelOnCentralModalReturn(&quot;fwElmb/fwElmbAiConfigConfiguration.pnl&quot;,
+                                     &quot;Create Device&quot;,
+                                     makeDynString(&quot;$sDpName:&quot; + $sDpName,
+                                                   &quot;$sElmbLabels:&quot; + dsTemp[3],
+                                                   &quot;$sNodeIDs:&quot; + &quot;&quot;,
+                                                   &quot;$sElmbComment:&quot; + &quot;&quot;),
+                                     df, ds);
+      break;
+    case &quot;2&quot;:
+      // Display panel to allow creation of analog inputs
+      ChildPanelOnCentralModalReturn(&quot;fwElmb/objects/fwElmbCreateAnalogInputSDO.pnl&quot;,
+                                     &quot;Create Device&quot;,
+                                     makeDynString(&quot;$sDpName:&quot; + $sDpName,
+                                                   &quot;$sElmbLabels:&quot; + dsTemp[3],
+                                                   &quot;$sNodeIDs:&quot; + &quot;&quot;,
+                                                   &quot;$sElmbComment:&quot; + &quot;&quot;),
+                                     df, ds);
+      break;
+  }
+
+  // Update table information
+  updateDeviceListTable();
+
+  // Return to calling routine
+  return;
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

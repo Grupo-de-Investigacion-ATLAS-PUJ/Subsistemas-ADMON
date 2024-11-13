@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   <prop name="en_US.iso88591"></prop>
+   <prop name="de_AT.iso88591"></prop>
+  </prop>
+  <prop name="Size">212 224</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[ApplyCancelOKButtonClick(string returnVal)
+{
+  string format;
+  switch(returnVal)
+  {
+    case &quot;OK&quot;:
+      PanelOffReturn(makeDynFloat(0.0), makeDynString(txtFormat.text));
+    break;
+    case &quot;Cancel&quot;:
+      PanelOffReturn(makeDynFloat(0.0), makeDynString(&quot;Cancel&quot;));
+    break;
+  }
+}
+
+enableFields(bool enable)
+{
+  ValueFormatInteger.enabled = enable;
+  ValueFormatDecimal.enabled = enable;
+  txtFormat.enabled = enable;
+  computeFormat();
+}
+
+computeFormat()
+{
+  int autoFormat;
+  getValue(&quot;AutoFormat&quot;,&quot;state&quot;,0,autoFormat);
+  if(autoFormat)
+    txtFormat.text = &quot;&quot;;
+  else
+    txtFormat.text = &quot;%0&quot;+ValueFormatInteger.text+&quot;.&quot;+ValueFormatDecimal.text+&quot;f&quot;;  
+}]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  string sFormat, sDummy;
+  dyn_string dsFormat;
+  int iDigits, iAfterDec;
+  
+  sFormat = $format;
+  txtFormat.text = $format;
+  sscanf(sFormat,&quot;%%%d.%d%s&quot;, iDigits, iAfterDec, sDummy);
+  
+  if(iDigits==0 &amp;&amp; iAfterDec==0)
+  {
+    AutoFormat.state(0,1);
+    enableFields(0);
+  }
+  else
+  {
+    ValueFormatInteger.text = iDigits;
+    ValueFormatDecimal.text = iAfterDec;
+  }
+  
+}
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">False</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">False</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">False</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">False</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">False</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="Text1" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">66 54</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">68 54</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> Integer digits:</prop>
+     <prop name="en_US.iso88591"> Integer digits:</prop>
+     <prop name="de_AT.iso88591"> Vor Komma:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text2" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 94</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">32 94</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Pos. after dec. point:</prop>
+     <prop name="en_US.iso88591">Pos. after dec. point:</prop>
+     <prop name="de_AT.iso88591"> Nach Komma:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="ValueFormatInteger" shapeType="SPIN_BUTTON">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">160.2608695652174 48</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">162 50</prop>
+    <prop name="Size">41 26</prop>
+    <prop name="MinimumID">1</prop>
+    <prop name="MaximumID">12</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">3</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  computeFormat();
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ValueFormatDecimal" shapeType="SPIN_BUTTON">
+   <properties>
+    <prop name="serialId">42</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">160.2608695652174 88</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">42</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial [Microsoft Windows],-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">162 90</prop>
+    <prop name="Size">41 26</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">6</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">2</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  computeFormat();
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="AutoFormat" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">51</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 18</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">51</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial [Microsoft Windows],-1,12,5,49,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial [Microsoft Windows],-1,12,5,49,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-*-Arial [Microsoft Windows]-*-r-normal-*-12-*-100-100-*-*-iso8859-1|-12,0,0,0,495,0,0,0,0,0,0,0,0,Arial [Microsoft Windows]</prop>
+    </prop>
+    <prop name="Location">10 20</prop>
+    <prop name="Size">88 25</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Auto format</prop>
+       <prop name="en_US.iso88591">Auto format</prop>
+       <prop name="de_AT.iso88591">Autoformat</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  enableFields(!state);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ButtonOK" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">52</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 190</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{
+	ApplyCancelOKButtonClick(&quot;OK&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ButtonCancel" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">53</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">110 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">53</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Hotkey">Esc</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">110 190</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	ApplyCancelOKButtonClick(&quot;Cancel&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="txtFormat" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">54</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9.999999999999995 150</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">54</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">MS Shell Dlg 2,8.25,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 150</prop>
+    <prop name="Size">191 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

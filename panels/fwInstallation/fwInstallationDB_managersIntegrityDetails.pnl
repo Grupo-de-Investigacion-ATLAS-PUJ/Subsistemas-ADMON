@@ -1,0 +1,632 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">1230 340</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwInstallation/fwInstallationDB.ctl&quot;
+
+init()
+{
+  bool isOk;
+  dyn_dyn_mixed dbManagersInfo, pvssManagersInfo;
+
+  clear();
+
+  if(fwInstallationDB_connect())
+  {
+     DebugN(&quot;Could not connect to DB. Please, check connection parameters and availability of the server.&quot;);
+     return;
+  }
+
+  if(fwInstallationDBAgent_checkProjectManagersInfo(isOk, dbManagersInfo, pvssManagersInfo) != 0)
+  {
+     DebugN(&quot;ERROR -&gt; Could not check consistency between PVSS and DB for project managers&quot;);
+  }
+  else
+  {
+    for(int i = 1; i &lt;= dynlen(pvssManagersInfo); i++)
+    {
+      string col = &quot;yellow&quot;;
+      tbPvssManagers.appendLine(&quot;manager&quot;, pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_NAME_IDX],
+                                  &quot;start&quot;, pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_START_IDX],
+                                  &quot;restart&quot;, pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_RESTART_IDX],
+                                  &quot;reset&quot;, pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_RESETMIN_IDX],
+                                  &quot;seckill&quot;, pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_SECKILL_IDX],
+                                  &quot;options&quot;, pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_OPTIONS_IDX],
+                                  &quot;alerts&quot;, pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_TRIGGERS_ALERTS_IDX]);
+
+      for(int j = 1; j &lt;= dynlen(dbManagersInfo); j++)
+      {
+        if(pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_NAME_IDX] == dbManagersInfo[j][FW_INSTALLATION_DB_MANAGER_NAME_IDX] &amp;&amp;
+           pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_START_IDX] == dbManagersInfo[j][FW_INSTALLATION_DB_MANAGER_START_IDX] &amp;&amp;
+           pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_OPTIONS_IDX] == dbManagersInfo[j][FW_INSTALLATION_DB_MANAGER_OPTIONS_IDX])
+        {
+//          DebugN(pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_NAME_IDX],
+//                 pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_OPTIONS_IDX],
+//                 pvssManagersInfo[i][FW_INSTALLATION_DB_MANAGER_START_IDX],
+//                 dbManagersInfo[j][FW_INSTALLATION_DB_MANAGER_START_IDX]);
+
+          col = &quot;_Window&quot;;
+          break;
+        }
+      }
+
+      tbPvssManagers.cellBackColRC(i-1, &quot;manager&quot;,  col);
+      tbPvssManagers.cellBackColRC(i-1, &quot;start&quot;, col);
+      tbPvssManagers.cellBackColRC(i-1, &quot;restart&quot;, col);
+      tbPvssManagers.cellBackColRC(i-1, &quot;reset&quot;, col);
+      tbPvssManagers.cellBackColRC(i-1, &quot;seckill&quot;, col);
+      tbPvssManagers.cellBackColRC(i-1, &quot;options&quot;, col);
+      tbPvssManagers.cellBackColRC(i-1, &quot;alerts&quot;, col);
+
+    }
+    for(int i = 1; i &lt;= dynlen(dbManagersInfo); i++)
+    {
+      string col = &quot;yellow&quot;;
+
+      //Savannah #55313: UI crash if values are not initialized.
+      string temp = dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_OPTIONS_IDX];
+      dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_OPTIONS_IDX] = temp;
+
+      tbDbManagers.appendLine(&quot;manager2&quot;, dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_NAME_IDX],
+                                  &quot;start2&quot;, dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_START_IDX],
+                                  &quot;restart2&quot;, dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_RESTART_IDX],
+                                  &quot;reset2&quot;, dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_RESETMIN_IDX],
+                                  &quot;seckill2&quot;, dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_SECKILL_IDX],
+                                  &quot;options2&quot;, dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_OPTIONS_IDX],
+                                  &quot;alerts2&quot;, dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_TRIGGERS_ALERTS_IDX]);
+
+
+
+      for(int j = 1; j &lt;= dynlen(pvssManagersInfo); j++)
+      {
+        if(pvssManagersInfo[j][FW_INSTALLATION_DB_MANAGER_NAME_IDX] == dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_NAME_IDX] &amp;&amp;
+           pvssManagersInfo[j][FW_INSTALLATION_DB_MANAGER_START_IDX] == dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_START_IDX] &amp;&amp;
+           pvssManagersInfo[j][FW_INSTALLATION_DB_MANAGER_OPTIONS_IDX] == dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_OPTIONS_IDX])
+        {
+//          DebugN(pvssManagersInfo[j][FW_INSTALLATION_DB_MANAGER_NAME_IDX],
+//                 pvssManagersInfo[j][FW_INSTALLATION_DB_MANAGER_OPTIONS_IDX],
+//                 pvssManagersInfo[j][FW_INSTALLATION_DB_MANAGER_START_IDX],
+//                 dbManagersInfo[i][FW_INSTALLATION_DB_MANAGER_START_IDX]);
+          col = &quot;_Window&quot;;
+          break;
+        }
+      }
+
+      tbDbManagers.cellBackColRC(i-1, &quot;manager2&quot;,  col);
+      tbDbManagers.cellBackColRC(i-1, &quot;start2&quot;, col);
+      tbDbManagers.cellBackColRC(i-1, &quot;restart2&quot;, col);
+      tbDbManagers.cellBackColRC(i-1, &quot;reset2&quot;, col);
+      tbDbManagers.cellBackColRC(i-1, &quot;seckill2&quot;, col);
+      tbDbManagers.cellBackColRC(i-1, &quot;options2&quot;, col);
+      tbDbManagers.cellBackColRC(i-1, &quot;alerts2&quot;, col);
+    }
+  }
+}
+
+void clear()
+{
+  tbPvssManagers.deleteAllLines();
+  tbDbManagers.deleteAllLines();
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  init();
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="projectIndicatorBg" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">65</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">150 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Window</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">127</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">615 295</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="databaseIndicatorBg" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">66</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">480 415</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowAlternate</prop>
+    <prop name="BackColor">_WindowAlternate</prop>
+    <prop name="TabOrder">128</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">615 0</prop>
+    <prop name="Size">615 295</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="projectIndicatorLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">67</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-256 374</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">129</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">6.123233995736766e-17 -1 1 6.123233995736766e-17 -450 384</prop>
+    <prop name="Location">190 460</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">PROJECT</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="databaseIndicatorLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">68</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1584 1126</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">130</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">6.123233995736766e-17 1 -1 6.123233995736766e-17 1680 -94.00000000000003</prop>
+    <prop name="Location">190 460</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">DATABASE</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btnCheck" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">56</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1050 275</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">113</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Check PVSS_DB consistency</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 305</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/refresh_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  init();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">57</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1145 320</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">115</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1145 305</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tbPvssManagers" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">58</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">40 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">116</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">40 30</prop>
+    <prop name="Size">565 255</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">10</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">manager</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Manager</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">start</prop>
+     <prop name="Width">73</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Start mode</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">restart</prop>
+     <prop name="Width">52</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Restart</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">reset</prop>
+     <prop name="Width">55</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Reset</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Minutes</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">seckill</prop>
+     <prop name="Width">42</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Kill</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Seconds</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">options</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Options</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">alerts</prop>
+     <prop name="Width">42</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Alerts</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="tbDbManagers" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">62</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">625 36.3870967741935</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">124</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">625 30</prop>
+    <prop name="Size">565 255</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">10</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">manager2</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Manager</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">start2</prop>
+     <prop name="Width">73</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Start mode</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">restart2</prop>
+     <prop name="Width">53</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Restart</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">reset2</prop>
+     <prop name="Width">55</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Reset</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Minutes</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">seckill2</prop>
+     <prop name="Width">42</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Sec Kill</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">options2</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Options</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">alerts2</prop>
+     <prop name="Width">42</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Alerts</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="runningProjectLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">63</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">40 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">125</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">40 10</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Running project:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="databaseLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">64</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">625 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">126</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">625 10</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Database:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

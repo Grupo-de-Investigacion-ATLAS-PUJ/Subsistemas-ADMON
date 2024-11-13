@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">415 160</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 40</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[/** Dollar parameters:
+  * $text
+  * $icon = &quot;INFO&quot; [allowed: &quot;INFO&quot;, &quot;WARNING&quot;, &lt;pathToCustonIcon&gt;]
+  * $keepOnTop = &quot;no&quot; [enables keeping this window above others when value = &quot;yes&quot;]
+  */
+
+/** Returned values:
+  * timeout elapsed -&gt; -1.0, &quot;timeout&quot;
+  * btnOk -&gt; 0.0, &quot;DENY&quot;
+  */
+
+string lastChildPanelOpen;
+
+keepSelfOnTopCb(string childPanelModuleDpe, string childPanelModule,
+                string childPanelNameDpe, string childPanelName,
+                string isChildModalDpe, bool isChildModal){
+  if(childPanelModule == myModuleName() &amp;&amp; !isChildModal){
+    delay(0, 10);
+    storeLastOpenedChildPanel(childPanelName);
+    bringPanelToTop(self);
+  }
+}
+
+bringPanelToTop(shape panelShape){
+  panelShape.windowState(&quot;WindowNoState&quot;);
+  panelShape.windowState(&quot;WindowActive&quot;);
+}
+
+storeLastOpenedChildPanel(string childPanelName){
+  lastChildPanelOpen = childPanelName;
+}
+
+//////////////////////////
+
+string getIcon(string iconId){
+  switch(iconId){
+    case &quot;INFO&quot;:    return getPath(PICTURES_REL_PATH, &quot;StandardIcons/info_40.png&quot;);
+    case &quot;WARNING&quot;: return getPath(PICTURES_REL_PATH, &quot;StandardIcons/Attention_40.png&quot;);
+  } // default: return iconId (assume that this is a path to custom icon)
+  return iconId;
+}
+
+void loadIcon(string icon){
+  if(icon == &quot;&quot; || access(icon, R_OK) != 0){
+    fwInstallation_throw(&quot;Icon file: &quot; + icon + &quot; does not exist, default icon is displayed&quot;, &quot;WARNING&quot;);
+  }
+  rectIconPlaceholder.fill(&quot;[pattern,[fit,any,&quot; + icon + &quot;]]&quot;);
+}
+
+//////////////////////////
+
+closePanelWithReturnValues(const dyn_float &amp;df, const dyn_string &amp;ds){
+  PanelOffReturn(df, ds);
+  activateLastOpenedChildPanel();
+}
+
+activateLastOpenedChildPanel(){ // note: does not work on Windows (setting windowState on sibling panel does not activate it)
+  if(lastChildPanelOpen != &quot;&quot; &amp;&amp; isPanelOpen(lastChildPanelOpen)){
+    bringPanelToTop(getShape(myModuleName() + &quot;.&quot; + lastChildPanelOpen + &quot;:&quot;));
+  }
+}
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  // Overwriting Close script to disable possibility of closing panel with 'X' button
+}
+]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+  // Overwriting Terminate script
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  messageLabel.text = $text;
+
+  if(isDollarDefined(&quot;$keepOnTop&quot;) &amp;&amp; strtolower(getDollarValue(&quot;$keepOnTop&quot;)) == &quot;yes&quot;){
+    dpConnect(&quot;keepSelfOnTopCb&quot;, myUiDpName() + &quot;.ChildPanelOn.ModuleName&quot;,
+              myUiDpName() + &quot;.ChildPanelOn.PanelName&quot;, myUiDpName() + &quot;.ChildPanelOn.Modal&quot;);
+  }
+
+  if(isDollarDefined(&quot;$icon&quot;)){
+    string icon = getDollarValue(&quot;$icon&quot;);
+    loadIcon(getIcon(icon.isEmpty()?&quot;INFO&quot;:icon));
+  }
+
+  // Start countdown for auto-closing the panel
+  for(int i=60; i&gt;0; i--){
+    closingInfoLabel.text = &quot;Window automatically closes in &quot;+i+&quot; seconds.&quot;;
+    delay(1);
+  }
+
+  closePanelWithReturnValues(makeDynFloat(-1.0), makeDynString(&quot;timeout&quot;));
+}
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="closingInfoLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">72 95.40000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">74 97.40000000000001</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,75,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Window automatically closes in xx seconds.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btnOk" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">331 125</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">331 125</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  closePanelWithReturnValues(makeDynFloat(0.0), makeDynString(&quot;DENY&quot;));
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="rectBackground" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">110 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.8243243243243243 0 0 1 1.398164738108584e-14 0</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">75 160</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="rectIconPlaceholder" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">14 14</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[none,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[fit,any,pictures/StandardIcons/info_40.png]]</prop>
+    <prop name="Geometry">1 0 0 1 -3 46</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">14 14</prop>
+    <prop name="Size">40 40</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="messageLabel" shapeType="Label" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">90 12</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">72 12</prop>
+    <prop name="Size">334 75</prop>
+    <extended>
+     <prop type="ENUM" name="frameShape">0</prop>
+     <prop type="ENUM" name="textInteractionFlags">4</prop>
+     <prop type="BOOL" name="openExternalLinks">True</prop>
+     <prop type="BOOL" name="wordWrap">True</prop>
+    </extended>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

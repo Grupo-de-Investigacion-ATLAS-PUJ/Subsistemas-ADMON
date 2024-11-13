@@ -1,0 +1,302 @@
+#uses "fwTrending/fwTrendingTree.ctl"
+
+main()
+{
+  bool bTemp;
+  int iVersionNumber, iConfigType;
+  string sUnCoreVersion, sIsUnicos, sFreshInstall;
+  dyn_string exceptionInfo;
+
+  DebugTN("");
+  DebugTN("**************** fwTrending .postinstall (start) ****************");
+  DebugTN("");
+
+
+  sIsUnicos = "TrendingConfiguration.UNICOS.isUNICOS:_original.._value";
+
+  if ( dpExists("FwTrendingPlotInfo.type") )
+  {
+    dpGet("FwTrendingPlotInfo.type:_general.._type", iConfigType);
+    if ( DPCONFIG_GENERAL ==  iConfigType )
+    {
+      dpGet("FwTrendingPlotInfo.type:_general.._string_01", sFreshInstall);
+
+      if ( "FreshInstall" == sFreshInstall )
+      {
+        DebugTN("fwTrending: Detected fresh installation of fwTrending. Importing DPs...");
+        importFwTrendingFreshInstallDPs();
+        dpSetWait("FwTrendingPlotInfo.type:_general.._type", DPCONFIG_NONE); /*delete the config holding the fresh install info*/
+      }
+    }
+  }
+  else
+  {
+    DebugTN("-----------------------------------------------------");
+    DebugTN("Error in fwTrending.postInstall -> FwTrendingPlotInfo.type doesn't exist.");
+    DebugTN("-----------------------------------------------------");
+  }
+
+
+  DebugTN("fwTrending: configuring default panels");
+
+  if( (sIsUnicos != "") && (dpExists(sIsUnicos)) )
+  {
+    dpGet(sIsUnicos, bTemp);
+  }
+  else
+  {
+    DebugTN("-----------------------------------------------------");
+    DebugTN("Error in fwTrending.postInstall -> sIsUnicos DPE is empty or doesn't exist: " + sIsUnicos);
+    DebugTN("-----------------------------------------------------");
+    return;
+  }
+
+  if( bTemp )
+  {
+    dpSetWait("TrendingConfiguration.PageSettings.operationPanels:_original.._value",     makeDynString("fwTrending/fwTrendingPage"),
+              "TrendingConfiguration.PageSettings.configurationPanels:_original.._value", makeDynString("fwTrending/fwTrendingPlotsPage","fwTrending/fwTrendingManageChildren"),
+              "TrendingConfiguration.PlotSettings.operationPanels:_original.._value",     makeDynString("fwTrending/fwTrendingPlot"),
+              "TrendingConfiguration.PlotSettings.configurationPanels:_original.._value", makeDynString("fwTrending/fwTrendingPlotConfPanel","fwTrending/fwTrendingManageChildren"));
+  }
+  else
+  {
+    dpSetWait("TrendingConfiguration.PageSettings.operationPanels:_original.._value",     makeDynString("fwTrending/fwTrendingStandardViewNavigator"),
+              "TrendingConfiguration.PageSettings.configurationPanels:_original.._value", makeDynString("fwTrending/fwTrendingStandardViewEditor","fwTrending/fwTrendingPlotsPage"),
+              "TrendingConfiguration.PlotSettings.operationPanels:_original.._value",     makeDynString("fwTrending/fwTrendingStandardViewNavigator"),
+              "TrendingConfiguration.PlotSettings.configurationPanels:_original.._value", makeDynString("fwTrending/fwTrendingStandardViewEditor","fwTrending/fwTrendingPlotConfPanel"));
+  }
+
+  DebugTN("fwTrending: adding clipboard to trend tree");
+  _fwTrendingTree_addClipboard();
+
+  // Upgrades old trees to the new format of tree (new format as of fwTrending2.3)
+  dpGet("TrendingConfiguration.versionNumber", iVersionNumber);
+  if( iVersionNumber < 2300 )
+    _fwTrendingTree_upgradeTree(exceptionInfo);
+
+  if(dynlen(exceptionInfo) >0 ){
+    DebugTN("-----------------------------------------------------");
+    DebugTN("Error in fwTrending.postInstall -> error upgrading trend tree to the new format.");
+    DebugTN("-----------------------------------------------------");
+    dynClear(exceptionInfo);
+  }else {
+    dpSetWait("TrendingConfiguration.versionNumber", 2300,
+              "fwTT_TrendTree.root", getSystemName());
+  }
+
+  DebugTN("fwTrending: updating device references");
+  _fwTrendingTree_addSystemNameRecursive(fwTrendingTree_TREE_NAME, exceptionInfo);
+  if(dynlen(exceptionInfo) >0 ){
+    DebugTN("-----------------------------------------------------");
+    DebugTN("Error in fwTrending.postInstall -> error adding system names to device references in trend tree.");
+    DebugTN("-----------------------------------------------------");
+  }
+
+  // Remove stylesheet.css file: FWTREND-1071
+  RemoveStyleSheet();
+
+  // Remove obsolete panel from UNICOS definitions: objects/fwTrending/fwTrendingFaceplate.pnl
+  fwTrending_FWTREND_1067();
+
+  DebugTN("");
+  DebugTN("**************** fwTrending .postinstall (finish) ****************");
+  DebugTN("");
+}
+
+
+
+void importFwTrendingFreshInstallDPs()
+{
+  string componentName = "fwTrending";
+  string sourceDir;
+  string subPath = "/dplist/";
+  dyn_string dynDplistFiles;
+  bool updateTypes = false;
+  dyn_string exceptionInfo;
+
+  dynDplistFiles = makeDynString("fwTrendingFreshInstallDPs.dpl");
+
+  string componentDP = fwInstallation_getComponentDp(componentName);
+
+  if(!dpExists(componentDP))
+  {
+    fwException_raise(exceptionInfo, "ERROR", "fwInstallation component DP for fwTrending does not exist. Cannot import DPs for fresh install.", "");
+    return ;
+  }
+
+  dpGet(componentDP+".installationDirectory",sourceDir);
+
+  for ( int i=1; i <= dynlen(dynDplistFiles); i++ )
+  {
+    dyn_string dsExceptions;
+    if(access(sourceDir + dynDplistFiles[i], R_OK) == 0)
+    {
+      fwException_raise(dsExceptions, "ERROR", "Not importing " + dynDplistFiles[i] + " due to lack of access. Check that the file exists and that it is readable by the current user.", "");
+      continue;
+    }
+
+    if(fwInstallation_importComponentAsciiFiles(componentName, sourceDir, subPath, dynDplistFiles, updateTypes))
+    {
+      fwException_raise(dsExceptions, "ERROR", "Failed to import the DPL file " + dynDplistFiles[i] + ".", "");
+    }
+  }
+}
+
+
+void RemoveStyleSheet()
+{
+  const string s_FWTRENDING_STYLESHEET_HASH       = "3a4f7feca115de3f964b7721cf92c78a";
+  const int    i_FWTRENDING_STYLESHEET_ITERATIONS = 20;
+
+
+  int iLoop, iReturn;
+  string sPathTrending;
+  string sHashTrending;
+
+
+  for( iLoop = 1; iLoop <= SEARCH_PATH_LEN ; iLoop++ )
+  {
+    // Get config path and file hash for the stylesheet deployed by fwTrending
+    sPathTrending = getPath(CONFIG_REL_PATH, "stylesheet.css", "", iLoop);
+    if( sPathTrending != "" )
+    {
+      sHashTrending = getFileCryptoHash(sPathTrending);
+
+      if( (sHashTrending == s_FWTRENDING_STYLESHEET_HASH) )
+      {
+        if( isfile(sPathTrending) )
+        {
+          iReturn = remove(sPathTrending);
+          if( iReturn != 0 )
+          {
+            DebugTN("-----------------------------------------------------");
+            DebugTN(" fwTrending.postInstall: Error: Removing the css file. Please remove it manually: " + sPathTrending);
+            DebugTN("-----------------------------------------------------");
+            break;
+          }
+          else
+          {
+            DebugTN("fwTrending.postInstall: StyleSheet.css file deployed by fwTrending removed in path: " + sPathTrending);
+          }
+        }
+        else
+        {
+          DebugTN("-----------------------------------------------------");
+          DebugTN(" fwTrending.postInstall: Error: css file doesn't exist and can't be removed: " + sPathTrending);
+          DebugTN("-----------------------------------------------------");
+          break;
+        }
+      }
+    }
+  }
+
+}
+
+
+void fwTrending_FWTREND_1067()
+{
+  int iLen, iPos, iLoop, iRet;
+  dyn_errClass err;
+  dyn_string dsTypes, dsTempDpes, dsDpes, dsValues, dsDpeChanged, dsValuesChanged;
+
+
+  dsTypes = dpTypes();
+  if( dynlen(err) > 0 )
+  {
+    DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Error getting system DPTs");
+    return;
+  }
+
+
+  if( dynlen(dsTypes) > 0 )
+  {
+    iPos = dynContains(dsTypes, "_UnObjects");
+    if( iPos > 0 )
+    {
+      dsTempDpes = dpNames("*.configHMI.TrendFaceplatePanel", "_UnObjects");
+      err        = getLastError();
+      if( dynlen(err) > 0 )
+      {
+        DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Error checking for UNICOS definitons. DPE affected: " + getErrorDpName(err) + ", " + getErrorText(err));
+        return;
+      }
+      dynAppend(dsDpes, dsTempDpes);
+
+
+      dsTempDpes = dpNames("*.deviceConfiguration.configHMI.TrendFaceplatePanel", "_UnFrontEnd");
+      err        = getLastError();
+      if( dynlen(err) > 0 )
+      {
+        DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Error checking for UNICOS definitons. DPE affected: " + getErrorDpName(err) + ", " + getErrorText(err));
+        return;
+      }
+      dynAppend(dsDpes, dsTempDpes);
+
+
+      iLen = dynlen(dsDpes);
+      iRet = dpGet(dsDpes, dsValues);
+      if( iRet != 0 )
+      {
+        DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Error getting UNICOS definitions. Any of these DPEs don't exist: " + dsDpes);
+        return;
+      }
+      else
+      {
+        err = getLastError();
+        if( dynlen(err) > 0 )
+        {
+          DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Error getting UNICOS definitions, query failled. DPE affected: " + getErrorDpName(err) + ", " + getErrorText(err));
+          return;
+        }
+      }
+
+      for( iLoop = 1 ; iLoop <= iLen ; iLoop++ )
+      {
+        if( dsValues[iLoop] == "objects/fwTrending/fwTrendingFaceplate.pnl" )
+        {
+          DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Detected " + dsDpes[iLoop] + " UNICOS definition on Windows to change");
+          dynAppend(dsDpeChanged,    dsDpes[iLoop]);
+          dynAppend(dsValuesChanged, "");
+        }
+        else
+        {
+          if( dsValues[iLoop] == "objects\fwTrending\fwTrendingFaceplate.pnl" )
+          {
+            DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Updated " + dsDpes[iLoop] + " UNICOS definition on Linux to change");
+            dynAppend(dsDpeChanged,    dsDpes[iLoop]);
+            dynAppend(dsValuesChanged, "");
+          }
+        }
+      }
+
+      iRet = dpSet(dsDpeChanged, dsValuesChanged);
+      if( iRet != 0 )
+      {
+        DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Error setting UNICOS definitions. Any of these DPEs don't exist: " + dsDpeChanged);
+        return;
+      }
+      else
+      {
+        err = getLastError();
+        if( dynlen(err) > 0 )
+        {
+          DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Error setting UNICOS definitions. DPE affected: " + getErrorDpName(err) + ", " + getErrorText(err));
+          return;
+        }
+      }
+
+      DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Changed Ok " + dynlen(dsDpeChanged) + " definitions");
+    }
+    else
+    {
+      DebugTN("fwTrending.postInstall() -> FWTREND-1067 -> Fix not required");
+    }
+  }
+
+  // cleanup obsolete fwTrending.config file
+  fwInstallation_cleanupObsoleteFiles("fwTrending", makeDynString("config/fwTrending.config"));
+
+  // cleanup obsolete placing of help and msg catalogue files
+  fwInstallation_cleanupObsoleteFiles("fwTrending", makeDynString("help/en_US.iso88591/fwTrending","help/en_US.utf8/fwTrending/scripts","msg/en_US.iso88591/fwTrending"),true);
+
+}

@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">570 255</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[// Reference names given to reference panels included in this
+// panel for common address settings
+const string OPC_SETTINGS_REFERENCE	= &quot;OPCsettings&quot;;
+const string DIM_SETTINGS_REFERENCE	= &quot;DIMsettings&quot;;
+const string MODBUS_SETTINGS_REFERENCE = &quot;MODBUSsettings&quot;;
+const string UNSUPPORTED_LABEL = &quot;labelUnsupported&quot;;
+
+string selected = &quot;&quot;;
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+    // Panel 'Close' script parametrization to block 'X' button
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">370</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">154</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">100</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">49</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Address Parameter Selection</prop>
+     <prop name="en_US.iso88591">Address Parameter Selection</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="DIMsettings" referenceId="8">
+   <properties>
+    <prop name="FileName">objects/fwConfigs/fwPeriphAddressDIM.pnl</prop>
+    <prop name="Location">138 60</prop>
+    <prop name="Geometry">1 0 0 1 83 527</prop>
+    <prop name="TabOrder">146</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sDpName</prop>
+      <prop name="Value">$sDpName</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <reference parentSerial="-1" Name="OPCsettings" referenceId="9">
+   <properties>
+    <prop name="FileName">objects/fwConfigs/fwPeriphAddressOPC.pnl</prop>
+    <prop name="Location">13 136</prop>
+    <prop name="Geometry">1 0 0 1 210 451</prop>
+    <prop name="TabOrder">147</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sDpName</prop>
+      <prop name="Value">$sDpName</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <reference parentSerial="-1" Name="MODBUSsettings" referenceId="12">
+   <properties>
+    <prop name="FileName">objects/fwConfigs/fwPeriphAddressMODBUS.pnl</prop>
+    <prop name="Location">320 30</prop>
+    <prop name="Geometry">1 0 0 1 -104 559</prop>
+    <prop name="TabOrder">150</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="Text4" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">339</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 42</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">151</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">10 44</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select parameter to be applied:</prop>
+     <prop name="en_US.iso88591">Select parameter to be applied:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="periphAddress" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">289</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">198 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">147</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">198 40</prop>
+    <prop name="Size">362 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+    if(!selected.isEmpty()){
+        setValue(selected, &quot;visible&quot;, false);
+    }
+    switch(this.text){
+        case fwDevice_ADDRESS_NONE:
+            selected = &quot;&quot;;
+            break;
+        case fwDevice_ADDRESS_OPC:
+            selected = OPC_SETTINGS_REFERENCE;
+            break;
+        case fwDevice_ADDRESS_DIM:
+            selected = DIM_SETTINGS_REFERENCE;
+            break;
+        case fwDevice_ADDRESS_MODBUS:
+            selected = MODBUS_SETTINGS_REFERENCE;
+            break;
+        default:
+            selected = UNSUPPORTED_LABEL;
+    }
+    if(!selected.isEmpty()){
+        setValue(selected, &quot;visible&quot;, true);
+    }
+    okButton.enabled = (selected != UNSUPPORTED_LABEL);
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	string deviceModel;
+	dyn_string possibleAddressTypes, addressTypes, exceptionInfo;
+
+	fwDevice_getModel(makeDynString($sDpName), deviceModel, exceptionInfo);
+	fwDevice_getPossibleAddressTypes(dpTypeName($sDpName), possibleAddressTypes, exceptionInfo, deviceModel);
+	addressTypes = makeDynString(fwDevice_ADDRESS_NONE);
+	dynAppend(addressTypes, possibleAddressTypes);
+
+	this.items = addressTypes;
+
+	this.selectedPos(1);
+
+	setMultiValue(	OPC_SETTINGS_REFERENCE, &quot;visible&quot;, false,
+					DIM_SETTINGS_REFERENCE, &quot;visible&quot;, false,
+					MODBUS_SETTINGS_REFERENCE, &quot;visible&quot;, false,
+					UNSUPPORTED_LABEL, &quot;visible&quot;, false);
+}
+]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="" referenceId="13">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">370 20</prop>
+    <prop name="Geometry">1 0 0 1 165 -18</prop>
+    <prop name="TabOrder">151</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwDevice/fwDeviceAddress</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="okButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">340</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">403 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">152</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">403 220</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	bool isRunning;
+	string errorString;
+	dyn_string exceptionInfo, addressParam;
+	
+	if(selected == &quot;&quot;)
+		addressParam[fwPeriphAddress_TYPE] = fwDevice_ADDRESS_NONE;
+	else
+	{
+		fwPeriphAddress_readSettings(selected, addressParam, exceptionInfo);		
+		fwPeriphAddress_checkIsDriverRunning(addressParam[fwPeriphAddress_DRIVER_NUMBER],
+																					isRunning, exceptionInfo, dpSubStr($sDpName, DPSUB_SYS));
+		if(!isRunning)
+		{
+			errorString = getCatStr(&quot;fwPeriphAddress&quot;, &quot;ERROR_DRIVERNOTRUNNING&quot;);
+			strreplace(errorString, &quot;&lt;driver&gt;&quot;, addressParam[fwPeriphAddress_DRIVER_NUMBER]);
+			fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;fwPeriphAddress_set(): &quot; + errorString, &quot;&quot;);
+		}
+	}
+
+	if(dynlen(exceptionInfo) &gt; 0)
+	{
+		fwExceptionHandling_display(exceptionInfo);
+	}
+	else
+	{
+		PanelOffReturn(makeDynFloat(), addressParam);
+	}
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">341</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">485 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">153</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">485 220</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{		
+	PanelOffReturn(makeDynFloat(), makeDynString());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="labelUnsupported" shapeType="Label" layerId="0">
+   <properties>
+    <prop name="serialId">400</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8.999999999999956 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">155</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">8.999999999999956 80</prop>
+    <prop name="Size">550 31</prop>
+    <extended>
+     <prop type="CHAR_STRING" name="text">Parametrization of this address type is not supported by this panel</prop>
+    </extended>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

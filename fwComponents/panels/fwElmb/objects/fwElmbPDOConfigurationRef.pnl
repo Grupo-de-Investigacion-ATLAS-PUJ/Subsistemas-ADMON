@@ -1,0 +1,1356 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">409 333</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 10</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="StartZoomPoint">0 0</prop>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+#uses &quot;fwElmb/fwElmb.ctl&quot;
+void modUpdatePanel()
+{
+// Local Variables
+// ---------------
+	bool bMultiplexAll;
+	
+	int iProfile;
+	int iTimesMultiplexed;
+	int iDataSize;
+	
+	string sTemp;
+
+// Executable Code
+// ---------------
+	// Get all data from the panel
+	bMultiplexAll = chkMultiplexAll.state(0);
+	iProfile = radProfile.number;
+	sTemp = txtTimesMultiplexed.text;
+	iTimesMultiplexed = sTemp;
+	sTemp = cmbDataType.selectedText;
+	switch (sTemp) {
+		case &quot;VT_BOOL&quot;:
+			iDataSize = 1;
+			break;
+		case &quot;VT_I1&quot;:
+			iDataSize = 8;
+			break;
+		case &quot;VT_I2&quot;:
+		case &quot;VT_UI2&quot;:
+			iDataSize = 16;
+			break;
+		case &quot;VT_I4&quot;:
+		case &quot;VT_UI4&quot;:
+		case &quot;VT_R4&quot;:
+			iDataSize = 32;
+			break;
+		case &quot;VT_I8&quot;:
+		case &quot;VT_UI8&quot;:
+		case &quot;VT_R8&quot;:
+			iDataSize = 64;
+			break;
+		default:
+			iDataSize = 8;
+			break;
+	}
+	
+	// Set controls firstly for profile
+	switch (iProfile) {
+		case 0:	// Profile 401, no multiplexing
+			// Disable all multiplex controls
+			frmMultiplex.enabled = false;
+			lblMultiplexByte.enabled = false;
+			spnMultiplexByte.enabled = false;
+			lblTimesMultiplexed.enabled = false;
+			txtTimesMultiplexed.enabled = false;
+			Border1.enabled = false;
+			chkMultiplexAll.enabled = false;
+			lblMultiplexNumber.enabled = false;
+			spnMultiplexNumber.enabled = false;
+			break;
+		default: // Profile 404 or LMB, multiplexed
+			// Enable all multiplex controls
+			frmMultiplex.enabled = true;
+			lblMultiplexByte.enabled = true;
+			spnMultiplexByte.enabled = true;
+			lblTimesMultiplexed.enabled = true;
+			txtTimesMultiplexed.enabled = true;
+			Border1.enabled = true;
+			chkMultiplexAll.enabled = true;
+			if (bMultiplexAll) {
+				lblMultiplexNumber.enabled = false;
+				spnMultiplexNumber.enabled = false;
+			} else {
+				lblMultiplexNumber.enabled = true;
+				spnMultiplexNumber.enabled = true;
+				
+				// Set limits on spin button for multiplex number
+				spnMultiplexNumber.sbMaximum = ((iTimesMultiplexed &lt; 1) ? 0 : (iTimesMultiplexed - 1));
+			}
+			break;
+	}
+	
+	// Set limits on data start byte from data size
+	spnDataByte.sbMaximum = ((iDataSize &lt; 8) ? 7 : (8 - (iDataSize / 8)));
+
+	// Return to calling routine
+	return;
+}
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	bool bEdit;
+	bool bAll;
+	bool bMuxed = true;
+	
+	int iDataByte;
+	int iMuxByte;
+	int iTimesMuxed;
+	int iNumber;
+	int iPos;
+	
+	string sNodeID;
+	string sOPCItem;
+	string sDirection;
+	string sProfile;
+	string sDataType;
+	string sTemp;
+	string sDpName;
+	
+	dyn_string dsItems;
+	
+// Executable Code
+// ---------------
+	// Check if a PDO is being edited or created
+	if (isDollarDefined(&quot;$bEdit&quot;)) {
+		bEdit = $bEdit;
+		if (bEdit) {
+			lblPrefixInfo.visible = false;
+			txtItemName.enabled = false;
+			sDpName = $sDpName;
+		} else {
+			lblPrefixInfo.visible = true;
+			txtItemName.enabled = true;
+		}
+	}
+	
+	// Check if a direction has been given (therefore don't allow any changes)
+	if (isDollarDefined(&quot;$sDirection&quot;)) {
+		if ($sDirection == &quot;IN&quot;) {
+			radDirection.number = 0;
+			radDirection.enabled = false;
+		 } else if ($sDirection == &quot;OUT&quot;) {
+			radDirection.number = 1;
+			radDirection.enabled = false;
+		}
+	}
+	
+	if (bEdit) {
+		// Get all data from the DP
+		dpGet(sDpName + &quot;.cobid&quot;, sNodeID,
+					sDpName + &quot;.name&quot;, sOPCItem,
+					sDpName + &quot;.direction&quot;, sDirection,
+					sDpName + &quot;.profile&quot;, sProfile,
+					sDpName + &quot;.dataType&quot;, sDataType,
+					sDpName + &quot;.dataByte&quot;, iDataByte,
+					sDpName + &quot;.mux.muxByte&quot;, iMuxByte,
+					sDpName + &quot;.mux.timesMuxed&quot;, iTimesMuxed,
+					sDpName + &quot;.mux.all&quot;, bAll,
+					sDpName + &quot;.mux.number&quot;, iNumber);
+					
+		// Enter data into panel
+		txtCobId.text = sNodeID;
+		txtItemName.text = sOPCItem;
+		
+		if (radDirection.enabled) {
+			if (sDirection == &quot;OUT&quot;)
+				radDirection.number = 1;
+		}
+			
+		switch (sProfile) {
+			case &quot;404&quot;:
+				radProfile.number = 1;
+				break;
+			case &quot;LMB&quot;:
+				radProfile.number = 2;
+				break;
+			default:
+				radProfile.number = 0;
+				bMuxed = false;
+				break;
+		}
+		
+		dsItems = cmbDataType.items;
+		iPos = dynContains(dsItems, sDataType);
+		cmbDataType.selectedPos = iPos;
+		sTemp = iDataByte;
+		spnDataByte.text = sTemp;
+		
+		if (bMuxed) {
+			sTemp = iMuxByte;
+			spnMultiplexByte.text = sTemp;
+			txtTimesMultiplexed.text = iTimesMuxed;
+			if (bAll) {
+				chkMultiplexAll.state(0) = true;
+			} else {
+				chkMultiplexAll.state(0) = false;
+				sTemp = iNumber;
+				spnMultiplexNumber.text = sTemp;
+			}
+		}
+	}
+					
+	// Update all other panel controls
+	modUpdatePanel();
+	
+	// Return to calling routine
+	return;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="lblCobId" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Size">47 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">COB-ID:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblNodeIdPlus" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">150 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">152 12</prop>
+    <prop name="Size">67 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Node ID +</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmProfile" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">90 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Profile:</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 70</prop>
+    <prop name="Size">80 90</prop>
+   </properties>
+  </shape>
+  <shape Name="frmDirection" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Direction:</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 70</prop>
+    <prop name="Size">70 90</prop>
+   </properties>
+  </shape>
+  <shape Name="frmMultiplex" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">180 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Multiplexing:</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">180 70</prop>
+    <prop name="Size">220 90</prop>
+   </properties>
+  </shape>
+  <shape Name="lblMultiplexByte" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">190 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">192 92</prop>
+    <prop name="Size">87 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Multiplex Byte:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblTimesMultiplexed" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">190 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">192 122</prop>
+    <prop name="Size">117 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Times Multiplexed:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblItemName" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 42</prop>
+    <prop name="Size">137 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">OPC Item Name/Prefix:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblDataType" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 192</prop>
+    <prop name="Size">67 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Data Type:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmDataValue" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 289</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Data:</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 170</prop>
+    <prop name="Size">390 120</prop>
+   </properties>
+  </shape>
+  <shape Name="lblDataStartIndex" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">240 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">242 192</prop>
+    <prop name="Size">77 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Data at Byte:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblMultiplexNumber" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 252</prop>
+    <prop name="Size">107 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Multiplex Number:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblHex" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">280 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">282 12</prop>
+    <prop name="Size">37 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">(Hex.)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblPrefixInfo" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">280 36</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">282 38</prop>
+    <prop name="Size">117 27</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">This cannot be modified
+once applied</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="Group2" referenceId="0">
+   <properties>
+    <prop name="FileName">gedi/EP_enter.ref</prop>
+    <prop name="Location">550 70</prop>
+    <prop name="Geometry">1 0 0 1 -180 50</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="txtCobId" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">220 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">220 10</prop>
+    <prop name="Size">51 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[3s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="radProfile" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">100 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">100 90</prop>
+    <prop name="Size">61 61</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">401</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">404</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">LMB</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+// Local Variables
+// ---------------
+
+// Executable Code
+// ---------------
+	modUpdatePanel();
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="radDirection" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 90</prop>
+    <prop name="Size">51 61</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">IN</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">OUT</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="spnMultiplexByte" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">310 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">310 90</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">7</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+
+// Executable Code
+// ---------------
+	modUpdatePanel();
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtTimesMultiplexed" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">310 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">310 120</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[3d,False,False,AlignLeft,False]</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+
+// Executable Code
+// ---------------
+	modUpdatePanel();
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtItemName" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">150 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8">Only alpha-numeric and underscore allowed</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">150 40</prop>
+    <prop name="Size">121 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="cmbDataType" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">140 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">140 190</prop>
+    <prop name="Size">91 24</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">VT_BOOL</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">VT_I1</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">VT_I2</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">VT_UI2</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">VT_I4</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">VT_UI4</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">VT_R4</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">VT_I8</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">VT_UI8</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">VT_R8</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+
+// Executable Code
+// ---------------
+	modUpdatePanel();
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="spnDataByte" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">330 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">330 190</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">7</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+  </shape>
+  <shape Name="spnMultiplexNumber" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">140 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">140 250</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">100</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+  </shape>
+  <shape Name="chkMultiplexAll" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 220</prop>
+    <prop name="Size">111 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Multiplex All?</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+// Local Variables
+// ---------------
+
+// Executable Code
+// ---------------
+	modUpdatePanel();
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdOK" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">270 300</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">270 300</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	bool bAll;
+	bool bEdit = false;
+	bool bCreate = false;
+	
+	int iDataByte;
+	int iMuxByte;
+	int iTimesMuxed;
+	int iNumber;
+	int iTemp;
+	int iLen;
+	
+	string sCobID;
+	string sOPCItem;
+	string sDirection;
+	string sProfile;
+	string sDataType;
+	string sTemp;
+	string sDpName;
+
+// Executable Code
+// ---------------
+	// Get required information from panel
+	sCobID = txtCobId.text;
+	iLen = strlen(sCobID);
+	
+	// Get $params
+	bEdit = $bEdit;
+	if (bEdit)
+		sDpName = $sDpName;
+	
+	// Check this is a valid hex value
+	sscanf(sCobID, &quot;%x&quot;, iTemp);
+	sprintf(sTemp, &quot;%0&quot; + iLen + &quot;x&quot;, iTemp);
+	if (sTemp != sCobID) {
+		ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+												&quot;Warning&quot;,
+												makeDynString(&quot;COB-ID '&quot; + sCobID + &quot;' is not a valid hexadecimal value&quot;));
+		return;
+	}
+	
+	// Need to check this value
+	sOPCItem = txtItemName.text;
+	
+	// Check OPC item as sensor prefix
+	if (!bEdit) {
+		if (!fwElmb_checkSensorPrefix(sOPCItem)) {
+			ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+													&quot;Warning&quot;,
+													makeDynString(&quot;OPC item '&quot; + sOPCItem + &quot;' is reserved for an existing raw sensor and cannot be used&quot;));
+			return;
+		}
+	}
+	
+	// Get data information
+	iTemp = radDirection.number;
+	if (iTemp == 1)
+		sDirection = &quot;OUT&quot;;
+	else
+		sDirection = &quot;IN&quot;;
+	iTemp = radProfile.number;
+	if (iTemp == 1)
+		sProfile = &quot;404&quot;;
+	else if (iTemp == 2)
+		sProfile = &quot;LMB&quot;;
+	else
+		sProfile = &quot;401&quot;;
+	if (sProfile != &quot;401&quot;) {
+		// PDO is multiplexed, so get information
+		sTemp = spnMultiplexByte.text;
+		iMuxByte = sTemp;
+		sTemp = txtTimesMultiplexed.text;
+		iTimesMuxed = sTemp;
+	}
+	sDataType = cmbDataType.text;
+	sTemp = spnDataByte.text;
+	iDataByte = sTemp;
+	
+	// Get multiplex information
+	if (chkMultiplexAll.state(0)) {
+		iNumber = 0;
+		bAll = true;
+	} else {
+		bAll = false;
+		sTemp = spnMultiplexNumber.text;
+		iNumber = sTemp;
+	}
+	
+	if ((strlen(sDpName) &gt; 0) &amp;&amp; bEdit) {
+		if (!dpExists(sDpName))
+			bCreate = true;
+	} else {
+		// Create DP name
+		sDpName = &quot;fwElmbPDO&quot; + sOPCItem + &quot;Info&quot;;
+		bCreate = true;
+	}
+	
+	if (bCreate)
+		dpCreate(sDpName, ELMB_PDO_INFO_TYPE_NAME);
+	
+	// Enter data into correct datapoint
+	dpSet(sDpName + &quot;.cobid&quot;, sCobID,
+				sDpName + &quot;.name&quot;, sOPCItem,
+				sDpName + &quot;.direction&quot;, sDirection,
+				sDpName + &quot;.profile&quot;, sProfile,
+				sDpName + &quot;.dataType&quot;, sDataType,
+				sDpName + &quot;.dataByte&quot;, iDataByte,
+				sDpName + &quot;.mux.muxByte&quot;, iMuxByte,
+				sDpName + &quot;.mux.timesMuxed&quot;, iTimesMuxed,
+				sDpName + &quot;.mux.all&quot;, bAll,
+				sDpName + &quot;.mux.number&quot;, iNumber);
+		
+	// Close panel
+  PanelOffReturn(makeDynFloat(1.0), makeDynString(sOPCItem));
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">340 300</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">340 300</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	// Close panel
+  PanelOffReturn(makeDynFloat(0.0), makeDynString(&quot;&quot;));
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

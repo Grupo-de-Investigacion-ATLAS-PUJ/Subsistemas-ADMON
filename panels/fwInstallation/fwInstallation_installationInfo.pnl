@@ -1,0 +1,619 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">850 42</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">6 9.5</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwInstallation/fwInstallation.ctl&quot;
+
+/**=== Panel events ===**/
+#event eventStartReporting() //Triggered when installation starts
+#event eventStopReporting() //Triggered when installation is finished
+#event eventCurrentComponentChanged(int componentId, int componentsNumber, dyn_mapping compInstallationInfo) //Triggered when a value is assigned to 'currentComponentId' panel scope variable (by setCurrentComponentId())
+#event eventInstallationLogMessageAppended(int messageId, mapping installationLogMessage) //Triggered when a new log message is appended to 'installationLogMessages' panel scope variable (by appendInstallationLogMessage())
+#event eventUpdateInstallationElapsedTime(string elapsedTimeString) //Triggered every X miliseconds with a formatted installation elapsed time (mm:ss) in measureInstallationElapsedTime()
+
+/**=== Panel scope variables ===**/
+int componentsNumber; //Number of components to be installed
+int totalInstallationStages; //Number of total installation stages that are performed during installation (componentsNumber * numberOfSingleComponentInstallationSteps), value depends on whether or not DB is used to register component installation
+int currentComponentId; //ID of the current component (component that is being installed at the moment) - index in componentInstallationInfo list
+dyn_mapping componentInstallationInfo; /* List of mappings with information about installation of each component. Mapping has the following fields:
+                                          */
+dyn_mapping installationLogMessages; /* List of mappings with log messages reported during component installation (currently only with fwInstallation_throw). Mapping has the following fields:
+                                        */
+
+/**=== Public panel ScopeLib functions ===**/
+/** Returns the number of components to be installed
+  */
+public int getComponentsNumber(){
+  return componentsNumber;
+}
+
+/** Returns ID of component that is being installed currently
+  */
+public int getCurrentComponentId(){
+  return currentComponentId;
+}
+
+/** Returns list of mappings, where each mapping contains information about installation of particular component
+  */
+public dyn_mapping getComponentInstallationInfoMapping(){
+  return componentInstallationInfo;
+}
+
+/** Returns list of mappings, where each mapping contains particular log message and metadata (for now: componentId)
+  */
+public dyn_mapping getInstallationLogMessages(){
+  return installationLogMessages;
+}
+
+/** Returns the number of total installation steps that are performed during installation process
+  */
+public int getTotalInstallationStages(){
+  return totalInstallationStages;
+}
+
+/** Returns the number of already performed installation steps
+  * @param compInstallationInfo (in)  List of mappings with information about components' installation
+  */
+public int getCompletedInstallationSteps(dyn_mapping compInstallationInfo)
+{
+  int currStep = 0;
+  for(int i=1;i&lt;=dynlen(compInstallationInfo);i++)
+  {
+    if(compInstallationInfo[i][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_FINISHED])
+      currStep += getTotalInstallationStages();
+    else
+      currStep += compInstallationInfo[i][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_STAGE];
+  }
+  return currStep;
+}
+
+/** Returns boolean value that indicates if installation of all components is finished - TRUE, if not then FALSE
+  * @param compInstallationInfo (in)  List of mappings with information about components' installation
+  */
+public bool isInstallationFinished(dyn_mapping compInstallationInfo)
+{
+  if(dynlen(compInstallationInfo) &lt; componentsNumber)
+    return false;
+
+  for(int i=1;i&lt;=dynlen(compInstallationInfo);i++)
+    if(!compInstallationInfo[i][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_FINISHED])
+      return false;
+
+  return true;
+}
+
+
+/**=== Handling of report messages ===**/
+/** This function handles report messages. It is called from fwInstallation_updateReport() function.
+  * @note Name of this function is declared in fwInstallation.ctl as FW_INSTALLATION_REPORT_MESSAGE_HANDLING_FUNCTION, in case of rename that constant must be updated.
+  * @param message (in)  Report message type
+  * @param value (in)  Value to be processed
+  */
+public synchronized updateReport(string message, anytype value) {
+  switch(message)
+  {
+    case FW_INSTALLATION_REPORT_MESSAGE_INSTALLATION_STARTED:
+      startThread(&quot;measureInstallationElapsedTime&quot;, value);
+      break;
+    case FW_INSTALLATION_REPORT_MESSAGE_COMPONENTS_NUMBER:
+      setComponentsNumber(value);
+      break;
+    case FW_INSTALLATION_REPORT_MESSAGE_ADDITIONAL_COMPONENTS_NUMBER:
+      setComponentsNumber(getComponentsNumber() + value);
+      break;
+    case FW_INSTALLATION_REPORT_MESSAGE_INSTALLING_COMPONENT:
+      if(!mappingHasKey(value, FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_COMPONENT) ||
+         !mappingHasKey(value, FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_STAGE))
+      {
+        DebugTN(&quot;Received value does not contain required keys, value: &quot;, value);
+        break;
+      }
+      setCurrentComponentId(
+          setComponentInstallationStage(value[FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_COMPONENT],
+                                        value[FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_STAGE]));
+      break;
+    case FW_INSTALLATION_REPORT_MESSAGE_COMPONENT_INSTALLATION_FINISHED:
+      setCurrentComponentId(
+          markComponentInstallationAsFinished(value));
+      break;
+    case FW_INSTALLATION_REPORT_MESSAGE_INSTALLATION_LOG_MESSAGE:
+      appendInstallationLogMessage(value);
+      break;
+    default:
+      DebugTN(&quot;Unrecognized message: &quot; + message + &quot;, value: &quot;, value);
+  }
+  /*DebugTN(&quot;ReportMessage: &quot; + message + &quot;; value: &quot;, value);
+  if(message == FW_INSTALLATION_REPORT_MESSAGE_INSTALLING_COMPONENT || message == FW_INSTALLATION_REPORT_MESSAGE_COMPONENT_INSTALLATION_FINISHED)
+  {
+    DebugTN(&quot;CurrentComponentId = &quot;, getCurrentComponentId());
+    DebugTN(getComponentInstallationInfoMapping());
+  }*/
+}
+
+/**=== Private ScopeLib functions ===**/
+
+/** Sets the number of components to be installed
+  * @param newComponentsNumber (in)  Number to be set
+  */
+void setComponentsNumber(int newComponentsNumber = 0){
+  componentsNumber = newComponentsNumber;
+}
+
+/** Sets ID of component that is being installed currently. Triggers eventCurrentComponentChanged() event
+  * @param ID of component to be set
+  */
+void setCurrentComponentId(int newComponentId = 0)
+{
+  currentComponentId = newComponentId;
+  try{//Prevents errors when 'Installation Details' panel is closed while here we waiting for finish of function triggered on that panel
+    triggerEventWait(this.eventCurrentComponentChanged, currentComponentId, componentsNumber, componentInstallationInfo);
+  }catch{}
+}
+
+/** Appends new log message to 'installationLogMessages' list of mappings. Triggers eventInstallationLogMessageAppended() event
+  * @param logMessage (in)  Log message of errClass type
+  */
+void appendInstallationLogMessage(errClass logMessage)
+{
+  mapping installationLogMessage = makeMapping(&quot;logMessage&quot;, logMessage,
+                                               &quot;componentId&quot;, currentComponentId);
+  int newLength = dynAppend(installationLogMessages, installationLogMessage);
+  if(newLength &gt; 0)
+  {
+    try{//Prevents errors when 'Installation Details' panel is closed while here we waiting for finish of function triggered on that panel
+      triggerEventWait(this.eventInstallationLogMessageAppended, newLength, installationLogMessage);
+    }catch{}
+  }
+}
+
+/** Sets component installation stage in componentInstallationInfo list of mappings.
+  * If mapping with installation info for given component does not exist yet then creates it and appends it to the list beforehand.
+  * @param componentName (in)  Name of the component that
+  * @param installationStage (in)  Installation step of given component
+  * @return ID of component (position in componentInstallationInfo list)
+  */
+int setComponentInstallationStage(string componentName, int installationStage)
+{
+  int componentId = getComponentIdFromInstallationInfoList(componentName);
+  if(componentId == 0)
+  {//first report for this component - not yet in componentInstallationInfo dyn_mapping
+    componentId = appendComponentToInstallationInfoList(componentName);
+    if(installationStage != 1)//print warning if we don't start from the beginning
+      DebugTN(&quot;Installation of new component does not start from step 1. Warning - there are unreported steps&quot;);
+  }
+  componentInstallationInfo[componentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_STAGE] = installationStage;
+  return componentId;
+}
+
+/** Returns ID of the component with given name (position in componentInstallationInfo list).
+  * ID can be returned only for components which installation has not been finished yet.
+  * @param componentName (in)  Name of the component
+  * @return 0 when installation of given component is finished or component is not yet in the componentInstallationInfo list, otherwise ID of the component
+  */
+int getComponentIdFromInstallationInfoList(string componentName)
+{
+  int componentInstallationInfoLen = dynlen(componentInstallationInfo);
+  for(int i=1;i&lt;=componentInstallationInfoLen;i++)
+   if(componentInstallationInfo[i][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_COMPONENT] == componentName &amp;&amp;
+      !componentInstallationInfo[i][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_FINISHED])
+     return i;
+  return 0;
+}
+
+/** Appends mapping that contains information about installation of component with given name to the componentInstallationInfo list
+  * @param componentName (in) Name of the component
+  * @return ID of component (position in componentInstallationInfo list)
+  */
+int appendComponentToInstallationInfoList(string componentName)
+{
+  int newComponentId = dynlen(componentInstallationInfo) + 1;//assingn new id for this component
+  int parentComponentId = getParentComponentId();
+  componentInstallationInfo[newComponentId] = makeMapping(FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_COMPONENT, componentName,
+                                                          FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_FINISHED, false,
+                                                          FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_PARENT, parentComponentId,
+                                                          FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_REASON, getReasonOfComponentInstallation(parentComponentId, componentName));
+  return newComponentId;
+}
+
+/** Returns ID of the parent component.
+  * @return ID of component that triggered installation of current component or 0 if current component is a root component (was requested to be installed before installation started)
+  */
+int getParentComponentId()
+{
+  if(getCurrentComponentId() &lt;= 0)//installing first component - there is no need to check if installation of previous components finished
+    return 0;
+
+  int parentCompId = getCurrentComponentId();//assume that previous component is a parent
+  while(parentCompId &gt; 0 &amp;&amp; componentInstallationInfo[parentCompId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_FINISHED])//look for parent component (the one with unfinished installation) until 'root' component is reached
+    parentCompId = componentInstallationInfo[parentCompId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_PARENT];//get parent component id of current parent
+  return parentCompId; //0 if installations of all parent components are finished or id of the closest parent with unfinished installation
+}
+
+//declarations of installation reason constants
+const int FW_INSTALLATION_REPORT_INSTALLATION_REASON_UNKNOWN = -1;
+const int FW_INSTALLATION_REPORT_INSTALLATION_REASON_ROOT = 0;//this is a root component - installation was triggered because it was on the list of component to be installed, not because other component request installation of it
+
+/** Returns code of the reason of component installation based on provided ID of parent component.
+  * @param parentComponentId (in)  ID of the parent component or 0 for root component
+  * @return 0 for root component, for component which installation was triggered by the other component the reason code depends on the stage of the installation
+  *         of the parent component in which installation of current component was requested, -1 in case when the reason is not known
+  */
+int getReasonOfComponentInstallation(int parentComponentId, string componentName)
+{//find out why this component is installed
+  if(parentComponentId &lt;= 0)//there is no parent component being installed at this moment - component is 'root' component, which means, that installation was triggered because it was on the list of components to be installed
+    return FW_INSTALLATION_REPORT_INSTALLATION_REASON_ROOT;
+
+  int componentInstallationReason = componentInstallationInfo[parentComponentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_STAGE];
+  switch(componentInstallationReason)
+  {//other component (parent) is being installed at this moment - check its installation stage to know the reason why installation of current component was triggered
+    case FW_INSTALLATION_REPORT_STEP_INSTALLING_REQUIRED_COMPONENTS:
+    case FW_INSTALLATION_REPORT_STEP_INSTALLING_SUBCOMPONENTS:
+      return componentInstallationReason;
+    default:
+      DebugTN(&quot;Installation of component: &quot; + componentName + &quot; triggered at stage &quot; + componentInstallationInfo[parentComponentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_STAGE] +
+              &quot; of installation of &quot; + componentInstallationInfo[parentComponentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_COMPONENT] +
+              &quot;. For this stage the reason of starting installation of another component is unknown&quot;);
+  }
+  return FW_INSTALLATION_REPORT_INSTALLATION_REASON_UNKNOWN;//installation of current component was triggered, when installation of 'parent' component was in the stage, at which this should not happen
+}
+
+/** Sets the state of installation of component with given name to 'finished'
+  * @param componentName (in)  Name of the component
+  * @return ID of component which state was changed, when any component was not marked as finished (there were no matching components) then ID of current component is returned
+  */
+int markComponentInstallationAsFinished(string componentName)
+{
+  int componentId = getComponentIdFromInstallationInfoList(componentName);
+  if(componentId &lt;= 0)
+  {
+    DebugTN(&quot;Reported finish of installation of component &quot; + componentName + &quot; that is not found on the list of components marked as 'installation in progress' - nothing to do&quot;);
+    return getCurrentComponentId();
+  }
+  componentInstallationInfo[componentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_FINISHED] = true;
+  return componentId;
+}
+
+/** Sets the number of total installation steps that are performed during installation process
+  * @param doOptional (in)  Flag that indicates if optional step (registering component installation in DB) is performed during component installation. Default value is FALSE.
+  */
+void setTotalInstallationStages(bool doOptional = false){
+  totalInstallationStages = doOptional?FW_INSTALLATION_REPORT_STEP_REGISTERING_INSTALLATION_IN_DB:FW_INSTALLATION_REPORT_STEP_REQUESTING_POSTINSTALLS;
+}
+
+/** Clears 'installationLogMessages' list of mappings
+  */
+void clearInstallationLogMessages(){
+  dynClear(installationLogMessages);
+}
+
+/** Clears 'componentInstallationInfo' list of mappings
+  */
+void clearComponentInstallationInfoMapping(){
+  dynClear(componentInstallationInfo);
+}
+
+/**=== Functions run in separated thread ===**/
+
+/** This function triggers the update of installation elapsed time every X miliseconds. It is started in a separated thread.
+  * @param installationStartTime (in)  Installation start time
+  */
+void measureInstallationElapsedTime(time installationStartTime)
+{
+  while(!isInstallationFinished(getComponentInstallationInfoMapping()))
+  {
+    time installationTime = getCurrentTime() - installationStartTime;
+    triggerEvent(this.eventUpdateInstallationElapsedTime, formatTime(&quot;%M:%S&quot;, installationTime));
+    delay(0, 100);
+  }
+  return;
+}
+
+/**=== Callback functions connected with events ===**/
+
+/** This function enables or disables sending installation report messages.
+  * Along with enabling reporting it sets initial value to the panel scope variables.
+  * @note It is connected with eventStartReporting() and eventStopReporting() events
+  * @param enable (in)  Flag that indicates if reporting should be enabled (TRUE) or disabled
+  */
+void enableReporting(bool enable)
+{
+  if(enable)
+  {//enable sending report messages to the panel, initialize panel global variables
+    setTotalInstallationStages(fwInstallationDB_getUseDB());
+    setCurrentComponentId();
+    setComponentsNumber();
+    clearComponentInstallationInfoMapping();
+    clearInstallationLogMessages();
+    fwInstallation_reportInit(getShape(&quot;&quot;));
+  }
+  else
+  {//disable sending report messages to the panel, keep the data in panel global variables
+    fwInstallation_reportTeardown();
+  }
+}
+
+/** This function shows information about currently installed component and progress of the installation on a panel.
+  * @note It is connected with eventCurrentComponentChanged() event
+  * @param componentId (in)  ID of the component
+  * @param componentsNumber (in)  Number of total components to be installed
+  * @param compInstallationInfo (in)  List of installation info mappings for each component
+  */
+synchronized void showInstallationInfo(int componentId, int componentsNumber, dyn_mapping compInstallationInfo)
+{//note: if event is not triggered with triggerEventWait() then synchronize keyword here cause that the connected function on another panel is not invoked
+  if(componentId == 0)
+  {
+    resetComponentName();
+    resetProgressBar();
+  }
+  else
+  {
+    setComponentName(compInstallationInfo[componentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_COMPONENT]);
+    updateProgressBar(getCompletedInstallationSteps(compInstallationInfo), componentsNumber);
+  }
+}
+
+/** This function shows installation elapsed time on a panel.
+  * @note It is connected with eventUpdateInstallationElapsedTime() event
+  * @param elapsedTimeString (in)  Elapsed installation time as a string with format mm:ss
+  */
+showInstallationElapsedTime(string elapsedTimeString)
+{
+  tfInstallationTime.text = elapsedTimeString;
+}
+
+/**=== UI functions ===**/
+
+setComponentName(string componentName)
+{
+  tfCurrComponent.text = componentName;
+}
+
+resetComponentName(){
+  setComponentName(&quot;&quot;);
+}
+
+updateProgressBar(int completedInstallationSteps, int componentsNumber)
+{
+  const int totalSteps = componentsNumber * getTotalInstallationStages();
+  if(totalSteps == 0)
+    return;
+
+  pbInstallationProgress.progress((completedInstallationSteps * 100)/totalSteps);
+}
+
+resetProgressBar(){
+  pbInstallationProgress.reset();
+}
+
+
+
+
+
+
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  //Connect callback functions with events
+  uiConnectUserData(&quot;enableReporting&quot;, true, this.eventStartReporting);
+  uiConnectUserData(&quot;enableReporting&quot;, false, this.eventStopReporting);
+  uiConnect(&quot;showInstallationInfo&quot;, this.eventCurrentComponentChanged);
+  uiConnect(&quot;showInstallationElapsedTime&quot;, this.eventUpdateInstallationElapsedTime);
+}
+
+
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="currComponentLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">6 9.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.123341195046321 0 0 1 88.9820914707802 -0.2500000000000044</prop>
+    <prop name="Location">8 11.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Now installing</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="tfCurrComponent" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">107 41.4545454545455</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">107 8</prop>
+    <prop name="Size">175 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="installationTimeLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">6 9.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.288565336640627 0 0 1 374.4857416816766 -0.25</prop>
+    <prop name="Location">8 11.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Elapsed time</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="tfInstallationTime" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">392 41.4545454545455</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">392 8</prop>
+    <prop name="Size">53 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="pbInstallationProgress" shapeType="PROGRESS_BAR" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">459 9</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">459 9</prop>
+    <prop name="Size">275 21</prop>
+   </properties>
+  </shape>
+  <shape Name="btnDetails" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">746.9999999999999 7</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">746.9999999999999 7</prop>
+    <prop name="Size">94 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">View details</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  //Open 'Installation Details' panel
+  ChildPanelOnCentral(&quot;fwInstallation/fwInstallation_installationDetails.pnl&quot;, &quot;Installation Details&quot;, makeDynString());
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

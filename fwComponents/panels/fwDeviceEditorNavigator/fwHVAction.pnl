@@ -1,0 +1,630 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">300 200</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">379 278</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwGeneral/fwProgressBar.ctl&quot;
+#uses &quot;fwDevice/fwDevice.ctl&quot;
+#uses &quot;fwDeviceEditorNavigator/fwDeviceEditorNavigator.ctl&quot;
+
+string g_sHierarchyType;
+
+// ------------------------------------------------------------------------------------------------
+
+void setProperty(string sDpe, int iValue)
+{
+  dyn_string exceptionInfo;
+  
+  fwOpenProgressBar(&quot;Set property recursively&quot;, &quot;Setting &quot; + sDpe + &quot; to &quot; + iValue + &quot; for all children...&quot;, 1);
+	fwDevice_setPropertyRecursively($sDpName, sDpe, g_sHierarchyType, iValue, exceptionInfo);
+
+	if(dynlen(exceptionInfo) &gt; 0)
+	{
+		fwCloseProgressBar(&quot;There were errors while setting &quot; + sDpe + &quot; to &quot; + iValue + &quot; for all children.&quot;);
+		fwExceptionHandling_display(exceptionInfo);
+	}	
+	else
+	{
+		fwCloseProgressBar(sDpe + &quot; set succesfully to &quot; + iValue + &quot; for all children.&quot;);
+    showUserFeedback(getUserFeedbackMessage(sDpe, iValue));
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+
+string getUserFeedbackMessage(string sDpe, int iValue)
+{
+  string sMessage, sState;
+  
+  switch(sDpe)
+  {
+    case &quot;.settings.i0&quot;:
+      sMessage = &quot;i0 set to &quot; + iValue + &quot;.&quot;;
+      break;
+    case &quot;.settings.i1&quot;:
+      sMessage = &quot;i1 set to &quot; + iValue + &quot;.&quot;;
+      break;
+    case &quot;.settings.rDwn&quot;:
+      sMessage = &quot;Ramp down speed set to &quot; + iValue + &quot;.&quot;;
+      break;
+    case &quot;.settings.rUp&quot;:
+      sMessage = &quot;Ramp up speed set to &quot; + iValue + &quot;.&quot;;
+      break;
+    case &quot;.settings.tripTime&quot;:
+      sMessage = &quot;Trip time set to &quot; + iValue + &quot;.&quot;;
+      break;
+    case &quot;.settings.v0&quot;:
+      sMessage = &quot;v0 set to &quot; + iValue + &quot;.&quot;;
+      break;
+    case &quot;.settings.v1&quot;:
+      sMessage = &quot;v1 set to &quot; + iValue + &quot;.&quot;;
+      break;
+    case &quot;.settings.onOff&quot;:
+      sState = iValue==0?&quot;off&quot;:&quot;on&quot;;
+      sMessage = &quot;All channels turned &quot; + sState + &quot;.&quot;;
+      break;
+    default:
+      break;
+  }
+  
+  return sMessage;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+showUserFeedback(string sMessage)
+{
+  feedbackLabel.visible(TRUE);
+  feedbackArrow.visible(TRUE);
+  feedbackLabel.text = sMessage;
+  
+  delay(5);
+  
+  feedbackLabel.visible(FALSE);
+  feedbackArrow.visible(FALSE);
+}
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  nameField.text($sDpName);
+   
+  if(isDollarDefined(&quot;$sHierarchyType&quot;))
+  {
+		g_sHierarchyType = $sHierarchyType;
+  }
+	else
+  {
+		g_sHierarchyType = fwDevice_HARDWARE;
+  }
+}
+
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="nameField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 39</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">217</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">280 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">190</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">651 512</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">215 165</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[// SimpleCtrlScriptStart {valid}
+// SimpleCtrlScript {PanelOff}
+// SimpleCtrlScriptEnd
+main()
+{
+  PanelOff();
+}
+]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="" referenceId="12">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">420 90</prop>
+    <prop name="Geometry">1.001602564102564 0 0 1.001602564102564 -155.6730769230769 -88.14423076923077</prop>
+    <prop name="TabOrder">219</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwDeviceEditorNavigator/fwHVAction</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">201</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">213</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">442 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">202</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 4</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">214</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">High Voltage Actions</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="channelLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">224</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 88</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">216</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 88</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All channels:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="channelOffButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">225</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">156 82</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">190</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 84</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Off</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int iValue = 0;  
+  string sDpe = &quot;.settings.onOff&quot;;
+
+  setProperty(sDpe, iValue);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="setElementLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">226</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 124</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">218</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 124</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Set element:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="setElementCombobox" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">227</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">97 132</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">213</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">100 120</prop>
+    <prop name="Size">190 23</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Select ...</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">i0</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">i1</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Ramp down speed</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Ramp up speed</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Trip time</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">v0</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">v1</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  int iValue;
+  string sDpe;
+  dyn_float df;
+	dyn_string ds;
+
+  if(this.selectedPos &gt; 1)
+  {
+    switch(this.selectedText())
+    {
+      case &quot;i0&quot;:
+        sDpe = &quot;.settings.i0&quot;;
+        break;
+      case &quot;i1&quot;:
+        sDpe = &quot;.settings.i1&quot;;
+        break;
+      case &quot;Ramp down speed&quot;:
+        sDpe = &quot;.settings.rDwn&quot;;
+        break;
+      case &quot;Ramp up speed&quot;:
+        sDpe = &quot;.settings.rUp&quot;;
+        break;
+      case &quot;Trip time&quot;:
+        sDpe = &quot;.settings.tripTime&quot;;
+        break;
+      case &quot;v0&quot;:
+        sDpe = &quot;.settings.v0&quot;;
+        break;
+      case &quot;v1&quot;:
+        sDpe = &quot;.settings.v1&quot;;
+        break;
+    }
+  
+    ChildPanelOnCentralModalReturn( &quot;fwDevice/fwDevicePropertyChange.pnl&quot;,
+  											&quot;Change property ...&quot;,
+  											makeDynString(&quot;$sElement:&quot; + sDpe),
+  											df, ds);
+	
+    if(ds[1] == &quot;Ok&quot;)
+  	{
+  		iValue = ds[2];
+
+      setProperty(sDpe, iValue);
+  	}
+    else
+    {
+      this.selectedPos(1);
+    }
+  }
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="feedbackLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">230</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20.00000000000004 168</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">222</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">22.00000000000004 169</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">User feedback.</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="feedbackArrow" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">231</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">_3DText</prop>
+    <prop name="TabOrder">223</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.7259259259259259 0 0 0.6825000000000002 2.740740740740741 -355.5250000000001</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+     <prop name="Location">20 780</prop>
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="channelOnButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">233</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">100 84</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">224</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">100 84</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">On</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int iValue = 1;  
+  string sDpe = &quot;.settings.onOff&quot;;
+
+  setProperty(sDpe, iValue);
+}
+
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

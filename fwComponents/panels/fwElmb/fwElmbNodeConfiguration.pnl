@@ -1,0 +1,265 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">CreateELMBChannels</prop>
+  </prop>
+  <prop name="Size">806 620</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">382 182</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwElmb/fwElmb.ctl&quot;
+
+void modDisplayPanel(int argiChannelType)
+{
+// Local Variables
+// ---------------
+  bool bValid = true;
+
+  string sPanel;
+  string sTitle;
+
+// Executable Code
+// ---------------
+  // Remove all symbols
+  removeSymbol(myModuleName(), myPanelName(), &quot;Create analog sensor&quot;);
+  removeSymbol(myModuleName(), myPanelName(), &quot;Create analog output&quot;);
+  removeSymbol(myModuleName(), myPanelName(), &quot;Create digital input line&quot;);
+  removeSymbol(myModuleName(), myPanelName(), &quot;Create digital output line&quot;);
+
+  // Check which selection has been made
+  switch (argiChannelType) {
+    case 0: // AI
+      sPanel = &quot;fwElmb/fwElmbAiConfigConfiguration.pnl&quot;;
+      sTitle = &quot;Create analog sensor&quot;;
+      break;
+    case 1: // AO
+      sPanel = &quot;fwElmb/objects/fwElmbCreateAnalogOutput.pnl&quot;;
+      sTitle = &quot;Create analog output&quot;;
+      break;
+    case 2: // DI
+      sPanel = &quot;fwElmb/objects/fwElmbCreateDigitalInput.pnl&quot;;
+      sTitle = &quot;Create digital input line&quot;;
+      break;
+    case 3: // DO
+      sPanel = &quot;fwElmb/objects/fwElmbCreateDigitalOutput.pnl&quot;;
+      sTitle = &quot;Create digital output line&quot;;
+      break;
+    default:
+      bValid = false;
+      break;
+  }
+
+  if (bValid) {
+    // Add the correct panel symbol
+    addSymbol(myModuleName(),
+              myPanelName(),
+              sPanel,
+              sTitle,
+              makeDynString(&quot;$sElmbLabels:&quot; + $sElmbLabels, &quot;$sDpName:&quot; + $sDpName),
+              210, 43,
+              0.0,
+              0.0, 0.0);
+  }
+
+  // Return to calling routine
+  return;
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int iChannelType = 0;
+	
+	// Check if $parameter given
+	if (isDollarDefined(&quot;$iChannelType&quot;))
+		iChannelType = $iChannelType;
+		
+	// Set the correct radio button the selected
+	rbChannelType.number = iChannelType;
+
+	modDisplayPanel(iChannelType);
+	/*
+	addSymbol(myModuleName(),
+	          myPanelName(),
+	          &quot;fwElmb/fwElmbAiConfigConfiguration.pnl&quot;, 
+	          &quot;Create analog sensor&quot;, 
+	          makeDynString(&quot;$sElmbLabels:&quot; + $sElmbLabels, &quot;$sDpName:&quot; + $sDpName), 
+	          210, 43,
+	          0.0,
+	          0.0, 0.0);
+	*/
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="Frame1" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">72</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">40 549</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Channel Type</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">40 50</prop>
+    <prop name="Size">160 500</prop>
+   </properties>
+  </shape>
+  <shape Name="txtTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">75</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 92</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">38</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 17</prop>
+    <prop name="Size">267 25</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Create Elmb Channels</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="rbChannelType" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">50 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 70</prop>
+    <prop name="Size">111 81</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Analog Input</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Analog Output</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Digital Input</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Digital Output</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+  modDisplayPanel(button);
+	
+  // Return to calling routine
+  return;
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

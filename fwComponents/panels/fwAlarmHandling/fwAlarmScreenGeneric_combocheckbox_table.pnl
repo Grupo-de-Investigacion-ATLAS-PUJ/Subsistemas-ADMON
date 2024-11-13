@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">190 100</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+string g_sReferenceName;
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  g_sReferenceName = $sReferenceName;
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="fwAlarmScreenGeneric_combochecktable" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">white</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">175 90</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">None</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">CHECK</prop>
+     <prop name="Width">20</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Check</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">ELEMENT</prop>
+     <prop name="Width">134</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Element</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Scrolled" isEscaped="1"><![CDATA[synchronized main()
+{
+  setInputFocus(myModuleName(), myPanelName(), g_sReferenceName + &quot;.&quot; + FW_ALARM_GENERIC_COMBOCHECKBOX_TEXT_FIELD);
+  setValue(g_sReferenceName + &quot;.&quot; + FW_ALARM_GENERIC_COMBOCHECKBOX_TEXT_FIELD, &quot;select&quot;, -1, 0);
+}
+
+
+]]></script>
+    <script name="SelectionChanged" isEscaped="1"><![CDATA[synchronized main()
+{
+  setValue(g_sReferenceName + &quot;.&quot; + FW_ALARM_GENERIC_COMBOCHECKBOX_CHECKBOX_ACTION, &quot;state&quot;, 0, true);
+  
+  dyn_int diSelectedColumns = this.getSelectedColumns();
+  dyn_int diSelectedLines = this.getSelectedLines();
+  // No selection if column 0
+  if (dynContains(diSelectedColumns, 0) &gt; 0)
+  {
+    return;
+  }
+  
+  // If one element selected only, ignore (let &quot;clicked&quot; event do the work).
+  if (dynlen(diSelectedLines) &gt; 1)
+  {
+    for (int i = 1 ; i &lt;= dynlen(diSelectedLines) ; i++)
+    {
+      this.cellValueRC(diSelectedLines[i], FW_ALARM_GENERIC_COMBOCHECKBOX_TABLE_INDEX_CHECK, true);
+      setInputFocus(myModuleName(), myPanelName(), g_sReferenceName + &quot;.&quot; + FW_ALARM_GENERIC_COMBOCHECKBOX_TEXT_FIELD);
+      setValue(g_sReferenceName + &quot;.&quot; + FW_ALARM_GENERIC_COMBOCHECKBOX_TEXT_FIELD, &quot;select&quot;, -1, 0);
+      _fwAlarmScreenGeneric_combocheckbox_checkAll();
+    }
+  }
+}
+
+]]></script>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  setValue(g_sReferenceName + &quot;.&quot; + FW_ALARM_GENERIC_COMBOCHECKBOX_CHECKBOX_ACTION, &quot;state&quot;, 0, true);
+  
+  if (FW_ALARM_GENERIC_COMBOCHECKBOX_TABLE_INDEX_ELEMENT == column)
+  {
+    _fwAlarmScreenGeneric_combocheckbox_hideTable(row);
+  }
+  else
+  {
+    setInputFocus(myModuleName(), myPanelName(), g_sReferenceName + &quot;.&quot; + FW_ALARM_GENERIC_COMBOCHECKBOX_TEXT_FIELD);
+    setValue(g_sReferenceName + &quot;.&quot; + FW_ALARM_GENERIC_COMBOCHECKBOX_TEXT_FIELD, &quot;select&quot;, -1, 0);
+    if (FW_ALARM_GENERIC_COMBOCHECKBOX_TABLE_LABEL_ALL == this.cellValueRC(row, FW_ALARM_GENERIC_COMBOCHECKBOX_TABLE_INDEX_ELEMENT))
+    {
+      _fwAlarmScreenGeneric_combocheckbox_selectAll(value);
+    }
+    else
+    {
+      _fwAlarmScreenGeneric_combocheckbox_checkAll();
+    }
+  }
+}
+
+
+]]></script>
+    <script name="MouseOver" isEscaped="1"><![CDATA[int iThreadId = -1;
+
+main(bool enter)
+{
+  setValue(g_sReferenceName + &quot;.&quot; + FW_ALARM_GENERIC_COMBOCHECKBOX_CHECKBOX_MOUSE_OVER, &quot;state&quot;, 0 , enter);
+  
+  if (-1 != iThreadId)
+  {
+    stopThread(iThreadId);
+    iThreadId = -1;
+  }
+  
+  // When mouseover out, hide if after 500 ms if the mouse is not back on the table.
+  if (!enter)
+  {
+    iThreadId = startThread(&quot;waitToHide&quot;);
+  }
+}
+
+void waitToHide()
+{
+  delay(0, FW_ALARM_GENERIC_COMBOCHECKBOX_MOUSEOVER_TIMEOUT);
+  bool bMouseOver;
+  getValue(g_sReferenceName + &quot;.&quot; + FW_ALARM_GENERIC_COMBOCHECKBOX_CHECKBOX_MOUSE_OVER, &quot;state&quot;, 0 , bMouseOver);
+    
+  if (!bMouseOver)
+  {
+    _fwAlarmScreenGeneric_combocheckbox_hideTable();
+  }
+    
+  iThreadId = -1;
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

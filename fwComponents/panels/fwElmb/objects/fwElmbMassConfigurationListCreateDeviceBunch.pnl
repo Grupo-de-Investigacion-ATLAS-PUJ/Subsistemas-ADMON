@@ -1,0 +1,1055 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">593 420</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+#uses &quot;fwGeneral/fwGeneral.ctl&quot;
+
+#uses &quot;fwElmb/fwElmb.ctl&quot;
+void pnlUpdateMaxAllowed()
+{
+// Local Variables
+// ---------------
+	bool bStandardElmb;
+	
+	int i;
+	int iMaxAllowed;
+	int iMax;
+	int iCurrentRequested;
+	int iAvailable;
+	
+	string sMaxAllowed;
+	
+	dyn_string dsAvailableNodeIdList;
+
+// Executable Code
+// ---------------
+	// Check whether standard ELMBs
+	bStandardElmb = chkStandardElmb.state(0);
+	
+	// Set maximum number allowed on bus
+	if (bStandardElmb)
+		iMax = 63;
+	else
+		iMax = 127;
+
+	// Get all available node IDs	
+	fwElmb_getAvailableNodeIdList($sDpName, dsAvailableNodeIdList, bStandardElmb);
+	iAvailable = dynlen(dsAvailableNodeIdList);
+	
+	// Get number of nodes being requested
+	iCurrentRequested = tabDevicesToBeCreated.lineCount;
+	
+	// Calculate number allowed to be created
+	iMaxAllowed = iAvailable - iCurrentRequested;
+	sprintf(sMaxAllowed, &quot;Max %d&quot;, iMaxAllowed);
+	// Set lines greater than the max allowed to be created to red
+	for (i = 0; (i &lt; tabDevicesToBeCreated.lineCount) &amp;&amp; (i &lt; iAvailable); i++) {
+		setValue(&quot;tabDevicesToBeCreated&quot;, &quot;cellForeColRC&quot;, i, &quot;node&quot;, &quot;black&quot;);
+	}
+	for (i = iAvailable; i &lt; tabDevicesToBeCreated.lineCount; i++) {
+		setValue(&quot;tabDevicesToBeCreated&quot;, &quot;cellForeColRC&quot;, i, &quot;node&quot;, &quot;red&quot;);
+	}
+	lblRowLimit.text = iAvailable;
+
+	if (iMaxAllowed == 0) {
+		btnAdd.enabled = false;
+		btnAddAll.enabled = false;
+		txtMaxExceeded.visible = false;
+	} else if (iMaxAllowed &lt; 0) {
+		btnAdd.enabled = false;
+		btnAddAll.enabled = false;
+		txtMaxExceeded.visible = true;
+	} else {
+		btnAdd.enabled = true;
+		btnAddAll.enabled = true;
+		txtMaxExceeded.visible = false;
+	}
+	txtMaxAllowed.text = sMaxAllowed;
+
+	// Return to calling routine
+	return;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="txtTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 81</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Size">191 23</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Devices to be Created</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="dpTypeTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">12 91</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">14 43</prop>
+    <prop name="Size">75 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Device Type:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblDeviceNames" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">45</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">11 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">43</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">13 102</prop>
+    <prop name="Size">158 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Suggested Device Names  </prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="typeOfDevice" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">46</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">100 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">44</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">102 42</prop>
+    <prop name="Size">477 18</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">deviceType</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	this.text = ELMB_TYPE_NAME;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="messageInPanel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">54</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">14 416</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">16 363</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblDevicesToBeCreated" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">60</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">338 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">57</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">340 102</prop>
+    <prop name="Size">129 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Devices to be created:  </prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtExplanation" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">65</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 359</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">60</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 361</prop>
+    <prop name="Size">247 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Names in red already exist and cannot be created </prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtMaxAllowed" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">67</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">480 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">62</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">482 102</prop>
+    <prop name="Size">97 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtMaxExceeded" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">68</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">340 360</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">63</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">342 362</prop>
+    <prop name="Size">240 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Names in red will not be created ( &gt; max allowed)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblRowLimit" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">69</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">270 390</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">64</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">272 392</prop>
+    <prop name="Size">97 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btnCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">500 380</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">500 380</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{	
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnAddAll" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">55</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">262 244</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">262 244</prop>
+    <prop name="Size">71 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">&gt;&gt;</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int i;
+	
+	dyn_int diLinesToRemove;
+	
+	dyn_anytype daLine;
+	
+// Executable Code
+// ---------------
+	// Go through each of the devices
+	for (i = 0; i &lt; tabDeviceNames.lineCount; i++) {
+
+		// Get information from line
+		getValue(&quot;tabDeviceNames&quot;, &quot;getLineN&quot;, i, daLine);
+		if (!(daLine[2])) {
+			tabDevicesToBeCreated.appendLine(&quot;node&quot;, daLine[1]);
+			dynAppend(diLinesToRemove, i);
+		}
+	}
+	
+	// Sort the device names
+	tabDevicesToBeCreated.sort(&quot;node&quot;);
+	
+	// Remove the added devices
+	for (i = dynlen(diLinesToRemove); i &gt; 0; i--)
+		tabDeviceNames.deleteLineN(diLinesToRemove[i]);
+
+	// Enable button to continue	
+	if (tabDevicesToBeCreated.lineCount &gt; 0)
+		btnNext.enabled = true;
+		
+	pnlUpdateMaxAllowed();
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnAdd" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">56</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">262 164</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">53</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">262 164</prop>
+    <prop name="Size">71 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">&gt;</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int i;
+	
+	dyn_int diSelectedLines;
+	
+	dyn_anytype daLine;
+	
+// Executable Code
+// ---------------
+	// Get (and sort) the selected rows
+	diSelectedLines = tabDeviceNames.getSelectedLines;
+	dynSortAsc(diSelectedLines);
+	
+	// Go through each of the selected devices
+	for (i = 1; i &lt;= dynlen(diSelectedLines); i++) {
+
+		// Get information from line
+		getValue(&quot;tabDeviceNames&quot;, &quot;getLineN&quot;, diSelectedLines[i], daLine);
+		if (!(daLine[2]))
+			tabDevicesToBeCreated.appendLine(&quot;node&quot;, daLine[1]);
+	}
+	
+	tabDevicesToBeCreated.sort(&quot;node&quot;);
+	for (i = dynlen(diSelectedLines); i &gt; 0; i--) {
+		if (!(daLine[2]))
+			tabDeviceNames.deleteLineN(diSelectedLines[i]);
+	}
+
+	// Enable button to continue	
+	if (tabDevicesToBeCreated.lineCount &gt; 0)
+		btnNext.enabled = true;
+		
+	pnlUpdateMaxAllowed();
+	
+	// Return to calling routine
+	return;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnRemove" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">57</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">262 204</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">54</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">262 204</prop>
+    <prop name="Size">71 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">&lt;</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int i;
+	
+	dyn_int diSelectedLines;
+	
+	dyn_anytype daLine;
+	
+// Executable Code
+// ---------------
+	// Get (and sort) the selected rows
+	diSelectedLines = tabDevicesToBeCreated.getSelectedLines;
+	dynSortAsc(diSelectedLines);
+	
+	// Go through each of the selected devices
+	for (i = 1; i &lt;= dynlen(diSelectedLines); i++) {
+
+		// Get information from line
+		getValue(&quot;tabDevicesToBeCreated&quot;, &quot;getLineN&quot;, diSelectedLines[i], daLine);
+		tabDeviceNames.appendLine(&quot;node&quot;, daLine[1], &quot;exists&quot;, false);
+	}
+	
+	tabDeviceNames.sort(&quot;node&quot;);
+	for (i = dynlen(diSelectedLines); i &gt; 0; i--)
+		tabDevicesToBeCreated.deleteLineN(diSelectedLines[i]);
+	
+	// Check if any devices are left
+	if (tabDevicesToBeCreated.lineCount == 0)
+		btnNext.enabled = false;
+		
+	pnlUpdateMaxAllowed();
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnRemoveAll" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">58</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">262 284</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">55</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">262 284</prop>
+    <prop name="Size">71 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">&lt;&lt;</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int i;
+	
+	dyn_int diSelectedLines;
+	
+	dyn_anytype daLine;
+	
+// Executable Code
+// ---------------
+	// Go through each of the devices
+	for (i = 0; i &lt; tabDevicesToBeCreated.lineCount; i++) {
+
+		// Get information from line
+		getValue(&quot;tabDevicesToBeCreated&quot;, &quot;getLineN&quot;, i, daLine);
+		tabDeviceNames.appendLine(&quot;node&quot;, daLine[1], &quot;exists&quot;, false);
+	}
+	
+	tabDeviceNames.sort(&quot;node&quot;);
+	tabDevicesToBeCreated.deleteAllLines();
+
+	// Disable 'Next' button	
+	btnNext.enabled = false;
+		
+	pnlUpdateMaxAllowed();
+
+	// Return to calling routine
+	return;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnNext" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">62</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">400 380</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">58</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">400 380</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Next &gt;</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int i;
+	int iLimit;
+	
+	string sText;
+	
+	dyn_string dsDeviceList;
+	
+	dyn_anytype daLine;
+	
+// Executable Code
+// ---------------
+	// Get information from panel
+	sText = lblRowLimit.text;
+	iLimit = sText;
+	if (iLimit &gt; tabDevicesToBeCreated.lineCount)
+		iLimit = tabDevicesToBeCreated.lineCount;
+		
+	// Get all devices to be created
+	for (i = 0; i &lt; iLimit; i++) {
+		getValue(&quot;tabDevicesToBeCreated&quot;, &quot;getLineN&quot;, i, daLine);
+		dynAppend(dsDeviceList, daLine[1]);
+	}
+
+	// Create new module
+	ModuleOn(&quot;assignIdsModule&quot;, 0,0,600,800, 0,0,&quot;&quot;);
+	
+	// Display panel
+	RootPanelOnModule(&quot;fwElmb/objects/fwElmbMassConfigurationAssignIDDeviceBunch.pnl&quot;,
+										&quot;Assign ELMB IDs for this bus&quot;,
+										&quot;assignIdsModule&quot;,
+										makeDynString(&quot;$sDeviceList:&quot; + dsDeviceList, &quot;$sDpName:&quot; + $sDpName, &quot;$bStandardElmb:&quot; + chkStandardElmb.state(0)));
+							
+	// Close this module
+	ModuleOff(myModuleName());
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tabDeviceNames" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">63</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">13 127</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">58</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">13 127</prop>
+    <prop name="Size">241 231</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">16</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">None</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">node</prop>
+     <prop name="Width">220</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">node</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">exists</prop>
+     <prop name="Width">100</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">exists</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"/>
+     <prop name="Label">
+	<prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	bool bSomeRed = false;
+	
+	int i;
+	
+	dyn_string dsDevices;
+
+// Executable Code
+// ---------------
+	// Set the table mode to allow for multiple selections
+	this.selectByClick = TABLE_SELECT_LINE;
+	this.tableMode = TABLE_SELECT_MULTIPLE;
+	
+	// Unpack string passed
+	fwGeneral_stringToDynString($passedPackedString, dsDevices);
+	
+	// First entry is always an empty string, therefore remove it
+	dynRemove(dsDevices, 1);
+	
+	// Add the names to the list
+	for (i = 1; i &lt;= dynlen(dsDevices); i++) {
+		// Check if device already exists
+		if (dpExists($sDpName + fwDevice_HIERARCHY_SEPARATOR + dsDevices[i])) {
+			bSomeRed = true;
+			this.appendLine(&quot;node&quot;, dsDevices[i], &quot;exists&quot;, true);
+			setValue(&quot;&quot;, &quot;cellForeColRC&quot;, i - 1, &quot;node&quot;, &quot;red&quot;);
+		} else {
+			this.appendLine(&quot;node&quot;, dsDevices[i], &quot;exists&quot;, false);
+			setValue(&quot;&quot;, &quot;cellForeColRC&quot;, i - 1, &quot;node&quot;, &quot;black&quot;);
+		}
+	}
+	
+	if (bSomeRed)
+		txtExplanation.visible = true;	
+	pnlUpdateMaxAllowed();
+	
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tabDevicesToBeCreated" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">64</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">310 17</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">59</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">340 127</prop>
+    <prop name="Size">244 231</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">16</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">None</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">node</prop>
+     <prop name="Width">220</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">node</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"/>
+     <prop name="Label">
+	<prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	// Set the table mode to allow for multiple selections
+	this.selectByClick = TABLE_SELECT_LINE;
+	this.tableMode = TABLE_SELECT_MULTIPLE;
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="chkStandardElmb" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">66</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">61</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 70</prop>
+    <prop name="Size">251 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Limit Node IDs to 63 (Standard ELMB)</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+	// Call function to update maximum number of nodes allowed
+	pnlUpdateMaxAllowed();
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

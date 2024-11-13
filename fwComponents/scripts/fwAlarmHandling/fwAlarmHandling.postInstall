@@ -1,0 +1,222 @@
+/**
+  * @par Modification history:
+  *  04/05/2017: Adrian Crestar Santome
+  *    - @jira{FWAH-353} Keep only DPT and DP definition in dpl files (remove dpe assignment)
+  *
+  *      Checks in the post installation if the default DPE's have been modified since their creation.
+  *      If they have been touched, it doesn't import their default definition (it has to be done manually).
+  *
+  *        - Constants to represent the DPE files, the DPEs that will be checked and the DPE config
+  *          used to check if they have been modified.
+  *        - New function: 'importNotInitializedAesDpes' that will import the default DPE values if
+  *          they have not been modified by the user.
+  *        - Modification in the function 'areAesDpesNotInitialized' to accept a DPE to test, instead
+  *          of having it hardcoded inside the function body.
+  */
+
+#uses "fwAlarmHandling/fwAlarmScreen"
+
+const dyn_string fwAlarmHandling_AES_DPE_FILES = makeDynString("./dplist/fwAlarmHandlingDPE_AESConfig_fwAes.dpl",
+                                                               "./dplist/fwAlarmHandlingDPE_AESProperties_fwAes.dpl",
+                                                               "./dplist/fwAlarmHandlingDPE_AEScreen_fwAes.dpl"
+                                                               );
+const string fwAlarmHandling_AES_DPE_CONFIG_TEST = ":_original.._stime";
+const dyn_string fwAlarmHandling_AES_DPE_DP_TEST = makeDynString("_AESConfig_fwAes.tables.alertTable.columns.name" + fwAlarmHandling_AES_DPE_CONFIG_TEST,
+                                                                 "_AESProperties_fwAes.Name" + fwAlarmHandling_AES_DPE_CONFIG_TEST,
+                                                                 "_AEScreen_fwAes.Name" + fwAlarmHandling_AES_DPE_CONFIG_TEST
+                                                                 );
+main()
+{
+	int length;
+    string fileName, destinationFileName, destinationDir;
+	dyn_bool values;
+	dyn_string settings, screenConfigurations, exceptionInfo, dsExceptions;
+
+	fwInstallation_throw("fwAlarmHandling: post install file","INFO");
+ 	fwInstallation_throw("fwAlarmHandling: Installing alarm screen extension library - Note: 64-bit version only", "INFO");
+
+
+	Cleanup();
+
+	fwInstallation_throw("fwAlarmHandling: Setting default screen style", "INFO");
+	screenConfigurations = dpNames("*", "_AEScreen");
+	length = dynlen(screenConfigurations);
+	for(int i = 1 ; i <= length; i++)
+	{
+		dynAppend(settings, screenConfigurations[i] + ".UseAsDefault");
+		dynAppend(values, FALSE);
+	}
+
+	dpSetWait(settings, values);
+	dpSetWait("_AEScreen_fwAes" + ".UseAsDefault", TRUE);
+	fwInstallation_throw("fwAlarmHandling: Default screen style set: fwAES_Alerts", "INFO");
+
+  if(!dpExists("_FwAlarmHelpSettings"))
+  {
+    fwInstallation_throw("fwAlarmHandling: Configuring alarm help default file types", "INFO");
+    dpCreate("_FwAlarmHelpSettings", "_FwAlarmHelp");
+
+    while(!dpExists("_FwAlarmHelpSettings"))
+    {
+      delay(0,200);
+    }
+
+    fwAlarmScreen_setHelpFileFormats(
+        makeDynString(".htm", ".html", ".xml", ".pdf"),
+        makeDynString("","","",""),
+        makeDynString("","","",""),
+        exceptionInfo
+      );
+  }
+
+  if(!dpExists("_FwAesSetup"))
+  {
+    fwInstallation_throw("fwAlarmHandling: Setting alarm screen option defaults", "INFO");
+
+    dpCreate("_FwAesSetup", "_FwAesSetup");
+    while(!dpExists("_FwAesSetup"))
+    {
+      delay(0,200);
+    }
+  }
+
+  //if the alarm filter option is just being created, make sure to
+  //to enable it
+  time tTimeAlertFilterOption;
+  dpGet("_FwAesSetup.enableAlarmFilter:_original.._stime", tTimeAlertFilterOption);
+  if(tTimeAlertFilterOption == 0)
+  {
+    dpSetWait("_FwAesSetup.enableAlarmFilter", 1);
+  }
+
+  if(!dpExists("_FwAesGroupsSetup"))
+  {
+    fwInstallation_throw("fwAlarmHandling: Setting alarm screen groups option defaults", "INFO");
+    dpCreate("_fwAesGroupsSetup", "_FwAesGroupsSetup");
+  }
+
+  time t;
+  dpGet("_FwAesSetup.onlineValueUpdateRate:_original.._stime", t);
+
+  if(t == 0)
+  {
+    dpSetWait("_FwAesSetup.onlineValueUpdateRate", 5);
+  }
+
+  dpGet("_FwAesSetup.rightClickMenu.items:_original.._stime", t);
+  if(t == 0)
+  {
+    dpSetWait(
+	      "_FwAesSetup.rightClickMenu.items",       makeDynString("FSM Panel", "Details", "Trend", "Alarm Help", "Comment Panel"),
+	      "_FwAesSetup.rightClickMenu.functions",   makeDynString("_fwAlarmScreen_showFsmPanel", "_fwAlarmScreen_showDetails", "_fwAlarmScreen_showTrend", "_fwAlarmScreen_showHelp", "_fwAlarmScreen_showCommentPanel"),
+	      "_FwAesSetup.rightClickMenu.alertTypes",  makeDynString("ALL", "ALL", "NO_SUMMARY", "ALL", "ALL")
+      );
+  }
+
+  fwInstallation_throw("fwAlarmHandling: Creating/updating alarm screen plot configuration", "INFO");
+  _fwAlarmScreen_createPlotDp("_FwAlarmScreenPlot");
+  
+  //FWAH-353 Import default values only if it has never been changed
+  fwInstallation_throw("fwAlarmHandling: Checking if the fwAlarmHandling DPEs need to be initialized", "INFO");
+  
+  importNotInitializedAesDpes();
+
+  fwInstallation_throw("fwAlarmHandling: Postinstall completed.", "INFO");
+}
+
+void importNotInitializedAesDpes() 
+{
+  dyn_string dsExceptions;
+  dyn_string dsManualImportFiles;
+  string sDpeConfigTest = "";
+  string sDpeFile = "";
+  
+  for(int iDpeTestIndex = 1; iDpeTestIndex <= dynlen(fwAlarmHandling_AES_DPE_DP_TEST); iDpeTestIndex++)
+  {
+    sDpeConfigTest = fwAlarmHandling_AES_DPE_DP_TEST[iDpeTestIndex];
+    sDpeFile = fwAlarmHandling_AES_DPE_FILES[iDpeTestIndex];
+
+    if(areAesDpesNotInitialized(sDpeConfigTest))
+    { 
+      fwInstallation_throw("fwAlarmHandling: Assigning default values to fwAlarmHandling DPEs as they seem unset from: " + sDpeFile, "INFO");
+      importAesDpes(sDpeFile);
+    } else
+    {
+      dynAppend(dsManualImportFiles, sDpeFile);
+    }
+  }
+  
+  if(dynlen(dsManualImportFiles) > 0)
+  {
+      fwInstallation_throw("fwAlarmHandling: Some fwAlarmHandling DPEs are not re-set to their default values as they have been changed.", "INFO");
+      fwInstallation_throw("fwAlarmHandling: If you want to reset to their default values, please manually import the following dpl files: "+ dsManualImportFiles, "INFO");
+  }
+}
+
+/*
+  Check one config DPE to see it has never been modified, i.e. we are on a clean installation
+  */
+bool areAesDpesNotInitialized(const string& sDpTest)
+{
+  time tEpochTime;
+  time tLastChanged;
+  dyn_string dsExceptions;
+    
+  if ( dpExists(sDpTest) == false)
+  {
+    //if the DP does not exist, return false so the ascii import will not be performed
+    dyn_string dsExceptions;
+	fwInstallation_throw("Missing internal fwAlarmhandling DPs. Please re-install the component ("+sDpTest+")", "ERROR");
+    return false;
+  }    
+  
+  dpGet( sDpTest, tLastChanged);
+  
+  return tLastChanged == tEpochTime;
+}
+
+/*
+  Import the ascii file
+  */
+void importAesDpes(string sDplFileDefaultValue)
+{
+  string componentName = "fwAlarmHandling";
+  string sourceDir;
+  string subPath = "";
+  dyn_string dynDplistFiles = makeDynString(sDplFileDefaultValue);
+  bool updateTypes = false;
+  dyn_string dsExceptions;
+  
+  string componentDP = fwInstallation_getComponentDp(componentName);
+        
+  if(!dpExists(componentDP))
+  {
+    fwInstallation_throw("fwInstallation component DP does not exist. The alarm screen will not work.", "ERROR");
+    return ;
+  }
+    
+  dpGet(componentDP+".installationDirectory",sourceDir);
+  
+  if(fwInstallation_importComponentAsciiFiles(componentName, sourceDir, subPath, dynDplistFiles, updateTypes))
+  {
+       fwInstallation_throw("Failed to import the dpl file("+sDplFileDefaultValue+"). The alarm screen will not work.", "ERROR");
+  } 
+}
+
+void Cleanup()
+{
+ // old location of help files
+   fwInstallation_cleanupObsoleteFiles("fwAlarmHandling", makeDynString("help/en_US.iso88591/fwAlarmHandling"),true);
+   fwInstallation_cleanupObsoleteFiles("fwAlarmHandling", makeDynString("help/en_US.iso88591/AlarmHelp/fwAlarmHandlingDefault.xml"));
+   fwInstallation_cleanupObsoleteFiles("fwAlarmHandling", makeDynString("help/en_US.iso88591/AlarmHelp/resource"),true);
+   fwInstallation_cleanupObsoleteFiles("fwAlarmHandling", makeDynString("bin/windows-64/TabUtilEx.dll",
+   																		"bin/linux-64/TabUtilEx.so",
+   																		"bin/fwAlarmHandling/TabUtilEx3.15.dll",
+   																		"bin/fwAlarmHandling/TabUtilEx3.15.so",
+   																		"bin/fwAlarmHandling/TabUtilEx3.16.dll",
+   																		"bin/fwAlarmHandling/TabUtilEx3.16.so"
+   																		));
+   fwInstallation_cleanupObsoleteFiles("fwAlarmHandling", makeDynString("help/en_US.utf8/fwAlarmHandling/scripts"),true);
+   fwInstallation_cleanupObsoleteFiles("fwAlarmHandling", makeDynString("help/en_US.utf8/fwAlarmHandling/panels"),true);
+   fwInstallation_cleanupObsoleteFiles("fwAlarmHandling", makeDynString("help/en_US.utf8/fwAlarmHandling/fwAlarmHandling.htm"));
+}

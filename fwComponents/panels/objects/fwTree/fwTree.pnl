@@ -1,0 +1,860 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">192 293</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">11 20</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96.06430220166801</prop>
+  <prop name="PDPI">96.064302201668</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">0</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[// FwTree reference panel
+// ----------------------
+//
+// This panel is supposed to be embedded as a reference panel and
+// initialized to display specific tree of subtree composed of FwTreeNodes.
+//
+// Handling of tree events (mouse clicks, drag-and drop) as well as how the
+// tree nodes are displayed are declared by an instance of the FwTreeDelegate class
+// (see initializeTree() below) or - if not specified - by the default implementation
+// provided by the FwTreeDelegate class.
+//
+// To define the type of the tree or the top node of the tree to display one
+//  needs to use the &quot;treeType&quot; property or the $treeType dollar parameter,
+//  with the following convention
+//  1) if treeType is not set (empty), then the call to initializeTree() must be issued
+//    specifying the treeType (see other cases below) and the delegate
+//  2) if the treeType name starts with &quot;fwTN_&quot; and NOT prepended with system name, it
+//    specifies the ID of the tree node localed in the LOCAL system that will be
+//    displayed as the top of the tree
+//  3) similarly, if it is prepended by a system name, the tree node at a specified
+//    system name will be used as the tree top
+//  4) if the specified treeType starts with &quot;*:fwTN_&quot; then the lookup of tree nodes
+//    will be done on all systems
+//  5) if the treeType does not start with &quot;fwTN_&quot; then the tree type is searched for,
+//    e.g. &quot;TrendTree&quot;, will look for a FwTreeNode being a root node (ie no parent) and
+//    named &quot;TrendTree&quot; (ie. the ID fwTN_TrendingTree)
+//  6) as above, if the treeType starts with the system name (and a collon) the lookup for
+//    the tree is done in the specific system
+//  7) specifying &quot;*:&quot; allows to displays the specific tree types of all connected systems.
+//
+// Examples,
+//   &quot;TrendTree&quot; shows the trend tree on the local system
+//   &quot;dcs32:FSM&quot; shows the FSM tree of system called &quot;dcs32:&quot;
+//   &quot;*:TrendTree&quot; shows all the trend trees from all the systems (ie. root nodes showing the system name)
+//   &quot;fwTN_ECAL&quot; shows the tree setting the &quot;fwTN_ECAL&quot; as the top node
+//   &quot;dcs12:fwTN_ECAL&quot; as above, yet for system &quot;dcs12:&quot;
+
+#uses &quot;classes/fwStdLib/FwException.ctl&quot;
+#uses &quot;classes/fwTree/FwTree.ctl&quot;
+#uses &quot;classes/fwTree/FwTree_Repository.ctl&quot;
+#uses &quot;classes/fwTree/FwTreeNodeDelegate.ctl&quot;
+
+#property string treeType
+#property bool editable
+#event clicked       (FwTreeNodePtr tNode)
+#event doubleClicked (FwTreeNodePtr tNode)
+#event rightClicked  (FwTreeNodePtr tNode)
+
+
+// main data-provider instance; see initialize() and checkConnect()
+shared_ptr&lt;FwTree_Repository&gt; treeRepo = nullptr;
+
+dyn_string allItemIDs; // track all the IDs in the tree widgets
+
+FwTreeNodeDelegatePtr myDelegate; // defines how to render a tree node (text, icon, visibility)
+
+// if not empty, indicates that we are in the mode in which a specific tree node
+// was specified to be used as top node, and will contain the ID of this node
+string nonRootTopNode;
+
+bool initialized=false; // set to true when initialization has completed
+
+// defines the top node(s) or tree type (see the documentation);
+// initialized by setTreeType() or the treeType property
+// e.g. &quot;TrendTree&quot; or &quot;FSM&quot; or dist_1:fwTN_SubDet1
+string myTreeType;
+
+// if set (e.g. using the &quot;editable&quot; property) then clipboard is shown and drag-and-drop of tree nodes is provided
+bool editable;
+
+//_____________________________________________________________________________________
+// Called by the panel initialization script (or from various other places that may
+// need to ensure the initialization)
+void initialize()
+{
+    if (isPanelInGedi()) return;
+
+    synchronized(initialized) {
+        if (initialized) return;
+        treeRepo = FwTree_Repository::getInstance();
+        FwException::assertNotNull(treeRepo,&quot;Tree Node instance not available&quot;);
+        treeRepo.initialize();
+        classConnect(&quot;treeDataModifiedCB&quot;, treeRepo, FwTree_Repository::evTreeNodesModified);
+        classConnect(&quot;treeNodeDeletedCB&quot;,  treeRepo, FwTree_Repository::evTreeNodeDeleted);
+        classConnect(&quot;treeNodeRenamedCB&quot;,  treeRepo, FwTree_Repository::evTreeNodeRenamed);
+        classConnect(&quot;treeDistChangedCB&quot;,  treeRepo, FwTree_Repository::evDistChanged);
+        initialized=true;
+    }
+
+    string treeType=myTreeType; // get the value from the panel property
+    // still, make it possible to override also using a $-param
+    if (isDollarDefined(&quot;$treeType&quot;)) myTreeType=getDollarValue(&quot;$treeType&quot;);
+
+    // When treeType was defined, initialize with default tree node delegate,
+    // so the tree is usable straight away;
+    // However, to allow the parent panel set its tree delegate first (in its own init script),
+    // firstly wait a little bit; we do it in another thread so that we won't block the initialization
+    if (myTreeType!=&quot;&quot;) startThread(&quot;_checkSetDefaultDelegate&quot;);
+}
+
+void _checkSetDefaultDelegate()
+{
+    delay(0, 200);
+    if (myTreeType!=&quot;&quot; &amp;&amp; equalPtr(myDelegate, nullptr)) initializeTree(new FwTreeNodeDelegate, myTreeType);
+}
+
+// ___ PUBLIC METHODS ___
+
+//_____________________________________________________________________________________
+// Initialization to be invoked by the parent panel,
+// notably if the tree type has not been defined in the &quot;treeType&quot; property of $treeType
+synchronized public void initializeTree(FwTreeNodeDelegatePtr aDelegate, string treeType=&quot;&quot;)
+{
+    try {
+        TreeWidget.clear();
+
+        synchronized(initialized) { if (!initialized) initialize();}
+
+        if (treeType!=&quot;&quot;) setTreeType(treeType);
+        FwException::assert(myTreeType!=&quot;&quot;, &quot;TreeType not specified (property or $treeType) for shape &quot;+this.name+&quot; in panel &quot;+myPanelName());
+
+        setTreeItemDelegate(aDelegate); // will trigger a refresh
+    } catch {
+        FwException::handleLast();
+    }
+}
+
+//_____________________________________________________________________________________
+synchronized public void setTreeItemDelegate(FwTreeNodeDelegatePtr theDelegate)
+{
+    synchronized(initialized) {
+        try {
+            if (!initialized) initialize();
+            FwException::assertNotNull(theDelegate, &quot;FwTreeNodeDelegate may not be null&quot;);
+            assignPtr(myDelegate, nullptr);
+            assignPtr(myDelegate, theDelegate);
+            if (myTreeType!=&quot;&quot;) refresh();
+        } catch {
+            FwException::handleLast();
+        }
+    }
+}
+
+//_____________________________________________________________________________________
+public string getTreeType() { return myTreeType;}
+//_____________________________________________________________________________________
+public void   setTreeType(string treeType)
+{
+    TreeWidget.clear();
+    allItemIDs.clear();
+    myTreeType=treeType;
+    if (isPanelInGedi()) return;
+    try {
+        if (equalPtr(myDelegate, nullptr)) return;
+        synchronized(initialized) {
+            if (!initialized) return;
+        }
+        refresh();
+    } catch {
+        FwException::handleLast();
+    }
+}
+
+//_____________________________________________________________________________________
+public bool getEditable() {return editable;}
+//_____________________________________________________________________________________
+public void setEditable(bool b)
+{
+    editable=b;
+    TreeWidget.setDragEnabled(&quot;&quot;, editable);
+    TreeWidget.setDropEnabled(&quot;&quot;, editable);
+
+    TreeWidget.acceptDrops(editable);
+    TreeWidget.showDropIndicator(editable);
+    TreeWidget.dragAutoScroll(true);
+    if (isPanelInGedi()) return;
+    try {
+        if (myTreeType==&quot;&quot;) return;
+        if (equalPtr(myDelegate, nullptr)) return;
+        synchronized(initialized) {
+            if (!initialized) return;
+        }
+        checkRepaintClipboardNodes();
+    } catch {
+        FwException::handleLast();
+    }
+}
+
+
+//_____________________________________________________________________________________
+public void expandNode(FwTreeNodePtr tNode)
+{
+    TreeWidget.setOpen(tNode.getID(), true);
+}
+
+//_____________________________________________________________________________________
+public void setUiDensity(unsigned density)
+{
+    // react only on font...
+    const dyn_string fontPerDensity=makeDynString(&quot;Sans Serif,-1,12,5,50,0,0,0,0,0&quot;, // Sans 9
+                                                  &quot;Sans Serif,-1,13,5,50,0,0,0,0,0&quot;, // Sans 10
+                                                  &quot;Sans Serif,-1,16,5,50,0,0,0,0,0&quot;, // Sans 12
+                                                  &quot;Sans Serif,-1,19,5,50,0,0,0,0,0&quot;  // Sans 14
+                                                 );
+    TreeWidget.font(fontPerDensity.at(density));
+}
+
+
+// ___ PRIVATE METHODS ___
+
+//_____________________________________________________________________________________
+void checkRepaintClipboardNodes()
+{
+    if (nonRootTopNode!=&quot;&quot;) return;
+    // exception handling in the called functions
+    FwTreeNodePVec topNodes=getTopNodes();
+    for (int i=0; i&lt;topNodes.count(); i++) {
+        // only in the mode where wenD
+        if (!topNodes.at(i).isRoot()) continue;
+
+        FwTreeNodePtr clipboard = topNodes.at(i).getClipboard();
+        if (equalPtr(clipboard, nullptr)) {
+            DebugTN(&quot;WARNING: No clipboard node found for top node&quot;, topNodes.at(i)._dp);
+            continue;
+        }
+        checkAddNode(clipboard);
+    }
+}
+
+
+//_____________________________________________________________________________________
+FwTreeNodePVec getTopNodes()
+{
+    FwTreeNodePVec treeTops;
+    string tt=fwNoSysName(myTreeType);
+
+    if (tt.startsWith(&quot;fwTN_&quot;)) {
+      // &quot;*&quot; not looked up here!!!
+        FwException::assertDP(myTreeType, &quot;_FwTreeNode&quot;, &quot;Tree top node &quot;+myTreeType+&quot; invalid&quot;);
+        nonRootTopNode=dpSubStr(myTreeType, DPSUB_SYS_DP);
+        FwTreeNodePtr topNode=FwTreeNode::get(myTreeType);
+        FwException::assertNotNull(topNode, &quot;Could not find the top node &quot;+myTreeType);
+        treeTops.append(topNode);
+    } else {
+        nonRootTopNode=&quot;&quot;;
+        FwTreeNodePVec matchNodes=treeRepo.findBy(&quot;_parent&quot;, &quot;&quot;, &quot;name&quot;, tt);
+        string sys=fwSysName(myTreeType,true);
+        if (sys==&quot;&quot;) sys=getSystemName();
+        if (sys==&quot;*:&quot;) {
+            treeTops=matchNodes;
+        } else {
+            for (int i=0;i&lt;matchNodes.count();i++) {
+                FwTreeNodePtr tn=matchNodes.at(i);
+                if (tn._dp.startsWith(sys)) {
+                    treeTops.append(tn);
+                    break;
+                }
+            }
+        }
+    }
+    return treeTops;
+}
+//_____________________________________________________________________________________
+void treeDistChangedCB(string sysName, bool connected)
+{
+    // make sure we wait enough to get the delegate modified;
+    // the fallback anyway is that after 200 ms the default one
+    // will be set by the initialize() script
+    int i=0;
+    while (equalPtr(myDelegate,nullptr)) {
+        delay(0,10);
+        if (i&gt;=100) break; // do not wait forever...
+    }
+    FwException::assertNotNull(myDelegate,&quot;Tree Delegate not set&quot;);
+
+    //DebugTN(__FUNCTION__, sysName, connected);
+    TreeWidget.updatesEnabled=false;
+    try {
+        FwTreeNodePtr treeTop=treeRepo.get(sysName+&quot;:fwTN_&quot;+myTreeType);
+        if (equalPtr(treeTop, nullptr)) {
+            if (!connected) {
+                if (TreeWidget.currentItem==treeTop._dp) {
+                    triggerEvent(&quot;clicked&quot;, nullptr);
+                    TreeWidget.currentItem(&quot;&quot;);
+                }
+                return; // nothing more to do anyway...
+            }
+            if (sysName+&quot;:&quot;==getSystemName()) {
+                FwException::raise(&quot;Top node of tree type &quot;+myTreeType+&quot; does not exist in this system.&quot;);
+            } else {
+                // there is no tree of this type in the remote system... Just skip for now...
+                return;
+            }
+        }
+        if (connected) {
+            checkAddNode(treeTop);
+        } else {
+            // get a recursive list of all children (and their _dp)
+            FwTreeNodePVec children = treeTop.getAllChildren();
+            //DebugTN(&quot;ALL IDs:&quot;,allItemIDs);
+
+            dyn_string tnNames;
+            for (int i=children.count()-1; i&gt;=0; i--) {
+                if (allItemIDs.contains(children.at(i)._dp)) {
+                    tnNames.append(children.at(i)._dp);
+                }
+            }
+            //TreeWidget.removeItems(tnNames);
+            for (int i=0; i&lt;tnNames.count(); i++) {
+                int idx=allItemIDs.indexOf(tnNames.at(i));
+                if (idx&gt;=0) {
+                    // DebugTN(&quot;TreeWidget.removeItem&quot;, tnNames.at(i));
+                    if (TreeWidget.itemExists(tnNames.at(i))) TreeWidget.removeItem(tnNames.at(i));
+                    allItemIDs.removeAt(idx);
+                }
+            }
+            updateNode(treeTop, false);
+        }
+
+    } catch {
+        FwException::handleLast();
+    } finally {
+        TreeWidget.updatesEnabled=true;
+    }
+}
+
+
+//_____________________________________________________________________________________
+public void refresh()
+{
+    // exception-handling is done in the called functions
+
+    TreeWidget.clear();
+    TreeWidget.updatesEnabled=false;
+
+    FwTreeNodePVec treeTops = getTopNodes();
+
+    for (int i=0; i&lt;treeTops.count(); i++) {
+        checkAddNode(treeTops.at(i));
+    }
+    checkRepaintClipboardNodes();
+    TreeWidget.updatesEnabled=true;
+}
+
+
+//_____________________________________________________________________________________
+void itemExpanded(string itemId)
+{
+    TreeWidget.updatesEnabled=false;
+    FwTreeNodePtr item = treeRepo.get(itemId);
+    if (equalPtr(item, nullptr)) {
+        DebugTN(__FUNCTION__, &quot;Item does not exist anymore (removing it)&quot;, itemId);
+        TreeWidget.removeItem(itemId);
+        allItemIDs.removeAt(allItemIDs.indexOf(itemId));
+        return;
+    }
+    FwTreeNodePVec children = item.getChildren();
+    for (int i=0; i&lt;children.count(); i++) checkAddNode(children.at(i), false);
+    TreeWidget.updatesEnabled=true;
+
+}
+
+//_____________________________________________________________________________________
+// we should maybe have a bulk-add acting on many nodes at once...
+// but for the time-being we do lazy-loading of the tree
+// so it is not so dramatically slow
+void checkAddNode(FwTreeNodePtr tn, bool addDirectChildren=true)
+{
+    try {
+        if (equalPtr(tn, nullptr)) {
+            DebugTN(&quot;WARNING: checkAddNode called with null tn&quot;, getStackTrace());
+            return;
+        }
+        string itemId=tn._dp;
+        DebugFTN(&quot;FwTree&quot;, __FUNCTION__, itemId);
+
+        if (tn._invalid) return;
+        if (tn._disconnected) return;
+
+        string parentId;
+
+        FwTreeNodePtr parentNode= tn.getParent();
+
+        if (!equalPtr(parentNode, nullptr)) {
+            parentId=parentNode._dp;
+
+            if (nonRootTopNode==tn.getID()) {
+                parentId=&quot;&quot;;
+            } else {
+                // check/add parent node if not present
+                // but only if we have a root node at top...
+                if (! TreeWidget.itemExists(parentId)) checkAddNode(parentNode, false);
+
+            }
+        }
+
+        if (TreeWidget.itemExists(itemId)) {
+            if (parentId!=TreeWidget.parent(itemId)) {
+                // move (reparent) the item
+                string selectedItem=TreeWidget.selectedItem();
+                bool isOpen=TreeWidget.isOpen(selectedItem);
+                TreeWidget.removeItem(itemId);
+                TreeWidget.appendItem(parentId, itemId, tn.name);
+                updateNode(tn, true);
+                if (selectedItem==itemId) {
+                    TreeWidget.setSelectedItem(selectedItem);
+                    TreeWidget.setOpen(itemId, isOpen);
+                    triggerEvent(&quot;clicked&quot;, tn);
+                }
+            } else {
+                updateNode(tn, true);
+            }
+        } else {
+            if (tn.isClipboard()) {
+                TreeWidget.insertItem(parentId, itemId, tn.name);
+            } else {
+                TreeWidget.appendItem(parentId, itemId, tn.name);
+            }
+            allItemIDs.append(itemId);
+            updateNode(tn, addDirectChildren);
+        }
+
+        if (tn.isRoot() &amp;&amp; fwSysName(tn._dp, true)==getSystemName()) TreeWidget.setOpen(itemId, true);
+    } catch {
+        FwException::handleLast();
+    }
+}
+
+//_____________________________________________________________________________________
+synchronized void updateNode(FwTreeNodePtr tn, bool addDirectChildren=true)
+{
+    try {
+        string curNode=TreeWidget.currentItem();
+        string selNode=TreeWidget.selectedItem();
+        string itemId=tn._dp;
+        DebugFTN(&quot;FwTree&quot;, __FUNCTION__, itemId);
+
+        if (tn._invalid &amp;&amp; TreeWidget.itemExists(itemId)) {
+            DebugTN(__FUNCTION__, &quot;Deleting node that got invalidated&quot;, itemId);
+            if (curNode==itemId) TreeWidget.currentItem(&quot;&quot;);
+            if (selNode==itemId) TreeWidget.selectedItem(&quot;&quot;);
+            TreeWidget.removeItem(itemId);
+            triggerEventWait(&quot;clicked&quot;, nullptr);
+            return;
+        }
+
+        FwTreeViewItemData data = myDelegate.getTreeItemData(tn);
+        TreeWidget.setExpandable(itemId, data.isExpandable);
+        TreeWidget.setIcon(itemId, 0, data.icon);
+        TreeWidget.setEnabled(itemId, data.isEnabled);
+        TreeWidget.setText(itemId, 0, data.name);
+        TreeWidget.setToolTip(itemId,0,data.tooltip);
+        TreeWidget.setDragEnabled(itemId, true);
+        TreeWidget.setDropEnabled(itemId, true);
+        if (data.hasOptionalProperties) {
+            TreeWidget.setBackColor(itemId,0,data.bgColor);
+            TreeWidget.setForeColor(itemId,0,data.fgColor);
+            TreeWidget.setFont(itemId,0,data.font);
+        }
+        if (tn.isClipboard()) {
+            TreeWidget.setVisible(itemId, editable);
+            TreeWidget.setDragEnabled(itemId, false);
+        }
+
+        // TODO: maybe do this with our clearSelection() instead
+        if (selNode=itemId) { // reset the selection
+            TreeWidget.selectedItem(&quot;&quot;);
+            triggerEventWait(&quot;clicked&quot;, nullptr);
+        }
+        if (curNode=itemId) TreeWidget.currentItem(&quot;&quot;);
+
+        // update children...
+        dyn_string children = TreeWidget.children(itemId);
+        // exclude the clipboard node...
+        for (int i=0; i&lt;children.count(); i++) {
+            if (children.at(i).startsWith(fwSysName(itemId, true)+&quot;fwTN_---Clipboard&quot;)) {
+                children.removeAt(i); break;
+            }
+        }
+
+        if (children!=tn._children) {
+            TreeWidget.removeItems(children);
+            for (int i=0; i&lt;children.count(); i++) {
+                int idx=allItemIDs.indexOf(children.at(i));
+                if (idx&gt;=0)allItemIDs.removeAt(idx);
+            }
+            if (addDirectChildren || TreeWidget.isOpen(itemId)) {
+                FwTreeNodePVec childTNs = tn.getChildren();
+                for (int i=0; i&lt;childTNs.count(); i++) checkAddNode(childTNs.at(i), false);
+            } else {
+            }
+        }
+    } catch {
+        FwException::handleLast();
+    }
+}
+
+//_____________________________________________________________________________________
+synchronized void treeDataModifiedCB(FwTreeNodePVec modifiedNodes)
+{
+    // make sure we wait enough to get the delegate modified;
+    // the fallback anyway is that after 500 ms the default one
+    // will be set by the initialize() script
+    int i=0;
+    while (equalPtr(myDelegate,nullptr)) {
+        delay(0,10);
+        if (i&gt;=100) break; // do not wait forever...
+    }
+    FwException::assertNotNull(myDelegate,&quot;Tree Delegate not set&quot;);
+
+    // exceptions handled in the called function
+    TreeWidget.updatesEnabled=false;
+    for (int i=0; i&lt;modifiedNodes.count(); i++) {
+        FwTreeNodePtr tn=modifiedNodes.at(i);
+        // we will modify the tree items only if they already exist...
+        //if (allItemIDs.contains(tn._dp)) checkAddNode(tn);
+        checkAddNode(tn);
+    }
+    TreeWidget.updatesEnabled=true;
+}
+
+//_____________________________________________________________________________________
+// we need it for the treeNodeDeletedCB...
+// it is a workaround to avoid a &quot;previous&quot; tree node being selected
+// when a tree item is deleted... Unfortunately this means
+// an arbitrary delay...
+void clearSelection()
+{
+    delay(0, 150); // 100 works fine...
+    TreeWidget.clearSelection();
+    triggerEvent(&quot;clicked&quot;, nullptr);
+}
+
+//_____________________________________________________________________________________
+void treeNodeDeletedCB(FwTreeNodePtr deletedNode)
+{
+    string itemId=deletedNode._dp;
+    DebugFTN(&quot;FwTree&quot;, __FUNCTION__, itemId);
+    string selectedId=TreeWidget.selectedItem;
+
+    int idx=allItemIDs.indexOf(itemId);
+    if (idx&gt;=0) allItemIDs.removeAt(idx);
+    if (TreeWidget.itemExists(itemId)) {
+        TreeWidget.removeItem(itemId);
+        // removeItem causes the selectionChanged() event to trigger with the item above...
+        // and we do not really know how to work it around well...
+        // what's working is to do the TreeWidget.clearSelection() with a delay
+        // using a dedicated thread...
+        if (selectedId==itemId) startThread(&quot;clearSelection&quot;);
+    }
+}
+
+void treeNodeRenamedCB(FwTreeNodePtr renamedNode, string oldItemId)
+{
+    // make sure we wait enough to get the delegate modified;
+    // the fallback anyway is that after 500 ms the default one
+    // will be set by the initialize() script
+    int i=0;
+    while (equalPtr(myDelegate,nullptr)) {
+        delay(0,10);
+        if (i&gt;=100) break; // do not wait forever...
+    }
+    FwException::assertNotNull(myDelegate,&quot;Tree Delegate not set&quot;);
+
+    string newId=renamedNode._dp;
+    if (!TreeWidget.itemExists(oldItemId)) return; // nothing more to do...
+    if (TreeWidget.itemExists(newId)) TreeWidget.removeItem(newId);
+    TreeWidget.changeId(oldItemId,newId);
+    int idx=allItemIDs.indexOf(oldItemId);
+    if (idx&gt;=0) allItemIDs[idx+1]=newId;
+    updateNode(renamedNode,false);
+}
+
+//_____________________________________________________________________________________
+void handleDrop(string payload, string droppedOn, string position)
+{
+    try {
+        //DebugTN(__FUNCTION__, payload, droppedOn, position);
+
+        // firstly, check what we have in the info...
+        // a FwTreeNode would be something like &quot;dist_1:fwTN_MyTrendFolder01&quot;
+        // ie. it contains the system name, which should be equal to the system name of the node on which we drop
+        // and then start with fwTN_* which could be interpretted as a datapoing which must be of type _FwTreeNode
+        // (or simply we could get it from the repo).
+        //
+        // another option is that someone wants to link an object to the tree node...
+
+        if (droppedOn == &quot;&quot;) return;
+
+        FwTreeNodePtr droppedOnTN = FwTreeNode::get(droppedOn);
+        FwTreeNodePtr payloadTN;
+
+        if (equalPtr(droppedOnTN, nullptr))     { DebugTN(__FUNCTION__, &quot;Could not locate FwTreeNode for the droppedOn item &quot; + droppedOn); return; }
+
+        if (payload.contains(&quot;:&quot;)) {
+            string payloadID = fwNoSysName(payload);
+            if (payloadID.startsWith(&quot;fwTN_&quot;)) {
+                payloadTN = FwTreeNode::get(payload);
+                if (equalPtr(payloadTN, nullptr))                  { DebugTN(__FUNCTION__, &quot;Could not locate FwTreeNode for payload &quot;+payload); return;}
+                if (payloadTN.isClipboard() &amp;&amp; payloadTN.isRoot()) { DebugTN(__FUNCTION__, &quot;Root or clipboard nodes cannot be moved&quot;); return;}
+                if (fwSysName(payload) != fwSysName(droppedOn))    { DebugTN(__FUNCTION__, &quot;Nodes are from different systems - rejecting D&amp;D&quot;); return;}
+            }
+        }
+
+//  if (payloadTN==nullptr) DebugTN(&quot;PAYLOAD NULL&quot;); else DebugTN(&quot;PAYLOAD&quot;,payloadTN._dp);
+
+        switch (position) {
+            case &quot;OnViewPort&quot;: // we may consider a handler of some kind ...
+                return;
+            case &quot;OnItem&quot;:
+                if (equalPtr(payloadTN, nullptr)) {
+                    handleDropOther(droppedOnTN, payload);
+                } else {
+                    handleTreeNodeDropOnItem(droppedOnTN, payloadTN);
+                }
+                break;
+            case &quot;AboveItem&quot;:
+            case &quot;BelowItem&quot;:
+                if (!equalPtr(payloadTN, nullptr)) {
+                    handleTreeNodeDropBetween(droppedOnTN, payloadTN, (position==&quot;AboveItem&quot;));
+                    break;
+                }
+        }
+    } catch {
+        FwException::handleLast();
+    }
+}
+
+//_____________________________________________________________________________________
+void handleTreeNodeDropOnItem(FwTreeNodePtr dropOnTN, FwTreeNodePtr droppedTN)
+{
+//    DebugTN(__FUNCTION__, dropOnTN._dp, droppedTN._dp);
+    int answer;
+    dyn_string menu=makeDynString(
+                        &quot;PUSH_BUTTON,MOVE &quot;+droppedTN.name+&quot;,1,0&quot;,
+                        &quot;SEPARATOR&quot;,
+                        &quot;PUSH_BUTTON,Add as child,2,1&quot;,
+                        &quot;PUSH_BUTTON,Insert before,3,&quot;+ (dropOnTN.isClipboard() || dropOnTN.isRoot() ? 0 : 1),
+                        &quot;PUSH_BUTTON,Append after,4,&quot; + (dropOnTN.isClipboard() || dropOnTN.isRoot() ? 0 : 1),
+                        &quot;SEPARATOR&quot;,
+                        &quot;PUSH_BUTTON,Cancel,99,1&quot;
+                    );
+    popupMenu(menu, answer);
+
+    try {
+        if (answer==2) {
+            droppedTN.move(dropOnTN);
+        } else if (answer==3) {
+            handleTreeNodeDropBetween(dropOnTN, droppedTN, true);
+        } else if (answer==4) {
+            handleTreeNodeDropBetween(dropOnTN, droppedTN, false);
+        }
+    } catch {
+        FwException::handleLast();
+    }
+}
+
+//_____________________________________________________________________________________
+void handleTreeNodeDropBetween(FwTreeNodePtr dropOnTN, FwTreeNodePtr droppedTN, bool dropAbove)
+{
+    //  DebugTN(__FUNCTION__, dropOnTN._dp, droppedTN._dp, dropAbove);
+    FwTreeNodePtr parent = dropOnTN.getParent(); // already checked for null in our caller
+
+    if (equalPtr(parent, droppedTN.getParent())) {
+
+        // merely children-reordering
+        FwTreeNodePVec children=parent.getChildren();
+        // firstly remove the droppedTN then add it at the correct place
+        int idx=children.indexOf(droppedTN);
+        if (idx&lt;0) return; // may still happen (inconsistency);
+        children.removeAt(idx);
+        idx=children.indexOf(dropOnTN);
+        if (idx&lt;0) return;
+        int pos=0;
+        if (dropAbove) {
+            if (idx&gt;0) pos=idx-1;
+        } else { // drop below...
+            pos=idx+1;
+        }
+        if (pos&lt;children.count()) {
+            children.insertAt(pos, droppedTN);
+        } else {
+            children.append(droppedTN);
+        }
+        parent.reorderChildren(children);
+
+    } else {
+        // move of an item... and place it below/above the one we selected
+        if (equalPtr(parent, nullptr)) return; // nothing to do...
+        FwTreeNodePtr beforeTN=nullptr; // this means: append
+        if (dropAbove) {
+            beforeTN=dropOnTN;
+        } else {
+            FwTreeNodePVec siblings=parent.getChildren();
+            int idx=siblings.indexOf(dropOnTN);
+            idx++; // advance to the next
+            if (idx&lt;siblings.count()) beforeTN=siblings.at(idx); // otherwise it is past the end -&gt; use null to get the append
+        }
+        droppedTN.move(parent, beforeTN);
+    }
+}
+
+//_____________________________________________________________________________________
+void handleDropOther(FwTreeNodePtr dropOnTN, string payload)
+{
+    myDelegate.handleDrop(dropOnTN, payload);
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  initialize();
+}
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="TreeWidget" shapeType="TREE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">17 35</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_AlternatingRowColorLight</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Noto Sans,-1,16,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">17 35</prop>
+    <prop name="Size">200 331</prop>
+    <extended>
+     <prop type="BOOL" name="alternatingRowColors">False</prop>
+     <prop type="BOOL" name="animated">True</prop>
+     <prop type="BOOL" name="headerHidden">True</prop>
+     <prop type="ENUM" name="sizeAdjustPolicy">2</prop>
+     <prop type="ENUM" name="verticalScrollMode">1</prop>
+     <prop type="INT" name="treeStepSize">20</prop>
+     <prop type="ENUM" name="selectionBehavior">1</prop>
+     <prop type="BOOL" name="rootIsDecorated">True</prop>
+     <prop type="INT" name="midLineWidth">0</prop>
+     <prop type="INT" name="lineWidth">1</prop>
+     <prop type="ENUM" name="contextMenuPolicy">0</prop>
+     <prop type="BOOL" name="wordWrap">False</prop>
+     <prop type="ENUM" name="textElideMode">1</prop>
+     <script name="expanded" isEscaped="1"><![CDATA[expanded(string id)
+{
+    try {
+        itemExpanded(id);
+    } catch {
+        FwException::handleLast();
+    }
+}
+]]></script>
+     <script name="clicked" isEscaped="1"><![CDATA[clicked(string id, int column)
+{
+    try {
+        if (id==&quot;&quot;) this.clearSelection();
+        //DebugTN(__FUNCTION__,id);
+        FwTreeNodePtr tNode=nullptr;
+        if (id!=&quot;&quot;) tNode=treeRepo.get(id);
+        triggerEvent(&quot;clicked&quot;, tNode);
+        myDelegate.handleLeftClick(tNode);
+    } catch {
+        FwException::handleLast();
+    }
+}
+]]></script>
+     <script name="doubleClicked" isEscaped="1"><![CDATA[doubleClicked(string id, int column)
+{
+    try {
+        FwTreeNodePtr tNode=treeRepo.get(id);
+        triggerEvent(&quot;doubleClicked&quot;, tNode);
+        myDelegate.handleDoubleClick(tNode);
+    } catch {
+        FwException::handleLast();
+    }
+
+}
+]]></script>
+     <script name="rightClicked" isEscaped="1"><![CDATA[rightClicked(string id, int column)
+{
+    try {
+        FwTreeNodePtr tNode=treeRepo.get(id);
+        triggerEvent(&quot;rightClicked&quot;, tNode);
+        myDelegate.handleRightClick(tNode);
+    } catch {
+        FwException::handleLast();
+    }
+
+}
+]]></script>
+    </extended>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    this.showHeader(false);
+    this.addColumn(&quot;ITEM&quot;);
+    this.setColumnWidthMode(0,TREE_WIDTH_STRETCH);
+    this.styleSheet=&quot;QTreeView{alternate-background-color: oa-color(_AlternatingRowColorDark);}&quot;;
+    this.alternatingRowColors(true);
+
+    // Note: we need to force the font here, as the property
+    // is ignored when embedding the panel
+    //this.font=&quot;Sans Serif,-1,16,5,50,0,0,0,0,0&quot;;
+}
+]]></script>
+    <script name="DragDrop" isEscaped="1"><![CDATA[main(string information, int dragType, string id, int column)
+{
+    handleDrop(information, id, this.dropIndicatorPosition);
+}
+]]></script>
+    <script name="DragStart" isEscaped="1"><![CDATA[main(int keys, string id)
+{
+    dragStart(id, &quot;&quot;, DRAG_MOVE, &quot;text/FwTreeNode&quot;);
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP1" serial="0">
+   <properties>
+    <prop idx="0" name="shapeSerial">1</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

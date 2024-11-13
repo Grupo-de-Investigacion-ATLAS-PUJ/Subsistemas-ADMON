@@ -1,0 +1,755 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">680 424</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[const string LIST_SEPARATOR 		= &quot;|&quot;;
+const string LIST_ITEM_SEPARATOR 	= &quot;;&quot;;
+dyn_dyn_string list1, list2;
+int validColumns;
+
+moveLines(string sourceTableName, string destinationTableName, dyn_string &amp;exceptionInfo, bool moveAll = FALSE)
+{
+	int i, j, numOfLines;
+	shape 	sourceTable		 = getShape(sourceTableName),
+			destinationTable = getShape(destinationTableName);
+	dyn_int selectedLines;
+	dyn_anytype line;
+
+	if(moveAll)
+	{	
+		for(i = 0; i &lt; sourceTable.lineCount; i++)
+		{
+			selectedLines[i + 1] = i;
+		}
+	}
+	else
+	{
+		selectedLines = sourceTable.getSelectedLines();
+	}
+//	DebugN(&quot;selectedLines &quot; + selectedLines);
+	numOfLines = destinationTable.lineCount;
+	
+	// transfer lines
+	for(i = 1; i &lt;= dynlen(selectedLines); i++)
+	{
+		line = sourceTable.getLineN(selectedLines[i]);
+		
+		destinationTable.appendLine(destinationTable.columnName(0), line[1]);
+
+		for(j = 2; j &lt;= dynlen(line); j++)
+		{
+			destinationTable.cellValueRC(numOfLines + i - 1, destinationTable.columnName(j - 1), line[j]);
+//			DebugN(numOfLines, destinationTable.columnName(j - 1), line[j]);
+		}
+	}
+	
+	// sort lines to process in reverse order so that they can be deleted
+	dynSortAsc(selectedLines);
+
+	// delete lines after transfering them
+	for(i = dynlen(selectedLines); i &gt;= 1; i--)
+	{
+		sourceTable.deleteLineN(selectedLines[i]);
+	}
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+	
+	readList(&quot;$ddsList1&quot;, list1, exceptionInfo);
+	readList(&quot;$ddsList2&quot;, list2, exceptionInfo);
+	
+	// which coluns have to be taken into account.
+	// consider that passed lists have all the same
+	// number of columns
+	if(dynlen(list1) &gt; 0)
+	{
+		validColumns = dynlen(list1[1]);
+	}
+	else
+	{
+		if(dynlen(list2) &gt; 0)
+		{
+			validColumns = dynlen(list2[1]);
+		}
+		else
+		{
+			fwException_raise(	exceptionInfo,
+								&quot;ERROR&quot;,
+								&quot;No lists to be processed (either $ddsList1 or $ddsList2 or both have to contain data&quot;,
+								&quot;&quot;);
+			fwExceptionHandling_display(exceptionInfo);
+		}
+	}
+	
+	// make necessary columns visible
+	for(int i = 0; i &lt; validColumns; i++)
+	{
+		tableList1.columnVisibility(i, TRUE);
+		tableList2.columnVisibility(i, TRUE);
+	}
+
+	
+	initializeTable(&quot;tableList1&quot;, list1, exceptionInfo);
+	initializeTable(&quot;tableList2&quot;, list2, exceptionInfo);
+}
+
+readList(string dollarParameter, dyn_dyn_string &amp;list, dyn_string &amp;exceptionInfo)
+{
+	string dollarParameterValue;
+	dyn_string listRow;
+	
+	if(isDollarDefined(dollarParameter))
+	{
+		dollarParameterValue = getDollarValue(dollarParameter);
+		fwGeneral_stringToDynString(dollarParameterValue, list, LIST_SEPARATOR);			
+		for(int i = 1; i &lt;= dynlen(list); i++)
+		{	
+			fwGeneral_stringToDynString(list[i], listRow, LIST_ITEM_SEPARATOR);
+			list[i] = listRow;
+		}
+	}
+}
+
+initializeTable(string tableName, dyn_dyn_string list, dyn_string &amp;exceptionInfo)
+{
+	int i, j, columns;
+	shape table = getShape(tableName);
+
+	table.sortOnClick(TRUE);
+	table.selectByClick(TABLE_SELECT_LINE);
+
+	table.tableMode(TABLE_SELECT_MULTIPLE);
+	table.deleteAllLines();
+			
+	for(i = 1; i &lt;= dynlen(list); i++)
+	{	
+		if(table.columnCount &gt; dynlen(list[i]))
+			columns = dynlen(list[i]);
+		else
+			columns = table.columnCount;
+	
+		//necessary to add the line before setting individual cells
+		table.appendLine(table.columnName(0), list[i][1]);
+		for(j = 2; j &lt;= columns; j++)
+		{
+			table.cellValueRC(i - 1, table.columnName(j - 1), list[i][j]);
+//			DebugN(&quot;Adding &quot; + list[i][j] + &quot; in &quot; + i + &quot; &quot; + tableList1.columnName(j - 1));
+		}
+	}
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="Text3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">17 83</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">19 14</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">$sPanelTitle</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	this.text = $sPanelTitle;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Text1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">45</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 54</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">43</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">23 56</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Not in selection:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="messageInPanel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">54</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 412</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">23 359</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,16,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">60</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">394 53</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">57</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">396 55</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">In Selection:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">611 387</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">611 387</prop>
+    <prop name="Size">61 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	//close button has been pressed
+	PanelOffReturn(makeDynFloat(), makeDynString());
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="Button3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">55</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">316 236</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">316 236</prop>
+    <prop name="Size">61 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">>></prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+	
+	moveLines(&quot;tableList1&quot;, &quot;tableList2&quot;, exceptionInfo, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Button4" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">56</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">316 156</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">53</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">316 156</prop>
+    <prop name="Size">61 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">></prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+	
+	moveLines(&quot;tableList1&quot;, &quot;tableList2&quot;, exceptionInfo);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Button5" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">57</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">316 196</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">54</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">316 196</prop>
+    <prop name="Size">61 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">&lt;</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+	
+	moveLines(&quot;tableList2&quot;, &quot;tableList1&quot;, exceptionInfo);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Button6" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">58</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">316 276</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">55</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">316 276</prop>
+    <prop name="Size">61 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">&lt;&lt;</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+	
+	moveLines(&quot;tableList2&quot;, &quot;tableList1&quot;, exceptionInfo, TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="okButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">61</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">542 387</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">58</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">542 387</prop>
+    <prop name="Size">61 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Ok</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	int i, j;
+	string list2;
+	dyn_anytype line;
+	
+//	DebugN(&quot;validColumns &quot; + validColumns);
+	for(i = 0; i &lt; tableList2.lineCount; i++)
+	{
+		line = tableList2.getLineN(i);
+		
+		// go through the columns for each row consider only
+		// rows passed originally in the list dollar parameter.
+		for(j = 1; j &lt;= validColumns; j++)
+		{
+			list2 = list2 + line[j] + LIST_ITEM_SEPARATOR;
+		}
+		// remove extra item separator (LIST_ITEM_SEPARATOR)
+		list2 = substr(list2, 0, strlen(list2) - 1);
+		// add line separator (LIST_SEPARATOR)
+		list2 = list2 + LIST_SEPARATOR;
+	}
+	
+	// remove leading LIST_ITEM_SEPARATOR and ending LIST_SEPARATOR
+	list2 = substr(list2, 0, strlen(list2) - 1);
+	
+	PanelOffReturn(makeDynFloat(), makeDynString(list2));
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tableList1" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">66</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">62</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 80</prop>
+    <prop name="Size">281 281</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">26</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">param1</prop>
+     <prop name="Width">128</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">param1</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">param2</prop>
+     <prop name="Width">128</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">param2</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">param3</prop>
+     <prop name="Width">128</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">param3</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">param4</prop>
+     <prop name="Width">128</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">param4</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">param5</prop>
+     <prop name="Width">128</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">param5</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="tableList2" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">68</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">377 -583</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">63</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">390 80</prop>
+    <prop name="Size">281 281</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">26</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">param1</prop>
+     <prop name="Width">128</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">param1</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">param2</prop>
+     <prop name="Width">128</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">param2</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">param3</prop>
+     <prop name="Width">128</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">param3</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">param4</prop>
+     <prop name="Width">128</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">param4</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">param5</prop>
+     <prop name="Width">128</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">param5</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

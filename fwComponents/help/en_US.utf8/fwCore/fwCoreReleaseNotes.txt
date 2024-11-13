@@ -1,0 +1,300 @@
+             JCOP Framework Core
+
+
+30 October 2023: fwCore-9.1.0
+-------------------------------
+
+Contained in the JCOP Framework 9.1.0 release.
+
+* New component: fwStdLib regroups the recently implemented core functionality, notably enabling effective
+    CTRL++ programming:
+    - FwException class (previously in fwGeneral)
+    - CtrlOOUtils (previously in fwCtrlUtils component)
+    - CtrlJsonSerialization (previously in fwCtrlUtils)
+* New component: fwStdUi providing utilities and building blocks for advanced user interfaces (panels):
+    - new FwStdUi class with utility functions to pop up modernized dialog boxes for selection of item,
+        text input or a message
+    - new FwPanel class allowing to develope much cleaner code related to the use of reference panels, 
+        and binding shapes to class/struct, effectively enabling Model-View programming. 
+    - initial set of feature-rich Object-Oriented reference panels, working smoothly with CTRL++ lists
+        and objects: selection list with filtering, powerful table with feature-rich headers, sorting/filtering
+    - definition of modernized color style definitions, for the "light" and "dark" style; initial set of
+        standardinzed icons (will be enhanced in the upcoming releases)
+    - initial support for "variable UI density" (e.g. changing the text/icon sizes and spacing at runtime, e.g.
+        for more ergonomic use at large/high-DPI screens); initial integration in the new Trending Tree.
+* FwTree component with the alternative Object-Oriented API for tree structure management and a new
+    refObject panel for visualization/operation, enabling drag-and-drop, etc; used e.g. in the new Trending Tool.
+* fwConfigs: a set of new utility classes to handle the S7 configuration datapoints
+* the AlertTone.wav file distributed with fwAlarmHandling component replaced with well known origin (sound-theme-freedesktop project);
+    see data/licensing/fwAlarmHandling/CREDITS for details.
+* Fix in CtrlOOUtils: fwIsInstanceOf() always returned false
+* FWCORE-3153: fwAlerConfig_initialize(): if the object already initialized, clear it
+* FWCORE-3386: Alarm Smoothing config panel: do not truncate the value by applying the formatting to text field
+* FWCORE-3556: un-deprecate fwTableStatusValue.pnl; ensure other deprecated panels are reported as such
+* FWCORE-3524: fix _fwConfigs_getConfigAttributes() producing unreadable exceptionInfo
+* FWCORE-3570/FWAH-376: AlarmHandling: make the configuration-export work with SQLite-based projects
+* FWCORE-3579: Fix the Archive Configuration panel: the Valarch DB configuration button should be open when archive class is selected
+* FWCORE-3580: Fix the Y2038-compliance warning in fwArchiveConfig.pnl
+   Fix the panels popped up when NGA or RDB is used
+* FWCORE-3581: fwArchiveConfig panel was too big to fit in the AnalogDigital devices; fix for the "parameterize" button
+* FWCORE-3582: fix the runtime warning in the fwScreeShotButtonIcon.pnl
+* FWCORE-3583: run the CTRL Syntax-Checker on all the libraries
+* FWCORE-3583: fwDevice.ctl: use the Framework function to check if a dpType exists
+* FWCORE-3583: fwGeneral: fix undefined variables in the init script and fwPanelUtils.ctl
+* FWCORE-3584: fix the documentation in fwStdLib
+* FWCORE-3587: consistent way to refer to the archive groups used by NGA
+* FWCORE-3588: proper handling of address type in the fwDeviceAddressCommonSettings.pnl ; cleanup/refactor
+* FWCORE-3591: fwConfigs should report error on wrong DPE rather than fail
+* FWCORE-3592: clean up/refactor log output in fwException_raise, suppress misleading and wrong error-location log lines
+* FWCORE-3593: fwCinfigs: fix unhandled exceptionInfo on missing datapoints
+* UCPC-4331: fwPeriphAddess adds the PVSS_MODBUS_BOOLEAN_AS_BYTE constant
+* UNCORE-270: Fix the name of the archive-select panel to be compliant with the new name in WinCC OA 3.19
+* UNAESCRN-391: Link to the AlamrmScreenNG added to the GEDI menu
+* FwDevice_create panel: protect from errors when the device definition is inconsistent/incomplete
+* Fix for the number of parameters passed and swichint address types in the fwPeriphAddressConfig panel
+* Fixes in fwArchiveConfig functions for REDU systems
+
+15 March 2023: fwCore-9.0.0
+-------------------------------
+* contained in the JCOP Framework 9.0.0 release - please refer to the release notes therein
+
+15 February 2023: fwCore-8.5.2
+-------------------------------
+* contained in JCOP Framework 8.4.3 release.
+
+* The documentation of large part of the fwGeneral component has been reviewed and restructured. The manuals describing the errors/exceptions and the ways to load the libraries have been added.
+* New library: fwGeneral/fwPanelUtils.ctl implementing fwOOPanelOpen() function allowing to open the OO-panel and invoke its method (such as initialize()) and pass the parameters. See the help for details and FwException::handle() for an example of use
+* FWCORE: FwException::checkLastError() - new static method particularly useful to properly check the status of dpGet()/dpSet()/dpConnect()....
+* FWCORE: Extended documentation for error/exception handling for dpGet()/dpSet()/dpConnect()... (dedicated chapter in the Exceptions manual)
+* FWCORE-3546: CtrlOOUtils - support for typed nullptr in fwGetClass
+* FWCORE-3545: CtrlOOUtils - fwClassMemberVars() and fwClassMemberFuncs() -> recursively scan through the class hierarchy; returned methods do not have a class prefix
+* FWCORE-3552 unDistributedControl: improve the log output in postInstall and refactor deprecated _fwInstallation_parseDistPeer()
+* FWCORE-3551 unDistributedControl: integrate the code for redundancy contributed by CMS
+* FWCORE-3548: FwDevice address configuration panel not working if DIM not installed
+* FWCORE-3544: JCOP Fw GEDI Menu: show (raise) the module if already open
+* FWCORE-3543: Mass-configuration of addresses fails with an error
+* FWCORE-3452: fwTree - suppress debug messages from appendTreeNodes
+* FWCORE-3540: Wrong label for the "width" field in the "create device" panel
+* FWCORE-3535: fwGeneral_loadCtrlLib works properly with CTRL Extensions
+* FWCORE-3534: refactoring of fwPeriphAddress_OPCUA to remove the "dpe" variable in the library-scope (moved to reference panel)
+* FWCORE-3531: FwTree: restore the possibility to pass the top node of FwTreeDisplay via $-parameters
+* FWCORE-3527: FwTree triggers a redo also in some problematic situations (notably for fwFSM v34r6)
+* FWCORE-3452: fwTree - suppress debug messages from appendTreeNodes
+* FWCORE-3367: Integration of MODBUS addressing for fwDevice
+* FWCORE: Bugfix in fwDevice_dpNames() for the case where inquired dpType does not exist in remote system
+* FWCORE: FwException::rethrow() converted to a static method and made to work correctly with CtrlOOUtils
+* FWCORE: Integration of new Object-Oriented exceptions (FwException class)
+* FWCORE-3528, FWCORE-3532: fix in MQTT addressing for fwConfigs
+* FWCORE: Bugfix: fwDevice_dpNames() for the case where inquired dpType does not exist in remote system
+* "JCOP Framework" menu in GEDI: fwAccessControl and fwDEN take over their part of responsibility to set these up. Others should follow
+
+
+01 December 2022: fwCore-8.5.1
+-------------------------------
+* FwException::checkLastError() - new static method particularly useful to 
+	properly check the status of dpGet()/dpSet()/dpConnect()....
+* Extended documentation for error/exception handling for dpGet()/dpSet()/dpConnect()...
+	(dedicated chapter in the Exceptions manual)
+* fwPanelUtils: new fwOOPanelInvokeMenthod() function
+* FWCORE-3535: fwGeneral_loadCtrlLib works properly with CTRL Extensions
+* FwException::rethrow() converted to a static method and made to work
+	correctly with CtrlOOUtils
+
+
+Modified subcomponents
+ - fwGeneral-8.5.1
+
+
+26 July 2022: fwCore-8.5.0
+-------------------------------
+* FWCORE-3367: Integration of MODBUS addressing for fwDevice
+* FWCORE-3527: FwTree triggers a redo also in some problematic situations (notably for fwFSM v34r6)
+* FWCORE-3531: FwTree: restore the possibility to pass the top node of FwTreeDisplay via $-parameters
+* Improvements/bugxfixes for fwPeriphAddress_MQTT library
+* Integration of new Object-Oriented exceptions (FwException class), through fwGeneral-8.5.0 component
+* New library: fwGeneral/fwPanelUtils.ctl implementing fwOOPanelOpen() function allowing to open 
+	the OO-panel and invoke its method (such as initialize()) and pass the parameters. See the help
+	for details and FwException::handle() for an example of use
+* The documentation of large part of the fwGeneral component has been reviewed and restructured. The
+	manuals describing the errors/exceptions and the ways to load the libraries have been added.
+
+Modified subcomponents
+ - fwConfigs-8.5.2
+ - fwDevice-8.4.4
+ - fwGeneral-8.5.0
+ - fwTree-8.4.2
+
+13 April 2022: fwCore-8.4.8
+-------------------------------
+This version provides a hotfix for MQTT addressing in fwConfigs (FWCORE-3532).
+It is a dedicated release of fwCore to be included in UNICOS.
+
+Modified subcomponents:
+- fwConfigs-8.5.1
+
+
+08 March 2022: fwCore-8.4.7
+-------------------------------
+This version provides support for MQTT addressing in fwConfigs (FWCORE-3528).
+It is a dedicated release of fwCore to be included in UNICOS-8.6.0.
+
+Modified subcomponents:
+- fwConfigs-8.5.0
+
+
+28 January 2022: fwCore-8.4.6
+-------------------------------
+This is a dedicated release for UNICOS, addressing only a single issue:
+
+- UNCORE-184: Schneider PLC specific constants moved to unCore for better consistency/extendability
+	and integration with UNICOS.
+
+Modified subcomponents:
+- fwConfigs-8.4.7
+
+
+
+05 October 2021: fwCore-8.4.5
+-------------------------------
+- FWCORE-3515: Fix issue with send screenshot by email functionality when module... ·
+- ENS-29976: empty table in Alarm Screen system picker. 
+- FWCORE-3514: Fix inconsistency in fwAlertConfig_objectGetMany under certain circumstances
+- FWCORE-3434: Potentially unsafe dpQuery in the fwDeviceCreate.pnl (avoid using dpQuery that triggers the ETM-1783 bug)
+- FWCORE-3521: Error when adding channels and using model selector
+- FWCORE-3525: Fix the issues related to wrong expert panels in device definitions
+
+Modified subcomponents:
+- fwGeneral-8.4.3
+- fwAlarmHandling-8.4.3
+- fwConfigs-8.4.6
+- fwDevice-8.4.3
+
+
+16 December 2020: fwCore-8.4.4
+-------------------------------
+- FWCORE-3504: all declarations in the libraries are either const or global,
+ 	so that the libraries may be safely dynamically-loaded and also
+ 	separated instances of variables are not created in every script
+- ENS-27528: fwAlarmHandling help configuration panel: fix directory name
+- FWCORE-3493: fwGeneralEditDynString.pnl: fixed race condition at init
+- FWCORE-3512: clean up of deprecated fwWebBrowser files
+- Programming guide on the use of CTRL libraries
+- Documented the assignment of driver numbers for JCOP Devices in fwDevice
+
+Modified subcomponents:
+- fwAlarmHandling-8.4.2
+- fwConfigs-8.4.5
+- fwDevice-8.4.2
+- fwGeneral-8.4.2
+
+
+02 September 2020: fwCore-8.4.3
+-------------------------------
+- Fixed several panels with default rows in tables.
+- Fixed ISO / UTF8 inconsistencies in panels.
+- Fixed error message in the JCOP alarm screen (ENS-27122)
+- Fixed panel fwPeriphAddress_setOPCUA.pnl (FWCORE-3482, ENS-27677)
+- Fixed and improved panel fwPeriphAddressOPCUA.pnl (FWCORE-3495)
+- Documentation and improvements to the NGA support in fwConfigs/fwArchive.ctl
+- Improved function fwPeriphAddressBACnet_get, fwPeriphAddressCMW_get (FWCORE-3486)
+- Support of cernbox in the fwScreenShot (ENS-27014)
+- Fixed fwTree panels dependency on fwFSM (FWCORE-3447)
+- Fixed a minor issue in the unDistributedControl configuration panel (UNCORE-148)
+- Fixed false possitive in the postInstall script of unDistributedControl (UNCORE-151
+
+July 2019: fwCore-8.4.0
+---------------------------
+Restructuring and cleanup
+- fwFSM and fwDeviceEditorNavigator are now separate tools and do not belong
+  to fwCore (need to be installed separately)
+- fwTree component was separated-out from the fwFSM and included in fwCore
+- new "fwCore.ctl" library that is responsible for loading all dependent
+  subcomponents libraries; this "fwCore.ctl" library is in turn loaded from
+  the config file (fwCore now has its own snippet for the config file)
+
+05 February 2019: fwCore-8.3.1
+---------------------------
+- cleanups  (FWCORE-3388) and trivial fix in fwGeneral (FWCORE-3387)
+
+28 January 2019: fwCore-8.3.0
+---------------------------
+release as a part of JCOP Framework 8.3.0 and UNICOS framework 8.3.0.
+Please refer to release notes therein.
+
+18 June 2018: fwCore-8.2.0
+---------------------------
+- Latest version of fwFSM v33r3, with a few additional bugfixes
+- Enhancements in fwWebBrowser (fwGeneral-8.1.2):
+ - FWCORE-3335: support for PDF files through mozilla's PDF.js
+ - FWCORE-3336: fwWebBrowser opens as non-modal window by default
+ - FWCORE-3338: properly handle SSL exceptions in fwWebBrowser
+ - FWCORE-3344: add possibility to use the file:// URI scheme
+- FWCORE-3337: Support for "Polling on use" in S7 addressing (fwConfigs)
+- FWCORE-2848: Layout and tab order in fwGetTimes.pnl
+- FWCORE-3022: Properly handle result in fwGeneral_openMessagePanel()
+- FWCORE-2526: fwProgressBar is opened centrally on parent panel
+- FWCORE-3341: fwManager_checkDriverRunning() error for remote systems
+- FWCORE-3350: cleanup for "open help" buttons in various component
+- FWCORE-3340: component help should be open in fwWebBrowser; configuration
+               panel (System Settings) allow to configure this
+- FWCORE-3349: fwFSM installation not working properly
+- FWCORE-3320: fix unit tests in fwGeneral/fwException
+- FWCORE-3022: fix fwGeneral_openMessagePanel when closed using the "X" button
+- FWCORE-2848: fix tab order in fwGeneral/fwGetTimes.pnl
+- FWCORE-3352, FWCORE-3302, FWCORE-3303, UNCORE-19: 
+               various issues with unDistributedControl fixed
+- FWCORE-3348: "hide" the test components when new installation tool is used
+- Initial support for WinCC OA 3.16 (FSM binaries)
+- FWCORE-3353: Remove incorrect UTF-encoded labels on widgets 
+               (for compatibility with UTF-ecoded WinCC OA 3.16 projects)
+- FWCORE-3348: test components are "hidden" (requires fwInstallation-8.2.0)
+- FWAH-368    :fix for DPL file import (complaining about not-a-langtext);
+               actually a compatiblity fix for a change in the _AESConfig
+               DPType introduced with patch P004 of WinCC OA 3.15
+
+
+
+05 March 2018: fwCore-8.1.2
+---------------------------
+- bugfix release of the complete core to resolve issue FWCORE-3334
+(syntax error in fwConfigs library affecting fwConfigConversion and fwSmoothing).
+- new component versions in this release
+    fwConfigs-8.1.2
+    fwFSM v33r2
+- FWCORE-1967: exception handling panel improvements (layout management, single 
+  window to display a stack of exceptions)
+- otherwise identical in features to fwCore-8.1.1
+- added Release Notes document to the component
+
+
+
+27 February 2018: fwCore-8.1.1
+------------------------------
+- Due to a syntax error in fwConfigs, use fwCore-8.1.2 instead
+- performance improvements for fwConfigs (FWCORE-3312), as well as minor fixes
+- initial release of "fwWebBrowser" (FWCORE-3319, FWCORE-3325)
+- improvements in the exception handling panel (layout management, etc) (FWCORE-1967)
+- enhancements in the "fwLabelText.pnl" reference object (FWCORE-3327)
+- fix for fwChangeSettings.pnl affecting the Wiener component (FWCORE-3329)
+- new component versions in this release
+    fwConfigs-8.1.1
+    fwGeneral-8.1.1
+
+
+12 December 2018: fwCore-8.1.0
+------------------------------
+- release for the JCOP and UNICOS Frameworks 8.1.0
+- new component versions in this release: 
+    fwFSM v33r1
+    fwConfigs-8.1.0
+    fwGeneral-8.1.0
+    unDistributedControl-8.1.0
+
+
+For the older versions of the component release notes are not available.
+Please refer to the history of issues in the "FWCORE" Jira project:
+https://its.cern.ch/jira/projects/FWCORE
+
+
+-------------------------------------------------
+Piotr Golonka, CERN BE/ICS

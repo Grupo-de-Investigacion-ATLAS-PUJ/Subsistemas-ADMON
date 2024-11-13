@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">94 50</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName">objects_parampanels\fwTrending\fwTrendingDpSelector.pnl</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="PageOpenButton" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">2375 778</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,15,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,15,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 -10</prop>
+    <prop name="Size">51 51</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop SharedPixmap="1" name="Image">
+     <prop name="BackgroundPixmap">trendButton.bmp</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string pageName, panelName, openPageName = &quot;&quot;;
+	bool isConnected;
+	int i = 1;
+	dyn_string panelsList, exceptionInfo;
+	dyn_dyn_string pageData;
+
+	pageName = strrtrim($pageName, &quot;.&quot;);
+		
+	_fwTrending_isSystemForDpeConnected(pageName, isConnected, exceptionInfo);
+	
+	if(dpExists(pageName) &amp;&amp; isConnected)
+	{
+		fwTrending_getPage(pageName, pageData, exceptionInfo);
+		openPageName = pageData[fwTrending_PAGE_OBJECT_TITLE][1];
+	}
+	else
+		openPageName = pageName;
+	
+//SMS template mechanism
+	_fwTrending_evaluateTemplate($templateParameters, openPageName, exceptionInfo);
+//SMS template mechanism
+
+	fwDevice_getDefaultOperationPanels(fwTrending_PAGE, panelsList, exceptionInfo);
+
+	panelName = &quot;Trending Page: &quot; + openPageName;
+//DebugN(panelName, isPanelOpen(panelName));
+	while(isPanelOpen(panelName))
+	{
+		panelName = &quot;Trending Page: &quot; + openPageName + &quot; [&quot; + i + &quot;]&quot;;
+//DebugN(panelName, isPanelOpen(panelName));
+		i++;
+	}
+
+	ChildPanelOn(panelsList[1] + &quot;.pnl&quot;, panelName,
+		makeDynString(&quot;$PageName:&quot; + pageName, &quot;$OpenPageName:&quot; + pageName, &quot;$templateParameters:&quot; + $templateParameters),0,0);
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

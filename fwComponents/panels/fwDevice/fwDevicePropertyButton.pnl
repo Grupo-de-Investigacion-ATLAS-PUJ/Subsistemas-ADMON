@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">150 48</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 10</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  FWDEPRECATED();
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="Button1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Size">120 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Button1</prop>
+     <prop name="en_US.iso88591">Button1</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	int dataType = $sDataType;
+	string hierarchyType, value;
+	dyn_float df;
+	dyn_string ds, exceptionInfo;
+	
+	if(isDollarDefined(&quot;$sHierarchyType&quot;))
+  {
+		hierarchyType = $sHierarchyType;
+  }
+	else
+  {
+		hierarchyType = fwDevice_HARDWARE;
+  }
+
+	switch(dataType)
+	{
+		case DPEL_BOOL:
+			value = $bValue;
+			break;
+		case DPEL_FLOAT:
+		case DPEL_INT:
+		case DPEL_STRING:
+			ChildPanelOnCentralModalReturn( &quot;fwDevice/fwDevicePropertyChange.pnl&quot;,
+											&quot;Channel Setting Panel&quot;,
+											makeDynString(&quot;$sElement:&quot; + $sElement),
+											df, ds);
+			//DebugN(&quot;Returned &quot; + ds);							
+			if(ds[1] == &quot;Ok&quot;)
+			{
+				//DebugN(&quot;Setting &quot;  + $sElement + &quot; to &quot; + ds[2]);
+				value = ds[2];
+			}
+			else
+			{
+				return;
+			}
+			break;
+		default:
+			fwException_raise(	exceptionInfo,
+								&quot;ERROR&quot;,
+								&quot;Unsupported data type for element&quot;,
+								&quot;&quot;);
+			fwExceptionHandling_display(exceptionInfo);
+			break;
+	}
+	
+	fwOpenProgressBar(&quot;Set property recursively&quot;, &quot;Setting &quot; + $sElement + &quot; to &quot; + value + &quot; for all children...&quot;, 1);
+	fwDevice_setPropertyRecursively($sDpName, $sElement, hierarchyType, value, exceptionInfo);
+
+	if(dynlen(exceptionInfo) &gt; 0)
+	{
+		fwCloseProgressBar(&quot;There were errors while setting &quot; + $sElement + &quot; to &quot; + value + &quot; for all children.&quot;);
+		fwExceptionHandling_display(exceptionInfo);
+	}	
+	else
+	{
+		fwCloseProgressBar($sElement + &quot; set succesfully to &quot; + value + &quot; for all children.&quot;);
+	}
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main() 
+{ 
+  	this.text = $sLabel;
+} 
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

@@ -1,0 +1,482 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">340 90</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 50</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[void modfnOnComplete()
+{
+// Local Variables
+// ---------------
+	int iState;
+
+// Executable Code
+// ---------------
+	// Get value of check box for automatic close
+	getValue(&quot;chkCloseOnComplete&quot;, &quot;state&quot;, 0, iState);
+	if (iState == 1) {
+		modfnOnClose();
+	} else {
+		cmdClose.enabled = true;
+	}
+
+	// Return to calling routine
+	return;
+}
+
+void modfnOnClose()
+{
+// Local Variables
+// ---------------
+	int iState;
+
+// Executable Code
+// ---------------
+	// Get value of check box for automatic close
+	getValue(&quot;chkCloseOnComplete&quot;, &quot;state&quot;, 0, iState);
+	if (iState == 1)
+		dpSet($sDpName + &quot;.autoClose&quot;, true);
+	else
+		dpSet($sDpName + &quot;.autoClose&quot;, false);
+		
+	// Set value to indicate panel is closed
+	dpSet($sDpName + &quot;.panelOpen&quot;, false);
+	
+	// Close panel
+	PanelOff();
+
+	// Return to calling routine
+	return;
+}
+
+void modfnTimedBar()
+{
+// Local Variables
+// ---------------
+	int iSeconds;
+	
+	string sMessage;
+
+// Executable Code
+// ---------------
+	// Get the number of seconds to wait
+	dpGet($sDpName + &quot;.timeout&quot;, iSeconds);
+	
+	// Check timeout is valid
+	if (iSeconds &gt; 0) {
+		// Loop until time is up
+		while (iSeconds &gt; 0) {
+	
+			// Set message
+			if (iSeconds == 1)
+				sprintf(sMessage, &quot;Please wait %d second&quot;, iSeconds);
+			else
+				sprintf(sMessage, &quot;Please wait %d seconds&quot;, iSeconds);
+		
+			dpSet($sDpName + &quot;.message&quot;, sMessage);
+	
+			// Wait one second before looping again	
+			delay(1);
+			iSeconds--;
+		}
+	}
+	
+	// Stop the busy bar
+	dpSet($sDpName + &quot;.message&quot;, &quot;Complete&quot;);
+	dpSet($sDpName + &quot;.run&quot;, false);
+	
+	// Return to calling routine
+	return;
+}
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	// Call function to handle last processing and close the panel
+	modfnOnClose();
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+	// Set value to indicate panel is closed (to stop anything from waiting)
+	dpSet($sDpName + &quot;.panelOpen&quot;, false);
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	bool bAutoClose;
+	
+	int iType;
+	int iThread;
+
+// Executable Code
+// ---------------
+	// Set DPE to indicate the panel is open
+	dpSet($sDpName + &quot;.panelOpen&quot;, true);
+	
+	// Get the type of progress bar to show
+	dpGet($sDpName + &quot;.type&quot;, iType,
+				$sDpName + &quot;.autoClose&quot;, bAutoClose);
+	
+	// Connect to message
+	dpConnect(&quot;cbkShowMessage&quot;, $sDpName + &quot;.message&quot;);
+	
+	// Set the automatic close checkbox
+	setValue(&quot;chkCloseOnComplete&quot;, &quot;state&quot;, 0, bAutoClose);
+	
+	switch (iType) {
+		case 3:	// Time to complete bar
+			// Hide the percentage complete bar
+			barProgress.visible = false;
+			bdProgress.visible = false;
+			txtValue.visible = false;
+			
+			// Ensure busy bar visible
+			Polyline1.visible = true;
+			Polyline2.visible = true;
+			
+			// Connect to value indicating when finished
+			dpConnect(&quot;cbkRunBusy&quot;, $sDpName + &quot;.run&quot;);
+			
+			// Start thread to count down the timeout
+			iThread = startThread(&quot;modfnTimedBar&quot;);
+			if (iThread &lt; 0)
+				dpSet($sDpName + &quot;.run&quot;, false);
+			break;
+		case 2:	// Percentage complete bar
+			// Make the percentage bar visible
+			barProgress.visible = true;
+			bdProgress.visible = true;
+			txtValue.visible = true;
+			
+			// Hide the busy bar
+			Polyline1.visible = false;
+			Polyline2.visible = false;
+			
+			// Connect to required progress value
+			dpConnect(&quot;cbkScaleBar&quot;, $sDpName + &quot;.value&quot;);
+			break;
+		default: // As default, assume just 'busy' indicator
+			// Hide the percentage complete bar
+			barProgress.visible = false;
+			bdProgress.visible = false;
+			txtValue.visible = false;
+			
+			// Ensure busy bar visible
+			Polyline1.visible = true;
+			Polyline2.visible = true;
+			
+			// Connect to value indicating when finished
+			dpConnect(&quot;cbkRunBusy&quot;, $sDpName + &quot;.run&quot;);
+			break;
+	}
+
+	// Return to calling routine
+	return;
+}
+
+void cbkScaleBar(string sDpe, float fValue)
+{
+// Local Variables
+// ---------------
+	string sText;
+	
+// Executable Code
+// ---------------
+	// Set the scale of the bar to indicate to percentage complete
+	barProgress.scale(fValue / 100.0, 1.0);
+	
+	// Display the percentage complete as text
+	sprintf(sText, &quot;%1.0f %&quot;, fValue);
+	txtValue.text = sText;
+	
+	// Check for action complete
+	if (fValue &gt;= 100.0)
+		modfnOnComplete();
+	
+	// Return to calling routine
+	return;
+}
+
+void cbkRunBusy(string sDpe, bool bRun)
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	// Check for action complete
+	if (!bRun)
+		modfnOnComplete();
+		
+	// Return to calling routine
+	return;
+}
+
+void cbkShowMessage(string sDpe, string sText)
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	// Enter the text message into the correct field in the panel
+	txtMessage.text = sText;
+	
+	// Return to calling routine
+	return;
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="bdProgress" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">STD_border_med</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,3]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">Sunken</prop>
+    <prop name="Location">10 30</prop>
+    <prop name="Size">321 21</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="barProgress" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">12 46</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{0,0,255}</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">12 32</prop>
+    <prop name="Size">317 16</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="txtValue" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 32</prop>
+    <prop name="Size">317 17</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">0 %</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtMessage" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Size">317 17</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="ProgressBarRef" referenceId="2">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwProgressBarRef.pnl</prop>
+    <prop name="Location">10 50</prop>
+    <prop name="Geometry">1 0 0 1 186 815</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sDpName</prop>
+      <prop name="Value">$sDpName</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="cmdClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">240 55</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">240 55</prop>
+    <prop name="Size">91 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	// Call function to handle last processing and close the panel
+	modfnOnClose();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="chkCloseOnComplete" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 60</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 60</prop>
+    <prop name="Size">181 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.iso88591">Close panel on completion</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

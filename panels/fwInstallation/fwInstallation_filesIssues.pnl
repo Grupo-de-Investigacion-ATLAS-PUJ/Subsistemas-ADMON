@@ -1,0 +1,1062 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">900 835</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">50 50</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[dyn_string hashFileIssues = makeDynString();
+
+const string COMPONENT_NAME = formatComponentName($componentName);
+
+string formatComponentName(string componentNameStr){
+  return strltrim(componentNameStr, &quot;_&quot;);
+}
+
+const shape TABLE_FILE_ISSUE_PANELS = getShape(&quot;tblFileIssuePanels&quot;);
+const shape TABLE_FILE_ISSUE_SCRIPTS = getShape(&quot;tblFileIssueScripts&quot;);
+const shape TABLE_FILE_ISSUE_LIBS = getShape(&quot;tblFileIssueLibs&quot;);
+const shape TABLE_FILE_ISSUE_OTHERS = getShape(&quot;tblFileIssueOther&quot;);
+
+const dyn_shape FILE_ISSUES_TABLES = makeDynShape(TABLE_FILE_ISSUE_PANELS,
+                                                  TABLE_FILE_ISSUE_SCRIPTS,
+                                                  TABLE_FILE_ISSUE_LIBS,
+                                                  TABLE_FILE_ISSUE_OTHERS);
+
+const int TABLE_COL_FILE_NAME_IDX = 1;
+const int TABLE_COL_ISSUE_DESC_IDX = 2;
+
+const string TABLE_COL_FILE_NAME = &quot;fileIssue&quot;;
+const string TABLE_COL_ISSUE_DESC = &quot;fileIssueType&quot;;
+
+mapping buildFileIssuesTables(const dyn_string &amp;fileNames, const dyn_string &amp;issueTypes, dyn_string &amp;hashFileIssues){
+  int fileNamesLen = dynlen(fileNames);
+  if(fileNamesLen != dynlen(issueTypes)){
+    fwInstallation_throw(&quot;Error retrieving the list of files with issues. &quot; +
+                         &quot;Cannot show the list&quot;, &quot;ERROR&quot;);
+    return makeMapping();
+  }
+  mapping fileIssuesTables = initFileIssuesTables();
+
+  for(int i=1;i&lt;=fileNamesLen;i++){
+    string fileName = formatFileNameString(fileNames[i]);
+    string issueType = formatErrorTypeString(issueTypes[i]);
+    string issueDesc = getIssueTypeDisplayText(issueType);
+
+    shape table = getFileIssueTableForFile(fileName);
+    dynAppend(fileIssuesTables[table][TABLE_COL_FILE_NAME_IDX], fileName);
+    dynAppend(fileIssuesTables[table][TABLE_COL_ISSUE_DESC_IDX], issueDesc);
+    if(isHashFileIssue(issueType)){
+      dynAppend(hashFileIssues, fileName);
+    }
+  }
+  return fileIssuesTables;
+}
+
+mapping initFileIssuesTables(){
+  mapping fileIssuesTables;
+  dyn_dyn_string ddsTableInit;
+  ddsTableInit[TABLE_COL_ISSUE_DESC_IDX] = makeDynString();
+  int fileIssueTablesNum = dynlen(FILE_ISSUES_TABLES);
+  for(int i=1;i&lt;=fileIssueTablesNum;i++){
+    fileIssuesTables[FILE_ISSUES_TABLES[i]] = ddsTableInit;
+  }
+  return fileIssuesTables;
+}
+
+string formatFileNameString(string fileNameRawString){
+  return formatRawInputString(fileNameRawString, &quot;name:&quot;);
+}
+
+string formatErrorTypeString(string errorTypeRawString){
+  return formatRawInputString(errorTypeRawString, &quot;error:&quot;);
+}
+
+string formatRawInputString(string rawInputString, string inputMarker){
+  strreplace(rawInputString, inputMarker, &quot;&quot;);
+  return strltrim(strrtrim(rawInputString));
+}
+
+string getIssueTypeDisplayText(string issueType){
+  switch(issueType){
+    case gFwInstallationOverparametrizedFileIssue:
+      return &quot;Multiple instances&quot;;
+    case gFwInstallationHashFileIssue:
+      return &quot;Hash mismatch&quot;;
+    case gFwInstallationCompNotPossibleFileIssue:
+      return &quot;Hash comparison n/a&quot;;
+  }
+  return &quot;No issue type assigned&quot;;
+}
+
+shape getFileIssueTableForFile(string fileName){
+  if(patternMatch(&quot;*scripts/libs/*&quot;, fileName)){
+    return TABLE_FILE_ISSUE_LIBS;
+  }else if(patternMatch(&quot;*scripts/*&quot;, fileName)){
+    return TABLE_FILE_ISSUE_SCRIPTS;
+  }else if(patternMatch(&quot;*panels/*&quot;, fileName)){
+    return TABLE_FILE_ISSUE_PANELS;
+  }
+  return TABLE_FILE_ISSUE_OTHERS;
+}
+
+bool isHashFileIssue(string issueType){
+  return (issueType == gFwInstallationHashFileIssue ||
+          issueType == gFwInstallationCompNotPossibleFileIssue);
+}
+
+void fillFileIssuesTables(const mapping &amp;fileIssuesTables){
+  int fileIssuesTablesNum = mappinglen(fileIssuesTables);
+  for(int i=1;i&lt;=fileIssuesTablesNum;i++){
+    shape table = mappingGetKey(fileIssuesTables, i);
+    dyn_dyn_string tblCells = fileIssuesTables[table];
+    int rows = dynlen(tblCells[TABLE_COL_FILE_NAME_IDX]);
+    table.appendLines(rows, TABLE_COL_FILE_NAME, tblCells[TABLE_COL_FILE_NAME_IDX],
+                      TABLE_COL_ISSUE_DESC, tblCells[TABLE_COL_ISSUE_DESC_IDX]);
+    setIssuesCounter(table, rows);
+  }
+  updateTotalIssuesCounter();
+}
+
+removeFilesFromFileIssueTable(const dyn_string &amp;fileNames, dyn_string &amp;hashFileIssues){
+  int fileNamesLen = dynlen(fileNames);
+  for(int i=1;i&lt;=fileNamesLen;i++){
+    string fileName = fileNames[i];
+    shape table = getFileIssueTableForFile(fileName);
+    table.deleteLine(1, TABLE_COL_FILE_NAME, fileName);
+
+    int rows = table.lineCount();
+    setIssuesCounter(table, rows);
+
+    int pos = dynContains(hashFileIssues, fileName);
+    dynRemove(hashFileIssues, pos);
+  }
+  updateTotalIssuesCounter();
+}
+
+setIssuesCounter(shape table, int issuesNum){
+  switch(table){
+    case TABLE_FILE_ISSUE_PANELS:
+      txPanels.text = issuesNum;
+      break;
+    case TABLE_FILE_ISSUE_SCRIPTS:
+      txScripts.text = issuesNum;
+      break;
+    case TABLE_FILE_ISSUE_LIBS:
+      txLibs.text = issuesNum;
+      break;
+    case TABLE_FILE_ISSUE_OTHERS:
+      txOthers.text = issuesNum;
+  }
+}
+
+updateTotalIssuesCounter(){
+  txTotal.text = (string)((int)txPanels.text + (int)txScripts.text + (int)txLibs.text);
+}
+
+setTablesAlternatingRowColors(){
+  int fileIssueTablesNum = dynlen(FILE_ISSUES_TABLES);
+  for(int i=1;i&lt;=fileIssueTablesNum;i++){
+    fwInstallation_ui_setTableAlternatingRowColors(FILE_ISSUES_TABLES[i]);
+  }
+}
+
+splitFilesIssuesString(const string &amp;filesIssuesStr, dyn_string &amp;fileNames, dyn_string &amp;issuesType){
+  dyn_string filesIssues = strsplit(filesIssuesStr, &quot; | &quot;);
+  fileNames = dynPatternMatch(&quot;name:*&quot;, filesIssues);
+  issuesType = dynPatternMatch(&quot;error:*&quot;, filesIssues);
+}
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  setTablesAlternatingRowColors();
+
+  txTitle.text = COMPONENT_NAME;
+
+  string filesIssuesStr = $filesIssues;
+  dyn_string fileNames, issuesType;
+  splitFilesIssuesString(filesIssuesStr, fileNames, issuesType);
+  mapping fileIssuesTables = buildFileIssuesTables(fileNames, issuesType, hashFileIssues);
+  fillFileIssuesTables(fileIssuesTables);
+
+  if(dynlen(hashFileIssues) &lt;= 0){
+    adoptHashesButton.enabled = false;
+  }
+}
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="tblFileIssuePanels" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">22 76.56218905472636</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 110</prop>
+    <prop name="Size">880 140</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">fileIssue</prop>
+     <prop name="Width">720</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Panels</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">fileIssueType</prop>
+     <prop name="Width">140</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Issue type</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">815 800</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">815 800</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOff();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="tblFileIssueScripts" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 453</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 463</prop>
+    <prop name="Size">880 140</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">fileIssue</prop>
+     <prop name="Width">720</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Scripts</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">fileIssueType</prop>
+     <prop name="Width">140</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Issue type</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="tblFileIssueLibs" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 286</prop>
+    <prop name="Size">880 140</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">fileIssue</prop>
+     <prop name="Width">720</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Libraries</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">fileIssueType</prop>
+     <prop name="Width">140</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Issue type</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="panelNumberLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">56 88</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">56 88</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Panels:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="scriptNumberLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">57 441</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">57 441</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Scripts:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="libNumberLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">65 264</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">65 264</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Libraries:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="btnHelp" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">867 2</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="HoverBackCol">{255,255,255,110}</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">867 2</prop>
+    <prop name="Size">25 25</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">help_2.xpm</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwInstallation_showHelpForPanel(&quot;fwInstallation/fwInstallation_filesIssues.html&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 2</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">File Issues</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="componentLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 44</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 44</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Component:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txTitle" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">77 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">87 40</prop>
+    <prop name="Size">300 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="txTotal" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">80 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">840 40</prop>
+    <prop name="Size">50 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="totalNumberLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">835 44</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">835 44</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Total:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="txPanels" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">80 134</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">840 84</prop>
+    <prop name="Size">50 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="txLibs" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">80 310</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">840 260</prop>
+    <prop name="Size">50 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="txScripts" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">80 487</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">840 437</prop>
+    <prop name="Size">50 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="separator" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 73</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="Start">10 73</prop>
+    <prop name="End">889 73</prop>
+   </properties>
+  </shape>
+  <shape Name="adoptHashesButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8.999999999999545 800</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">8.999999999999545 800</prop>
+    <prop name="Size">132 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Adopt hash value</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string ds;
+  dyn_float df;
+  dyn_string dollars = makeDynString(&quot;$files:&quot; + strjoin(hashFileIssues, &quot;|&quot;),
+                                     &quot;$header:Select files for adopting hash value&quot;);
+
+  ChildPanelOnCentralReturn(&quot;fwInstallation/fwInstallation_selectFiles.pnl&quot;, &quot;SelectFilesForHashAdoption&quot;, dollars, df, ds);
+  if(dynlen(ds) &lt;= 0)
+    return;
+
+  //get installation path - needed to substract it from file path
+  dyn_string at;
+  fwInstallation_getComponentInfo(COMPONENT_NAME, &quot;installationdirectory&quot;, at);
+  if(dynlen(at) &lt;= 0 || at[1] == &quot;&quot;)
+  {
+    fwInstallation_throw(&quot;Could not retrieve the installation directory for component: &quot; + COMPONENT_NAME + &quot;. Failed to adopt hashes of selected files&quot;);
+    return;
+  }
+  string installationDir = at[1];
+  fwInstallation_normalizePath(installationDir, true);
+  int installationDirLen = strlen(installationDir);
+
+  //adopt file hashes in a loop
+  dyn_string hashAdoptedFiles;
+  dyn_string fileList = ds;
+  int fileListLen = dynlen(fileList);
+  for(int i=1;i&lt;=fileListLen;i++)
+  {
+    string filePath = fileList[i];
+    fwInstallation_normalizePath(filePath);
+    if(strpos(filePath, installationDir) != 0)
+    {
+      fwInstallation_throw(&quot;File: &quot; + filePath + &quot; is not whithin installation directory &quot; + installationDir + &quot; of component: &quot; + COMPONENT_NAME + &quot;. Cannot to set new hash value for this file&quot;);
+      continue;
+    }
+    string fileName = substr(filePath, installationDirLen);//substract relative path to component file
+
+    if(fwInstallation_setAlternativeComponentFileHash(COMPONENT_NAME, fileName, installationDir) != 0)
+      fwInstallation_throw(&quot;Failed to set new hash value for &quot; + fileName + &quot; file of &quot; + COMPONENT_NAME + &quot; component&quot;);
+    else
+      dynAppend(hashAdoptedFiles, fileList[i]);
+  }
+
+  int hashAdoptedFilesLen = dynlen(hashAdoptedFiles);
+  if(hashAdoptedFilesLen != fileListLen)
+    fwInstallation_popup(&quot;Adopting hashes of modified files finished with errors.\nFailed to update &quot; + (string)(fileListLen - hashAdoptedFilesLen) +
+                         &quot;/&quot; + (string)fileListLen + &quot; file hashes. See log for details&quot;);
+  else
+    fwInstallation_popup(&quot;Adopting hashes of modified files finished successfully&quot;, FW_INSTALLATION_POPUP_TITLE_INFORMATION);
+
+  //update file issues tables
+  removeFilesFromFileIssueTable(hashAdoptedFiles, hashFileIssues);
+
+  //disable button to adopt hashes when there is no files with hash issues
+  if(dynlen(hashFileIssues) &lt;= 0)
+    adoptHashesButton.enabled = false;
+
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="tblFileIssueOther" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 629</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 639</prop>
+    <prop name="Size">880 140</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">fileIssue</prop>
+     <prop name="Width">720</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Other</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">fileIssueType</prop>
+     <prop name="Width">140</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Issue type</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">48 617</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">48 617</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Other:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="txOthers" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">80 663</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">840 613</prop>
+    <prop name="Size">50 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

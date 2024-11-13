@@ -1,0 +1,576 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">685 450</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[string panelName;
+string panelBarTitle;
+string config;
+int index;
+	
+init()
+{
+	int i, configType;
+	string deviceModel;
+	dyn_string exceptionInfo;
+	dyn_dyn_string elementsAndProperties;
+
+	// init global variables
+	panelName = &quot;fwConfigs/fwArchiveConfigPopup.pnl&quot;;
+	panelBarTitle = &quot;Archive configuration&quot;;
+	config = &quot;archive&quot;;
+	index = fwDevice_ARCHIVE_INDEX;
+	
+	fwDevice_getModel(makeDynString($sDpName), deviceModel, exceptionInfo);
+	fwDevice_getConfigElements(dpTypeName($sDpName), index, elementsAndProperties, exceptionInfo, deviceModel);
+	
+	Table1.deleteAllLines();
+	Table1.selectByClick(TABLE_SELECT_LINE);
+	Table1.tableMode(TABLE_SELECT_MULTIPLE);	
+	
+	for (i = 1; i &lt;= dynlen(elementsAndProperties[1]); i++) 
+	{
+//		DebugN(&quot;Element &quot; + $sDpName + alertElements[i]);		
+		dpGet($sDpName + elementsAndProperties[1][i] + &quot;:_&quot; + config + &quot;.._type&quot;, configType);
+		
+		if(configType == DPCONFIG_NONE)
+			Table1.appendLine(&quot;conf&quot;, &quot;No&quot;, &quot;elements&quot;, elementsAndProperties[1][i]);
+		else
+			Table1.appendLine(&quot;conf&quot;, &quot;Yes&quot;, &quot;elements&quot;, elementsAndProperties[1][i]);
+	}
+	
+	Table1.lineVisible(0);
+}
+
+updateRow(string table, int row)
+{
+	int configType;
+	shape tableShape = getShape(table);
+	dyn_string line = tableShape.getLineN(row);			
+
+	//DebugN(&quot;Updatig row &quot; + row + &quot; &quot; + line);
+	
+	dpGet($sDpName + line[2] + &quot;:_&quot; + config + &quot;.._type&quot;, configType);					
+
+	if(configType == DPCONFIG_NONE)
+		tableShape.cellValueRC(row, &quot;conf&quot;, &quot;No&quot;); 
+	else
+		tableShape.cellValueRC(row, &quot;conf&quot;, &quot;Yes&quot;); 
+}
+
+configureElement(dyn_int lineNumbers)
+{
+	int i;
+	dyn_float returnedValues;
+	dyn_string elements, line, returnedText, exceptionInfo;
+
+	enableButtons(FALSE);
+
+	for (i = 1; i &lt;= dynlen(lineNumbers); i++) 
+	{	
+		line = Table1.getLineN(lineNumbers[i]);			
+		dynAppend(elements, $sDpName + line[2]);
+	}
+	
+	if(dynlen(elements) &lt;= 0)
+	{
+		fwException_raise(	exceptionInfo, 
+							&quot;WARNING&quot;, 
+							&quot;Select at least one element.&quot;,
+							&quot;&quot;);
+		fwExceptionHandling_display(exceptionInfo);
+		enableButtons(TRUE);
+		return;
+	}
+	
+	if(getPath(PANELS_REL_PATH, panelName) == &quot;&quot;)
+	{
+		fwException_raise(	exceptionInfo, 
+							&quot;WARNING&quot;, 
+							&quot;The panel \&quot;&quot; + panelName + &quot;\&quot; \ncould not be found&quot;,
+							&quot;&quot;);
+		fwExceptionHandling_display(exceptionInfo);
+		enableButtons(TRUE);
+		return;
+	}
+	
+	ChildPanelOnCentralModalReturn(	panelName,
+									panelBarTitle,
+									makeDynString(	&quot;$sDpName:&quot; + $sDpName,
+													&quot;$sDpe:&quot; + elements),
+									returnedValues, 
+									returnedText);
+	
+	for (i = 1; i &lt;= dynlen(lineNumbers); i++) 
+	{	
+		updateRow(&quot;Table1&quot;, lineNumbers[i]);
+	}						
+	
+	enableButtons(TRUE);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Enables or disables the apply buttons.
+
+@param [in] bEnabled         bool, intended state of the buttons
+*/
+enableButtons(bool bEnabled)
+{
+	applySelectedButton.enabled(bEnabled);
+	applyAllButton.enabled(bEnabled);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Adjust action buttons depending on the context the panel is opened from.
+  
+@param [in] bEmbeddedPanel   bool, panel is embedded or stand-alone
+*/
+void showCloseButton(bool bEmbeddedPanel)
+{
+  if(bEmbeddedPanel)
+	{
+		closeButton.visible = FALSE;
+    positionApplyButtons();
+	}
+	else
+	{
+		closeButton.visible = TRUE;
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Re-positioning of some buttons is necessary depending on the context the panel is opened from.
+*/
+void positionApplyButtons()
+{
+  int xPos, yPos;
+	
+  getValue(&quot;applySelectedButton&quot;, &quot;position&quot;, xPos, yPos);
+  applySelectedButton.position(xPos+83, yPos);
+  getValue(&quot;applyAllButton&quot;, &quot;position&quot;, xPos, yPos);
+  applyAllButton.position(xPos+83, yPos);
+}
+
+// --------------------------------- End of ScopeLib ----------------------------------------------
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	init();
+  
+  if(isDollarDefined(&quot;$bHierarchyBrowser&quot;))
+	{
+		showCloseButton($bHierarchyBrowser);
+	}
+  
+  dpname.text = $sDpName;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">122</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">120</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">11 19</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Archive Configuration</prop>
+     <prop name="en_US.iso88591">Archive Configuration</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Table1" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">78</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-348 -513</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">78</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 73</prop>
+    <prop name="Size">665 332</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">conf</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Configured</prop>
+      <prop name="en_US.iso88591">Configured</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">elements</prop>
+     <prop name="Width">565</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Element</prop>
+      <prop name="en_US.iso88591">Element</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int xpos,string columnName,string value)
+{
+	if(columnName == &quot;elements&quot;)
+		configureElement(makeDynInt(xpos));
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="applySelectedButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">108</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">320 415</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">108</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">320 415</prop>
+    <prop name="Size">150 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Configure selected ...</prop>
+     <prop name="en_US.iso88591">Configure selected ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	configureElement(Table1.getSelectedLines);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="dpname" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">111</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">111</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Device name</prop>
+     <prop name="en_US.iso88591">Device name</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">665 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="applyAllButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">116</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">477 415</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">116</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">477 415</prop>
+    <prop name="Size">115 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Configure all ...</prop>
+     <prop name="en_US.iso88591">Configure all ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	int i;
+	dyn_int lineNumbers;
+
+	for (i = 1; i &lt;= Table1.lineCount(); i++) 
+	{
+		lineNumbers[i] = i - 1;
+	}
+	
+	configureElement(lineNumbers);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">117</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">600 415</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">117</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">600 415</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Button4" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">118</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">568 113</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">118</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Open WinCC database configuration</prop>
+     <prop name="en_US.iso88591">Open WinCC database configuration</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,16,arial</prop>
+    </prop>
+    <prop name="Location">10 415</prop>
+    <prop name="Size">100 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Database ...</prop>
+     <prop name="en_US.iso88591">Database ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	int iOK;
+	bool bNewDB;
+
+//
+//	Falls alte DB -&gt; unsichtbar !!!
+//
+
+	iOK = dpGet(&quot;_DataManager.UseValueArchive:_online.._value&quot;,bNewDB);
+	if (iOK!=-1 &amp;&amp; bNewDB)	// nur wenn neue DB Aktiv
+	{
+		if(!isModuleOpen(&quot;PVSS&quot;) )
+  			ModuleOn(&quot;PVSS&quot;, 100, 100, 500, 500, 1, 1, &quot;None&quot;);
+		RootPanelOnModule(&quot;para/archive/archive_HDB_select.pnl&quot;, &quot;&quot;, &quot;PVSS&quot;, makeDynString());
+	}
+	else
+	{
+		if(!isModuleOpen(&quot;PVSS&quot;) )
+			ModuleOn(&quot;PVSS&quot;, 100, 100, 500, 500, 1, 1, &quot;None&quot;);
+		RootPanelOnModule(&quot;vision/DataManager_par&quot;, &quot;&quot;, &quot;PVSS&quot;, makeDynString());
+	}
+}
+]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">590 150</prop>
+    <prop name="Geometry">1 0 0 1 60 -148</prop>
+    <prop name="TabOrder">119</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwDevice/fwDeviceArchiveConfig</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+ </shapes>
+</panel>

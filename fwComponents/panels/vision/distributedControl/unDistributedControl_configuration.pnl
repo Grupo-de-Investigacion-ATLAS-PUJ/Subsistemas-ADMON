@@ -1,0 +1,1683 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Distributed Control Configuration</prop>
+  </prop>
+  <prop name="Size">749 622</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;unDistributedControl/unDistributedControl.ctl&quot;
+
+string g_sPanelFileName;
+dyn_dyn_string g_OldTableContent;
+bool g_bEdited = FALSE;
+bool g_bGranted = FALSE;
+bool g_bInitialising = FALSE;
+
+//---------------------------------------------------------------------------------------------------------
+
+const string SYSTEM_DP_SEPARATOR= &quot;:&quot;;
+
+const string SYS_IN_CFG_YES = &quot;Y&quot;;
+const string SYS_IN_CFG_NO = &quot;N&quot;;
+
+//---------------------------------------------------------------------------------------------------------
+
+loadData()
+{
+	dyn_string dsSystemName, dsHostName;
+	dyn_int diSystemId, diPortNumber;
+	int i, len;
+	string sHostName, sPortNumber;
+  dyn_string exception;
+  g_bInitialising = TRUE;
+  
+	confTable.deleteAllLines();
+	unDistributedControl_getAllDeviceConfig(dsSystemName, diSystemId, dsHostName, diPortNumber);
+	len = dynlen(dsSystemName);
+  int count = 0;
+	for(i=1;i&lt;=len;i++) {
+		if(diPortNumber[i] &lt;=0)
+			sPortNumber = &quot;&quot;;
+		else
+			sPortNumber = diPortNumber[i];
+		if(dsHostName[i] == &quot;localhost&quot;)
+			sHostName = &quot;&quot;;
+		else
+			sHostName = dsHostName[i]; 
+   unDistributedControl_convertHostPort(sHostName, sPortNumber);
+		if(dsSystemName[i] + SYSTEM_DP_SEPARATOR == getSystemName()) {
+			localPortNumber.text = sPortNumber;
+			localHostName.text = sHostName;
+		}
+		else
+    {
+      bool match = false;
+      bool present = unDistributedControl_isSystemInFile(diSystemId[i], sHostName, diPortNumber[i], &quot;&quot;, match, exception);
+      string inFile = (present &amp;&amp; match)?SYS_IN_CFG_YES:SYS_IN_CFG_NO;
+          
+      confTable.appendLine(&quot;remoteSystemName&quot;, dsSystemName[i], &quot;remoteSystemId&quot;, (string)diSystemId[i],
+                           &quot;remoteHostName&quot;, sHostName, &quot;remotePortNumber&quot;, sPortNumber, &quot;configFile&quot;, inFile);
+      if(inFile != &quot;Y&quot;)
+      {
+        setValue(&quot;confTable&quot;, &quot;cellBackColRC&quot;, count, &quot;configFile&quot;, &quot;yellow&quot;);
+      }
+      count++;
+
+    }
+	}
+  
+  //Finally, append the systems in the config file we do not have an internal datapoint for:
+ 	dyn_string dsFileSystemName, dsFileHostName, dsFileReduHost;
+	dyn_int diFileSystemId, diFilePortNumber;
+  bool match = false;
+  bool showPopup = false;
+  
+	unDistributedControl_getAllDeviceConfigFromFile(diFileSystemId, dsFileHostName, diFilePortNumber, dsFileReduHost, exception);
+
+  int n = dynlen(diFileSystemId);
+  for(int j = 1; j &lt;= n; j++){
+    if(!unDistributedControl_systemDpExists(diFileSystemId[j], dsFileHostName[j], diFilePortNumber[j], dsFileReduHost[j], match, exception)){
+      showPopup = true;
+      
+  		if(diFilePortNumber[j] &lt;=0)
+  			sPortNumber = &quot;&quot;;
+  		else
+  			sPortNumber = diFilePortNumber[j];
+      
+  		if(dsFileHostName[j] == &quot;localhost&quot;)
+  			sHostName = &quot;&quot;;
+  		else
+  			sHostName = dsFileHostName[j]; 
+      
+      unDistributedControl_convertHostPort(sHostName, sPortNumber);
+     
+      confTable.appendLine(&quot;remoteSystemName&quot;, &quot;&quot;, &quot;remoteSystemId&quot;, (string)diFileSystemId[j],
+                           &quot;remoteHostName&quot;, sHostName, &quot;remotePortNumber&quot;, sPortNumber, &quot;configFile&quot;, SYS_IN_CFG_YES);
+      int row = confTable.lineCount() - 1;
+      setValue(&quot;confTable&quot;, &quot;cellBackColRC&quot;, row, &quot;remoteSystemName&quot;, &quot;FwStateAttention2&quot;);
+    }//end of if system dp does not exist    
+  }// end of loop over systems in the config file
+    
+  if(showPopup)
+  {
+    ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;Missing Dps&quot;, makeDynString(&quot;$1:Config file contains peers which are not known to unDistributedControl.\nThese systems have been added to the table.\nPlease, complete their info...&quot;));
+  }
+  g_bInitialising = FALSE;
+}
+
+
+
+loadDataFromConfig()
+{
+  g_bInitialising = TRUE;
+  
+  dyn_string exception;
+  dyn_string dsFileSystemName, dsFileHostName, dsFileReduHost;
+	dyn_int diFileSystemId, diFilePortNumber;  
+	unDistributedControl_getAllDeviceConfigFromFile(diFileSystemId, dsFileHostName, diFilePortNumber, dsFileReduHost, exception);
+  
+  confTable.deleteAllLines();
+  
+  bool showPopup = false;
+  int distPeerCount = dynlen(diFileSystemId);
+  for(int i=1;i&lt;=distPeerCount;i++)
+  {
+    int iSystemId = diFileSystemId[i];
+    string sSystemName = strrtrim(getSystemName(iSystemId), SYSTEM_DP_SEPARATOR);
+    
+    string sHostname = dsFileHostName[i];
+    if(sHostname == &quot;localhost&quot;){
+			sHostname = &quot;&quot;;
+    }
+    int iPortNum = diFilePortNumber[i];
+    string sPortNum = iPortNum;
+    if(iPortNum &lt;= 0){
+      if(sHostname != &quot;&quot;){
+        sPortNum = DEFAULT_DIST_PORT;
+      }else{
+        sPortNum = &quot;&quot;;
+      }
+    }
+    unDistributedControl_convertHostPort(sHostname, sPortNum);
+    
+    confTable.appendLine(&quot;remoteSystemName&quot;, sSystemName, &quot;remoteSystemId&quot;, (string)iSystemId,
+                         &quot;remoteHostName&quot;, sHostname, &quot;remotePortNumber&quot;, sPortNum, &quot;configFile&quot;, SYS_IN_CFG_YES);
+    if(sSystemName == &quot;&quot;)
+    {
+      int row = confTable.lineCount() - 1;
+      setValue(&quot;confTable&quot;, &quot;cellBackColRC&quot;, row, &quot;remoteSystemName&quot;, &quot;FwStateAttention2&quot;);
+      showPopup = true;
+    }
+  }
+  if(showPopup)
+  {
+    ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;Complete missing system names&quot;, makeDynString(&quot;$1:Could not resolve system name for one or more systems defined in config file.\nPlease, complete their system names...&quot;));
+  }
+  g_bInitialising = FALSE;
+}
+
+const int DEFAULT_DIST_PORT = 4777;
+
+bool areDpsAndConfigMatch()
+{
+  dyn_string dsSystemName, dsHostName;
+	dyn_int diSystemId, diPortNumber;
+	unDistributedControl_getAllDeviceConfig(dsSystemName, diSystemId, dsHostName, diPortNumber);
+  int dpSystemsLen = dynlen(diSystemId);
+  
+  dyn_string exception;
+  dyn_string dsFileSystemName, dsFileHostName, dsFileReduHost;
+	dyn_int diFileSystemId, diFilePortNumber;  
+	unDistributedControl_getAllDeviceConfigFromFile(diFileSystemId, dsFileHostName, diFilePortNumber, dsFileReduHost, exception);
+  int configSystemsLen = dynlen(diFileSystemId);
+  
+  if(dynlen(exception) &gt; 0)
+  {
+    DebugTN(&quot;Problem occured while retrieving data from config file, cannot check if current distributed system configuration match config file&quot;);
+    return true;
+  }
+  
+  int distPeersInDp;
+  bool match = true;
+  
+  for(int i=1;i&lt;=dpSystemsLen;i++)  {
+    if(dsHostName[i] == &quot;localhost&quot; || dsSystemName[i] + SYSTEM_DP_SEPARATOR == getSystemName()){
+      continue;
+    }
+    int distPeerIx = dynContains(diFileSystemId, diSystemId[i]);
+    if(distPeerIx &lt;= 0){
+      return false;
+    }
+    distPeersInDp++;
+    
+    if(diFilePortNumber[distPeerIx] &lt;= 0){
+      diFilePortNumber[distPeerIx] = DEFAULT_DIST_PORT;
+    }
+    
+    string sRealSystemName = strrtrim(getSystemName(diSystemId[i]), SYSTEM_DP_SEPARATOR);
+    if(dsHostName[i] != dsFileHostName[distPeerIx] ||
+       diPortNumber[i] != diFilePortNumber[distPeerIx] ||
+       (sRealSystemName != &quot;&quot; &amp;&amp; dsSystemName[i] != sRealSystemName)){
+     // DebugTN(diSystemId[i], dsHostName[i] != dsFileHostName[distPeerIx],  diPortNumber[i] != diFilePortNumber[distPeerIx], sRealSystemName != &quot;&quot; &amp;&amp; dsSystemName[i] != sRealSystemName);
+      return false;
+    }
+  }
+  return (distPeersInDp == configSystemsLen);
+}
+
+//---------------------------------------------------------------------------------------------------------
+
+checkData(dyn_string &amp;exceptionInfo)
+{
+	dyn_string dsSystemName, dsSystemId, dsPortNumber, dsHostName;
+	string sPortNumber, sHostName, sTemp;
+  
+  // Check and replace if necessary the provided portnumber in case it has not been done yet
+  setDistPortNumber();
+	
+// get all new config
+	dynAppend(dsSystemName, localSystemName.text);
+	dynAppend(dsSystemId, localSystemId.text);
+	dynAppend(dsPortNumber, localPortNumber.text);
+	dynAppend(dsHostName, localHostName.text);
+
+	for(int i=0;i&lt;confTable.lineCount();i++) {
+    
+		sTemp = confTable.cellValueRC(i, &quot;remoteSystemName&quot;);
+		if(sTemp == &quot;&quot;) {
+		  fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The table contains errors: empty system names. The configuration cannot be saved...&quot;, &quot;&quot;);
+    }
+	  dynAppend(dsSystemName, strrtrim(sTemp, SYSTEM_DP_SEPARATOR));
+	  dynAppend(dsSystemId, confTable.cellValueRC(i, &quot;remoteSystemId&quot;));
+		dynAppend(dsPortNumber, confTable.cellValueRC(i, &quot;remotePortNumber&quot;));
+		dynAppend(dsHostName, confTable.cellValueRC(i, &quot;remoteHostName&quot;));
+	}
+	dynUnique(dsSystemName);
+	dynUnique(dsSystemId);
+	
+// check that the system name, system Id are unique and port number is unique if on different computer.
+	if(dynlen(dsSystemName) != dynlen(dsSystemId))
+  {
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;saving unDistribtuedControl configuration: incorrect data, redundant systemName or systemId&quot;, &quot;&quot;);
+  }
+	else {
+		sPortNumber = dsPortNumber[1];
+		dynRemove(dsPortNumber, 1);
+		sHostName = dsHostName[1];
+		dynRemove(dsHostName, 1);
+
+		while(dynlen(dsPortNumber) &gt; 0) {
+			int pos = dynContains(dsPortNumber, sPortNumber);
+			if(pos&gt;0) {
+				if(sHostName == dsHostName[pos]) {
+					fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;saving unDistribtuedControl configuration: same portNumber on same host&quot;, &quot;&quot;);
+//					DebugN(i, dsSystemName, dsHostName, dsPortNumber, sPortNumber, sHostName);
+				}
+			}
+			sPortNumber = dsPortNumber[1];
+			dynRemove(dsPortNumber, 1);
+			sHostName = dsHostName[1];
+			dynRemove(dsHostName, 1);
+		}
+	}
+}
+
+//---------------------------------------------------------------------------------------------------------
+
+saveData(dyn_string &amp;exceptionInfo, string buttonPressed = &quot;otherButton&quot;)
+{
+	int iSystemId, iPortNumber;
+	string sSystemName, sHostName, sPortNumber;
+	dyn_string dsOldSystemName, dsSystemName, dsHostName;
+	dyn_int diSystemId, diPortNumber;
+	
+  g_bEdited = FALSE;
+  
+  // check data and do not save if the data is not correct
+	checkData(exceptionInfo);
+	
+  if(dynlen(exceptionInfo) &gt; 0) {
+    ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;Error in config&quot;, makeDynString(&quot;Configuration error. Correct errors in the table.\nConfiguration will not be saved&quot;));    
+    return;
+  }
+	else{
+	// save local config
+		sSystemName = localSystemName.text;
+		iSystemId = localSystemId.text;
+		sHostName = localHostName.text;
+		sPortNumber = localPortNumber.text;
+		if(sPortNumber == &quot;&quot;)
+			iPortNumber = 0;
+		else
+			iPortNumber = sPortNumber;
+			
+	// get current configs
+		unDistributedControl_getAllDeviceConfig(dsOldSystemName, diSystemId, dsHostName, diPortNumber);
+	
+	// create the local system if not already created
+		unDistributedControl_checkCreateDp(c_unDistributedControl_dpName+sSystemName, exceptionInfo);
+		if(dynlen(exceptionInfo) &lt;= 0) {
+			unDistributedControl_checkSetAlias(c_unDistributedControl_dpName+sSystemName, sSystemName, exceptionInfo);
+			unDistributedControl_setDeviceConfig(sSystemName, iSystemId, sHostName, iPortNumber, exceptionInfo);
+			dynAppend(dsSystemName, sSystemName);
+		}
+	// save remote PVSS server config
+		for(int i=0;i&lt;confTable.lineCount();i++) {
+			sSystemName = strrtrim(confTable.cellValueRC(i, &quot;remoteSystemName&quot;), SYSTEM_DP_SEPARATOR);
+			iSystemId = confTable.cellValueRC(i, &quot;remoteSystemId&quot;);
+			sHostName = confTable.cellValueRC(i, &quot;remoteHostName&quot;);
+			sPortNumber = confTable.cellValueRC(i, &quot;remotePortNumber&quot;);
+			if(sPortNumber == &quot;&quot;)
+				iPortNumber = 0;
+			else
+				iPortNumber = sPortNumber;
+			if(sSystemName != &quot;&quot;) {
+	// create the remote system if not already created
+				unDistributedControl_checkCreateDp(c_unDistributedControl_dpName+sSystemName, exceptionInfo);
+				if(dynlen(exceptionInfo) &lt;= 0) {
+					unDistributedControl_checkSetAlias(c_unDistributedControl_dpName+sSystemName, sSystemName, exceptionInfo);
+					unDistributedControl_setDeviceConfig(sSystemName, iSystemId, sHostName, iPortNumber, exceptionInfo);
+					dynAppend(dsSystemName, sSystemName);
+				}
+			}
+		}
+	}
+	
+// in case of error do nothing
+	if (dynlen(exceptionInfo) &lt;= 0)
+	{
+	// delete the others
+		for(int i=1;i&lt;=dynlen(dsOldSystemName);i++) {
+			iPortNumber = dynContains(dsSystemName, dsOldSystemName[i]);
+			if(iPortNumber &lt;= 0) {
+// delete systemIntegrity
+				deleteSystemIntegrity(dsOldSystemName[i]);
+// delete unDistributedControl DP
+				dpDelete(c_unDistributedControl_dpName+dsOldSystemName[i]);
+			}
+		}
+	// save config in the config file
+		unDistributedControl_saveInConfigFile(exceptionInfo);
+
+// 2. Reload data
+		loadData();   
+	}
+	else
+  {
+		fwExceptionHandling_display(exceptionInfo);
+    if(buttonPressed != &quot;okButtonPressed&quot;) 
+    {
+		  ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;,&quot;Warning&quot;,makeDynString(&quot;$1:Error while saving.&quot;));
+    }
+  }
+}
+
+//---------------------------------------------------------------------------------------------------------
+
+deleteSystemIntegrity(string sSystemName)
+{
+	// send the command
+	dpSetWait(UN_SYSTEM_INTEGRITY_DIST+UN_SYSTEMINTEGRITY_EXTENSION+&quot;.interface.command&quot;, UN_SYSTEMINTEGRITY_DELETE, 
+				UN_SYSTEM_INTEGRITY_DIST+UN_SYSTEMINTEGRITY_EXTENSION+&quot;.interface.parameters&quot;, 
+									makeDynString(c_unDistributedControl_dpName+sSystemName));
+// just wait it is done. not the best secure way but this is the only available.
+	delay(1);
+//	DebugN(&quot;delete systemIntegrity: &quot;, sSystemName);
+}
+
+//---------------------------------------------------------------------------------------------------------
+
+userCB(string sDp, string sUser)
+{
+	bool bFileExists;
+	dyn_string exceptionInfo, domainList, priviledgeList;
+	string user;
+
+  if(isFunctionDefined(&quot;unGenericButtonFunctionsHMI_isAccessAllowed&quot;)) {
+     unGenericButtonFunctionsHMI_isAccessAllowed(g_sPanelFileName, UN_GENERIC_USER_ACCESS, 
+                                                      unGenericButtonFunctionsHMI_getPanelAccessLevel(g_sPanelFileName, bFileExists), g_bGranted, exceptionInfo);
+  }
+	else {
+			g_bGranted = true;
+	}
+  
+	buttonApply.enabled = g_bEdited &amp;&amp; g_bGranted;
+  okButton.enabled = g_bGranted;
+	
+	if(isFunctionDefined(&quot;unMessageText_sendException&quot;)) {
+		if(dynlen(exceptionInfo)&gt;0)
+			unMessageText_sendException(getSystemName(), myManNum(), &quot;Distribtued Control configuration&quot;, &quot;user&quot;, &quot;*&quot;, exceptionInfo);
+	}
+	
+// handle here any error during the the send message:
+	if(dynlen(exceptionInfo)&gt;0) {
+		fwExceptionHandling_display(exceptionInfo);
+	}
+}
+
+//---------------------------------------------------------------------------------------------------------
+
+eventClose()
+{
+	int pos;
+	
+	if(isFunctionDefined(&quot;unGenericButtonFunctionsHMI_closePanel&quot;)) {
+		if(globalExists(&quot;g_unGraphicalFrame_childOpenedPanel&quot;)) {
+			pos = dynContains(g_unGraphicalFrame_childOpenedPanel, myModuleName()+&quot;/&quot;+myPanelName());
+			if(pos &gt;0)
+				dynRemove(g_unGraphicalFrame_childOpenedPanel, pos);
+		}
+	
+		unGenericButtonFunctionsHMI_closePanel(true);
+	}
+	else
+		PanelOff();
+}
+
+setDistPortNumber()
+{
+  string sHostName, sPortNumber=localPortNumber.text;
+  
+  unDistributedControl_convertHostPort(sHostName, sPortNumber);
+  localPortNumber.text = sPortNumber;
+}
+
+//---------------------------------------------------------------------------------------------------------
+
+void trimSpaces(string &amp;sItem)
+{
+  sItem = strrtrim(sItem, &quot; &quot;);
+  sItem = strltrim(sItem, &quot; &quot;);
+}
+
+enableUiButtons(bool enable)
+{
+  deleteEntry.enabled(enable);
+	cancelButton.enabled(enable);
+	reloadButton.enabled(enable);
+  
+  if(enable){
+    userCB(&quot;&quot;, &quot;&quot;);
+  }else{
+    okButton.enabled(false);
+    buttonApply.enabled(false);
+  }
+  loadFromConfigButton.enabled(enable &amp; (!areDpsAndConfigMatch()));
+  
+}
+
+bool askUserBeforeSave()
+{
+  dyn_string ds;
+  dyn_float df;
+  ChildPanelOnCentralModalReturn(&quot;fwGeneral/fwOkCancel.pnl&quot;, &quot;Confirm&quot;, makeDynString(&quot;$text:Modified distributed systems configuration will be saved.\n&quot;
+                                                                                      &quot;Note: Dist section of config file will be overwritten.\n&quot;
+                                                                                      &quot;Are you sure you want to proceed?&quot;), df, ds);
+  if(dynlen(ds) &gt;= 1 &amp;&amp; ds[1] == &quot;ok&quot;){
+    return true;
+  }
+  return false;
+}
+
+
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	eventClose();
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  enableUiButtons(false);
+  int iRes;
+  dyn_string exceptionInfo;
+  string systName = getSystemName();
+	
+  if(isFunctionDefined(&quot;unGraphicalFrame_setCorporateColors&quot;)){
+    unGraphicalFrame_setCorporateColors();
+  }
+  
+  if(isFunctionDefined(&quot;unGenericButtonFunctionsHMI_getPanelFileName&quot;))	
+    unGenericButtonFunctionsHMI_getPanelFileName(g_sPanelFileName);
+  confTable.tableMode(TABLE_SELECT_BROWSE);
+  confTable.selectByClick(TABLE_SELECT_LINE); 
+  confTable.sortOnClick(false);
+  loadData();
+  //check if all systems listed in the config file are listed in the table, otherwise add them.
+  localSystemName.text = substr(systName, 0, strpos(systName, SYSTEM_DP_SEPARATOR));
+  localSystemId.text = getSystemId();
+  
+  // fill global table information for check of edited information
+  for(int i = 0; i &lt; confTable.lineCount(); i++)
+  {
+    g_OldTableContent[i+1] = confTable.getLineN(i);
+  }
+  enableUiButtons(true);
+      
+  if(isFunctionDefined(&quot;fwAccessControl_setupPanel&quot;)){
+    fwAccessControl_setupPanel(&quot;userCB&quot;, exceptionInfo);
+  }
+  
+  if(isFunctionDefined(&quot;unGenericButtonFunctionsHMI_getPanelFileName&quot;))	
+  {
+    addSymbol(
+        myModuleName(), 
+        myPanelName(), 
+        &quot;objects/UN_INFOS/unManagerInfo.pnl&quot;, 
+        &quot;MANAGER&quot;,
+        makeDynString(
+            &quot;$sFrontEndOrSystemName:&quot; + getSystemName(), 
+            &quot;$sPanelName:&quot;+g_sPanelFileName,
+            &quot;$sShortName:WCCILdist&quot;, 
+            &quot;$sLongName:WCCILdist&quot;, 
+            &quot;$sManager:WCCILdist&quot;, 
+            &quot;$sCommandLine:&quot;,
+            &quot;$iManType:&quot; + DIST_MAN, 
+            &quot;$iManNum:&quot;+getSystemId(), 
+            &quot;$sShapeName:&quot;, 
+            &quot;$sSymbolName:WCCILdist&quot;,
+            &quot;$bAddDelete:true&quot;
+        ), 605, 50, 1, 1, 1);
+  }
+}
+
+
+
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="backgroundRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-1 -1</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">STD_state</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">751 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 4</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Distributed System Configuration</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="systemsTableLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 128</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 128</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">WinCC OA remote systems:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="localSystemNameLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 55</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">21 55</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">System name:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="localSystemIdLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">204 55</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">204 55</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">System ID:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="localHostNameLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">284 55</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">284 55</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Local host:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="localPortNumberLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">524 55</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">524 55</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Port:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="cancelButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">655 590</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Close the panel. Any unsaved modifications will be lost</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">655 590</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	eventClose();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="confTable" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 148</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 148</prop>
+    <prop name="Size">721 343</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">remoteSystemName</prop>
+     <prop name="Width">190</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">System name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">PVSS remote system name</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">remoteSystemId</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">System ID</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">PVSS remote system id</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">remoteHostName</prop>
+     <prop name="Width">240</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Host name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">host name of the remote PVSS system</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">remotePortNumber</prop>
+     <prop name="Width">110</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Port</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">port number of the remote distributed manager</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">configFile</prop>
+     <prop name="Width">82</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">In config file?</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Y-> the peer is present in the config file/ N-> the peer is not yet in config file / O -> the information of the peer does not match that of the config file</prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#30</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  string sHostName, sPortNumber, sId, sSyst;
+  int index;  
+   
+  if(column == &quot;remoteSystemName&quot;)
+    sSyst = value;
+  else
+    sSyst = this.cellValueRC(row, &quot;remoteSystemName&quot;);
+
+  if(sSyst != &quot;&quot;)
+  {
+    setValue(&quot;confTable&quot;, &quot;cellBackColRC&quot;, row, &quot;remoteSystemName&quot;, &quot;FwBackgroundInputText&quot;);
+    g_bEdited = true;
+  }
+
+  
+  trimSpaces(sSyst);
+      
+  if(column == &quot;remoteHostName&quot;)
+    sHostName = value;
+  else
+    sHostName = this.cellValueRC(row, &quot;remoteHostName&quot;);
+      
+  trimSpaces(sHostName);
+      
+  if(column == &quot;remotePortNumber&quot;)
+    sPortNumber = value;
+  else
+    sPortNumber = this.cellValueRC(row, &quot;remotePortNumber&quot;);
+      
+  trimSpaces(sPortNumber);
+      
+  if(column == &quot;remoteSystemId&quot;)
+    sId = value;
+  else
+    sId = this.cellValueRC(row, &quot;remoteSystemId&quot;);
+      
+  trimSpaces(sId);
+      
+  if(sId == &quot;&quot;)
+    sId = this.lineCount();
+      
+  unDistributedControl_convertHostPort(sHostName, sPortNumber);
+  this.cellValueRC(row, &quot;remoteSystemName&quot;) = sSyst;
+  this.cellValueRC(row, &quot;remoteHostName&quot;) = sHostName;
+  this.cellValueRC(row, &quot;remotePortNumber&quot;) = sPortNumber;
+  this.cellValueRC(row, &quot;remoteSystemId&quot;) = sId;      
+
+  
+  dyn_dyn_string tableContent;
+  
+  for(index = 0; index &lt; this.lineCount(); index++)
+  {
+    tableContent[index+1] = this.getLineN(index);    
+  }
+
+  if(dynlen(g_OldTableContent) != dynlen(tableContent))
+  {
+    g_bEdited = TRUE;
+  }
+  else
+  {
+    for(index = 1; index &lt;= dynlen(g_OldTableContent); index++)
+    {
+      if(g_OldTableContent[index] != tableContent[index])
+      {
+        g_bEdited = TRUE;
+      }
+    }
+  }
+
+  g_OldTableContent = tableContent;
+  userCB(&quot;&quot;,&quot;&quot;);
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="localSystemName" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 75</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 75</prop>
+    <prop name="Size">178 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="localSystemId" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">202 75</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">202 75</prop>
+    <prop name="Size">77 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="localHostName" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">282 75</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">282 75</prop>
+    <prop name="Size">237 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="localPortNumber" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">522 75</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">522 75</prop>
+    <prop name="Size">65 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  if(!g_bInitialising)
+  {
+    g_bEdited = TRUE;
+    userCB(&quot;&quot;,&quot;&quot;);
+  }
+}]]></script>
+    <script name="Command" isEscaped="1"><![CDATA[main()
+{
+  setDistPortNumber();
+}
+]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  setDistPortNumber();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="buttonApply" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">577 590</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Saves distributed systems configuration. Note that dist section of project config file will be overwritten by the applied configuration</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">577 590</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{  
+  dyn_string exception;
+  
+  if(!askUserBeforeSave()) return;
+  
+	enableUiButtons(false);
+	
+// 1. Save data
+	saveData(exception);
+  if(dynlen(exception))
+  {
+    fwExceptionHandling_display(exception);
+  }
+
+	enableUiButtons(true);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="reloadButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 559.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Reload distributed systems configuration. Note: Unsaved modifications will be lost</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">8 559.5</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/refresh_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	enableUiButtons(false);
+
+	loadData();
+  g_bEdited = FALSE;
+
+	enableUiButtons(true);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="deleteEntry" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">706 113.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Remove selected remote system</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">706 113.5</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/delete_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_int diLines;
+	
+	enableUiButtons(false);
+
+	diLines = confTable.getSelectedLines();
+	if(dynlen(diLines) &gt;= 1) 
+  {
+		//if(confTable.cellValueRC(diLines[1], &quot;remoteSystemName&quot;) != &quot;&quot;) {
+			confTable.deleteLineN(diLines[1]);
+      g_bEdited = TRUE;
+		//}
+	}
+
+	enableUiButtons(true);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="infoFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">16 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.475409836065574 0 0 1.330292192455632 -13.60655737704916 -18.21168769822526</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Local system</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">16 40</prop>
+    <prop name="Size">489 57</prop>
+   </properties>
+  </shape>
+  <shape Name="okButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">499 590</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Saves distributed systems configuration and close the panel. Note that dist section of project config file will be overwritten by the applied configuration.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">499 590</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string exception;
+  
+  if(!askUserBeforeSave()) return;
+	
+  enableUiButtons(false);	
+  
+	saveData(exception, &quot;okButtonPressed&quot;);
+  if(dynlen(exception))
+  {
+    dyn_string ds;
+    dyn_float df;
+    DebugTN(__FILE__ + &quot;, Error: &quot;, exception);
+    ChildPanelOnCentralModalReturn(&quot;vision/MessageInfo1&quot;, &quot;ErrorSavingData&quot;, makeDynString(&quot;$1:The table contains errors.\nInfo cannot be saved to config file.\nCheck log-viewer for more details...&quot;), df, ds);
+  }
+  
+  PanelOff();
+}
+
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="remoteSystemNameField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 521</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Name of remote system</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 521</prop>
+    <prop name="Size">178 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="addSystemFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 552</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.384615384615385 0 0 1.394736842105263 -3.846153846153846 -269.8947368421052</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Add remote system</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 552</prop>
+    <prop name="Size">521 39</prop>
+   </properties>
+  </shape>
+  <shape Name="remoteSystemIdField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">202 521</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">ID of remote system</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">202 521</prop>
+    <prop name="Size">77 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="remoteHostNameField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">282 521</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Name of remote host</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">282 521</prop>
+    <prop name="Size">237 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="remotePortNumberField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">522 521</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Remote port number</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">522 521</prop>
+    <prop name="Size">106 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="addRemoteSystem" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">690 519.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Change port number</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">690 519.5</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Insert_after_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sSystem, sHostName, sPortNumber, sId, sInFile;
+  
+  sSystem = remoteSystemNameField.text();
+  trimSpaces(sSystem);
+  sSystem = strrtrim(sSystem, SYSTEM_DP_SEPARATOR);
+  
+  if(sSystem != &quot;&quot;)
+  {
+    sId = remoteSystemIdField.text();
+    trimSpaces(sId);
+    sHostName = remoteHostNameField.text();
+    trimSpaces(sHostName);
+    sPortNumber = remotePortNumberField.text();
+    trimSpaces(sPortNumber);
+
+    if(sId == &quot;&quot;)
+    {
+      sId = confTable.lineCount() + 1;
+    }
+
+    unDistributedControl_convertHostPort(sHostName, sPortNumber);
+
+    
+    dyn_string exception;
+    bool match = false;
+    bool present = unDistributedControl_isSystemInFile((int)sId, sHostName, (int)sPortNumber, &quot;&quot;, match, exception);
+    sInFile = (present &amp;&amp; match)?SYS_IN_CFG_YES:SYS_IN_CFG_NO;
+
+    confTable.appendLine(&quot;remoteSystemName&quot;, sSystem, &quot;remoteSystemId&quot;, sId, &quot;remoteHostName&quot;, sHostName,
+                         &quot;remotePortNumber&quot;, sPortNumber, &quot;configFile&quot;, sInFile);
+
+    g_bEdited = TRUE;
+
+    dyn_dyn_string tableContent;
+
+    for(int index = 0; index &lt; confTable.lineCount(); index++)
+    {
+      tableContent[index+1] = confTable.getLineN(index);
+    }
+
+    g_bEdited = TRUE;
+    g_OldTableContent = tableContent;
+    userCB(&quot;&quot;,&quot;&quot;);
+
+    remoteSystemNameField.text = &quot;&quot;;
+    remoteSystemIdField.text = &quot;&quot;;
+  }
+  setInputFocus(myModuleName(), myPanelName(), &quot;remoteSystemNameField&quot;);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="loadFromConfigButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">43 560</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Loads remote systems configuration table based on the config file dist section entries. Note: This doesn't change the distributed system configuration. To save displayed configuration please click 'OK' or 'Apply' button. To discard this configuration click reload button or close this panel by clicking 'Cancel' button. This button is disabled when distributed systems configuration match the dist section of config file.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">43 560</prop>
+    <prop name="Size">149 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Load from config file</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  enableUiButtons(false);
+	loadDataFromConfig();
+  g_bEdited = true;
+  enableUiButtons(true);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="DistManagerButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">297 590</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">297 590</prop>
+    <prop name="Size">121 25</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Dist Manager</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  if (isFunctionDefined(&quot;unSystemIntergity_manageManager&quot;)) {
+    ChildPanelOnCentralModal(&quot;vision/systemIntegrity/unManageManager.pnl&quot;,&quot;Dist manager&quot;,
+                                        makeDynString(&quot;$sSystemName:&quot;+getSystemName(),
+                                                      &quot;$sPanelName:Distributed Manager&quot;,
+                                                      &quot;$g_sName:Distributed Manager&quot;,
+                                                      &quot;$sManager:WCCOAdist&quot;,
+                                                      &quot;$sCommandLine:&quot;,
+                                                      &quot;$iManType:&quot;+DIST_MAN,
+                                                      &quot;$iManNum:0&quot;,
+                                                      &quot;$bAddDelete:false&quot;)
+                       );
+   }
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  if (isFunctionDefined(&quot;unSystemIntergity_manageManager&quot;)) this.visible=true; else this.visible=false;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="DistRestartWarning" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">15 596</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">15 596</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,1,0,0,0,0,Italic</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">After reconfiguration you may need to restart the DIST manager</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

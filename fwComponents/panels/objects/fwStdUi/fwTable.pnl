@@ -1,0 +1,543 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">165 138</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96.06876790830945</prop>
+  <prop name="PDPI">96.06876790830945</prop>
+  <prop name="layoutType">VBox</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;CtrlOOUtils&quot;
+
+#property bool rowHeaderVisible
+#property int rowHeaderWidth
+#event rowSelected(mixed rowKey)
+#event doubleClicked(mixed rowKey)
+
+#property string styleSheet
+string myStyleSheet;
+public string getStyleSheet() { return myStyleSheet;}
+public void   setStyleSheet(string s)
+{
+    if (myStyleSheet==&quot;&quot; &amp;&amp; s==&quot;&quot;) return; // avoid unnecessary stylesheet change on init
+    myStyleSheet=s;
+    TheTable.styleSheet=s;
+}
+
+//#event rowSelectedData(shared_ptr&lt;void&gt; rowData)
+
+
+const int defaultRowHeaderWidth=40;
+
+// note that the 0'th column in the _KEY column,
+// hence everything is indexed starting with 1
+dyn_string g_columnNames;
+mapping g_columnTitles;
+mapping g_columnFilters;
+mapping g_maxColumnWidths;
+string lastSortedColumn;
+bool lastSortedOrder;
+string g_className;
+dyn_string g_classMembers;
+string g_keyMember;
+
+bool g_mutex;
+
+public bool getRowHeaderVisible() { return TheTable.rowHeaderVisibility;}
+public void setRowHeaderVisible(bool b) {TheTable.rowHeaderVisibility=b;}
+
+public int getRowHeaderWidth()  { return TheTable.rowHeaderWidth;}
+public void setRowHeaderWidth(int w) {TheTable.rowHeaderWidth=w;}
+
+public mixed getSelectedKey()
+{
+    dyn_int selLines = TheTable.getSelectedLines();
+    mixed selectedKey=&quot;&quot;; // marker for unselection...
+    if (!selLines.isEmpty()) {
+        dyn_mixed line = TheTable.getLineN(selLines.first());
+        selectedKey=line.first();
+    }
+    return selectedKey;
+}
+
+public void selectByKey(mixed key)
+{
+    dyn_string columnKeys=TheTable.getColumnN(0);
+    int idx = columnKeys.indexOf(key);
+    if (idx&gt;=0) {
+        TheTable.selectLineN(idx);
+        TheTable.lineVisible(idx);
+    } else {
+        TheTable.selectLineN(-1);
+        TheTable.lineVisible(0);
+    }
+}
+
+public void setStretchableColumn(string sColumnName, bool bStretchable=true)
+{
+    int idx=dynContains(g_columnNames, sColumnName);
+    FwException::assert(idx&gt;=0, &quot;Specified column: &quot;+sColumnName+&quot; does not exist&quot;);
+
+    int colNum=TheTable.nameToColumn(sColumnName); // dynamic! mind column-reordering!
+    if (colNum&gt;=0) TheTable.columnStretchable(colNum, bStretchable);
+}
+
+public void setupWithColumns(string className, dyn_string columns, string keyMember=&quot;&quot;)
+{
+    FwException::assert(columns.count()&gt;0, &quot;Empty list of columns&quot;);
+    if (keyMember!=&quot;&quot;) columns.append(keyMember);
+    columns.unique();
+    dyn_string classMembers=fwClassMemberVars(className);
+    dyn_string membersToIgnore=classMembers;
+    for (int i=0; i&lt;columns.count(); i++) {
+        int idx=membersToIgnore.indexOf(columns.at(i));
+        if (idx&gt;=0) membersToIgnore.removeAt(idx);
+    }
+    setup(className, keyMember, membersToIgnore);
+}
+
+
+public void setup(string className, string keyMember=&quot;&quot;, dyn_string membersToIgnore=makeDynString())
+{
+    synchronized(g_mutex) {
+        TheTable.blankNonExistingRows(true);
+        TheTable.enableColumnResize(true);
+        //TheTable.enableRowResize(true);   // does not make sense unless we show the row headers of non-zero width... to consider to display the key in this place.
+        TheTable.columnMovingEnabled(true);
+        TheTable.sortOnClick(false);            // we implement sorting ourselves
+        TheTable.hScrollBarMode(&quot;ScrollBarAlwaysOff&quot;); // H-Scrollbar would completely ruin our clickable table column positioning...
+
+        TheTable.tableMode(TABLE_SELECT_BROWSE);
+        TheTable.selectByClick(TABLE_SELECT_LINE);
+
+        TheTable.deleteAllLines();
+        int nCols=TheTable.columnCount();
+        for (int i=nCols-1; i&gt;=0; i--) TheTable.deleteColumn(i);
+        TheTable.updatesEnabled(false);
+
+        g_className=className;
+        g_classMembers=fwClassMemberVars(g_className);
+        g_keyMember=keyMember;
+
+        TheTable.insertColumn(0); // this one will hold the &quot;KEY&quot;... could be a line number
+        TheTable.columnName(0, &quot;_KEY&quot;);
+        TheTable.columnVisibility(0, false);
+
+        // initialize table columns
+        int colIdx=0;
+
+        for (int i=0; i&lt;dynlen(g_classMembers); i++) {
+            string colName=g_classMembers.at(i);
+            if (membersToIgnore.contains(colName)) continue; // skip it...
+            if (colName==keyMember) continue;
+            colIdx++;
+            TheTable.insertColumn(colIdx);
+            TheTable.columnName(colIdx, colName);
+            string columnTitle=colName;
+            strReplaceChars(columnTitle, 0, 1, strtoupper(columnTitle[0]));
+            g_columnNames  [colIdx] = colName;
+            g_columnTitles [colName] = columnTitle;
+            g_columnFilters[colName] = &quot;&quot;;
+
+            // make sure that the column title spans over 2 lines
+            TheTable.columnHeader(colIdx, columnTitle+&quot;\n&quot;);
+            TheTable.columnToolTipText(colIdx, columnTitle);
+        }
+        TheTable.visible=true;
+        TheTable.updatesEnabled(true);
+    } // end of synchronized(g_mutex)
+}
+
+//void setData(const anytype &amp;data) ///-&gt; this does not work...
+public void setData(mixed data)
+{
+
+    //    DebugTN(__FILE__,__FUNCTION__,data);
+    synchronized(g_mutex) {
+//DebugTN(__FUNCTION__,&quot;START&quot;);
+        TheTable.deleteAllLines();
+        vector&lt;void&gt; objList=data;
+        if (objList.isEmpty()) return; // nothing more to do. We cannot really check the type below as we sometimes get an error fwGetClass: obj parameter passed as mixed/anytype is invalid
+
+        if (objList.count()&gt;200) {
+            BusyIndicator.visible=true;
+            BusyIndicator.start();
+        }
+
+
+        string newClassName=fwGetClass(data);
+        if (g_className!=newClassName) setup(newClassName);
+        TheTable.updatesEnabled(false);
+        // initialize table rows with the vector of keys which we generate here
+        dyn_mixed keyColumnValues;
+        for (int i=0; i&lt;objList.count(); i++) {
+            if (g_keyMember==&quot;&quot;) {
+                keyColumnValues.append(i);
+            } else {
+                mixed obj = objList.at(i);
+                mixed keyVal=fwGetMember(obj, g_keyMember);
+                keyColumnValues.append(keyVal);
+            }
+        }
+        // check that the key column is unique...
+        dyn_mixed uniqKeyColumnValues=keyColumnValues;
+        dynUnique(uniqKeyColumnValues);
+        FwException::assert(uniqKeyColumnValues.count()==keyColumnValues.count(),
+                            &quot;setData(): values in the column specified as key (&quot;+g_keyMember+
+                            &quot;) are not unique , shape:&quot;+this.name+&quot; , panel:&quot;+myPanelName());
+//DebugTN(__FUNCTION__,&quot;Appending lines 1&quot;);
+        TheTable.appendLines(objList.count(), &quot;_KEY&quot;, keyColumnValues);
+//DebugTN(__FUNCTION__,&quot;Lines appended&quot;);
+        if (g_keyMember==&quot;&quot;) {
+            TheTable.rowHeaderVisibility=false;
+        } else {
+            int w=TheTable.rowHeaderWidth;
+            if (w==0) setRowHeaderWidth(defaultRowHeaderWidth);
+            TheTable.rowHeaders(keyColumnValues);
+            for (int i=0; i&lt;keyColumnValues.count(); i++) TheTable.rowHeaderToolTip(i, keyColumnValues.at(i));
+        }
+        for (int i=0; i&lt;dynlen(g_classMembers); i++) {
+            string colName=g_classMembers.at(i);
+            if (!g_columnNames.contains(colName)) continue; // the column mey have been excluded actually...
+//DebugTN(__FUNCTION__,&quot;processing lines for column&quot;,colName);
+
+            dyn_mixed columnValues;
+            for (int j=0; j&lt;objList.count(); j++) {
+                mixed obj = objList.at(j);
+                mixed val=fwGetMember(obj, colName);
+                switch (getType(val)) {
+                    case TIME_VAR: {
+                        if (val==0l) {
+                            val=&quot;&quot;;
+                        } else {
+                            val=formatTime(&quot;%Y-%m-%d&quot;, val);
+                        }
+                    }
+                    break;
+                    case CHAR_VAR: val=(val==&quot;Y&quot;||val==&quot;1&quot;||val==&quot;T&quot;); break;
+                    // to be extended here... e.g for enums, etc..
+                    default: break;
+                }
+                dynAppend(columnValues, val);
+            }
+//DebugTN(__FUNCTION__,&quot;Call updateLines&quot;,colName);
+            TheTable.updateLines(1, &quot;_KEY&quot;, keyColumnValues, colName, columnValues);
+
+            if (objList.count()&gt;200) delay(0, 5); //allow the busy indicator to update...
+
+        }
+
+        adjustColumnsWidth();
+        TheTable.lineVisible(0);
+        TheTable.updatesEnabled(true);
+
+//DebugTN(__FUNCTION__,&quot;END&quot;);
+        BusyIndicator.visible=false;
+    } // end of synchronized(g_mutex)
+}
+
+void adjustColumnsWidth()
+{
+    int nCols=TheTable.columnCount();
+    for (int i=1; i&lt;nCols; i++) { // count from 1 to skip the _KEY column
+        string col=TheTable.columnToName(i);     // column *currently* at position i
+        TheTable.adjustColumn(i);
+        int colWidth=TheTable.columnWidth(i);
+        int maxColumnWidth=g_maxColumnWidths.value(col, 200);
+        int minColumnWidth=20;
+        if (colWidth&lt;minColumnWidth) TheTable.columnWidth(i, minColumnWidth);
+        if (colWidth&gt;maxColumnWidth) TheTable.columnWidth(i, maxColumnWidth);
+
+    }
+}
+
+public void setColumnOrder(dyn_string newColumnOrder)
+{
+    dynUnique(newColumnOrder);
+    int nCols=TheTable.columnCount();
+    for (int i=1; i&lt;nCols; i++) { // count from 1 to skip the _KEY column
+        string col=TheTable.columnToName(i);     // column *currently* at position i
+        if (i&gt;=newColumnOrder.count()) break;
+        string newCol=newColumnOrder.at(i-1);
+        FwException::assertInSet(newCol, g_columnNames, &quot;setColumnOrder(): Column does not exist in the table:&quot;+newCol+&quot;, shape:&quot;+this.name+&quot;, panel:&quot;+myPanelName());
+        if (col!=newCol) TheTable.exchangeColumns(col, newCol);
+    }
+}
+
+/*
+    By default we auto-adjust all columns to their content,
+    yet in certain cases we may want to limit the column length
+    (e.g. if we expect that one of the values in the row may be
+    much longer than others, and hence the auto-adjust should not
+    be applied...).
+    This is particularly importand because we do not have a horizontal scrollbar
+    and want to make sure that all the columns are visible...
+**/
+public void setMaxColumnWidths(mapping maxColumnWidths)
+{
+    g_maxColumnWidths=maxColumnWidths;
+    if (g_maxColumnWidths.isEmpty()) return;
+    adjustColumnsWidth();
+}
+
+public void setColumnTitles(mapping newColumnTitles)
+{
+    dyn_string mKeys=mappingKeys(newColumnTitles);
+    for (int i=0; i&lt;mKeys.count(); i++) {
+        string col=mKeys.at(i);
+        FwException::assertInSet(col, g_columnNames, &quot;setColumnTitles(): Column does not exist in the table:&quot;+col+&quot;, shape:&quot;+this.name+&quot;, panel:&quot;+myPanelName());
+        string colTitle=newColumnTitles[col];
+        g_columnTitles [col] = colTitle;
+        int colIdx=TheTable.nameToColumn(col); // dynamic! mind column-reordering!
+        // make sure that the column title spans over 2 lines
+        TheTable.columnHeader(colIdx, colTitle+&quot;\n&quot;);
+        TheTable.columnToolTipText(colIdx, colTitle);
+    }
+}
+
+
+void ColumnHeaderClicked(string column)
+{
+    if (column==&quot;&quot;) return;
+
+    dyn_int pos=this.positionAsDyn();
+    int xPos=pos[1];
+    int yPos=pos[2];
+
+    xPos+=2; //some minimal margin
+    yPos+=2; // some minimal margin
+
+
+    if (g_keyMember!=&quot;&quot;) xPos+=getRowHeaderWidth();
+
+
+    // add the offset of all preceding columns
+    int colNum=TheTable.nameToColumn(column); // dynamic! mind column-reordering!
+    for (int i=0; i&lt;colNum; i++) xPos+=TheTable.columnWidth(i);
+
+    int width=TheTable.columnWidth(colNum);
+    width-=2;
+
+    dyn_mixed colValues = TheTable.getColumnN(colNum);
+    dynUnique(colValues);
+    dynSort(colValues);
+
+    int sortState=0; // default: no sorting
+    if (lastSortedColumn==column) sortState=(lastSortedOrder ? 1 : -1);
+
+    dyn_anytype da=makeDynAnytype(
+                       myModuleName(),
+                       &quot;objects/fwStdUi/fwTable_HeaderPopup.pnl&quot;,
+                       myPanelName(),
+                       &quot;TableColumnPopup_&quot;+column,
+                       xPos, yPos, 1.0, true,
+                       makeDynString(&quot;$width:&quot;+width,
+                                     &quot;$title:&quot;+g_columnTitles[column],
+                                     &quot;$colValues:&quot;+colValues,
+                                     &quot;$filter:&quot;+g_columnFilters[column],
+                                     &quot;$sortState:&quot;+sortState
+                                    )
+                       , false,
+                       makeMapping(&quot;windowFlags&quot;, &quot;Popup&quot;));
+
+    childPanel(da);
+    if (myStyleSheet!=&quot;&quot;) invokeMethod(&quot;TableColumnPopup_&quot;+column,&quot;setStyleSheet&quot;,myStyleSheet);
+
+
+    uiConnectUserData(&quot;filterChangedCB&quot;, column, myModuleName()+&quot;.TableColumnPopup_&quot;+column+&quot;:&quot;, &quot;filterChanged&quot;);
+    uiConnectUserData(&quot;sortingChangedCB&quot;, column, myModuleName()+&quot;.TableColumnPopup_&quot;+column+&quot;:&quot;, &quot;sortingChanged&quot;);
+}
+
+
+// the behaviour is as follows
+// - if newFilter is one of the values of columnName - apply as is
+// - otherwise, if it contains a wildcard (&quot;*&quot;) - apply as is with this wildcard
+// - otherwise, prepend and append &quot;*&quot; to the selected text (ie &quot;full text search&quot; on the column)
+// note that we also trim the leading and trailing spaces
+void filterChangedCB(string column, string newFilter)
+{
+    //DebugTN(__FUNCTION__,column,newFilter);
+
+    int colNum=TheTable.nameToColumn(column); // dynamic! mind that columns could be rearranged
+
+    // truncate trailing spaces
+    newFilter=strrtrim(newFilter);
+
+    bool hasExactMatch=false;
+
+    if (newFilter!=&quot;&quot; &amp;&amp; (!newFilter.contains(&quot;*&quot;))) {
+        // check if this is one of predefined values;
+        // if not then add &quot;*&quot; to it
+        dyn_string allColValues=TheTable.getColumnN(colNum);
+        dynUnique(allColValues);
+        if (allColValues.contains(newFilter)) {
+            hasExactMatch=true;
+        } else {
+            newFilter=&quot;*&quot;+newFilter+&quot;*&quot;;
+        }
+    }
+    // treat the case of someone putting a &quot;*&quot; at the beginning or an end
+    strreplace(newFilter, &quot;**&quot;, &quot;*&quot;);
+    if (newFilter==&quot;*&quot;) newFilter=&quot;&quot;;
+
+    g_columnFilters[column]=newFilter;
+
+    dyn_string filteredColumns, filterPatterns;
+    for (int i=1; i&lt;=mappinglen(g_columnFilters); i++) {
+        string colName=mappingGetKey(g_columnFilters, i);
+        string filter=mappingGetValue(g_columnFilters, i);
+        if (filter!=&quot;&quot; &amp;&amp; filter!=&quot;*&quot;) {
+            filteredColumns.append(colName);
+            filterPatterns.append(filter);
+        }
+    }
+    //DebugTN(&quot;FILTER&quot;,filteredColumns,filterPatterns);
+    TheTable.filterRows(filteredColumns, filterPatterns, true);
+
+    // now put a marker on the column title
+
+    string newColumnTitle=g_columnTitles[column]+&quot;\n&quot;;
+    if (newFilter!=&quot;&quot; &amp;&amp; newFilter!=&quot;*&quot;) {
+        string filterTitle=strltrim(strrtrim(newFilter, &quot;*&quot;), &quot;*&quot;);
+        if (hasExactMatch) {
+            newColumnTitle+=&quot;=&gt;&quot;+filterTitle;
+
+        } else {
+            newColumnTitle+=&quot;[&quot;+filterTitle+&quot;]&quot;;
+        }
+    }
+    TheTable.columnHeader(colNum, newColumnTitle);
+    //adjustColumnsWidth();
+}
+
+void sortingChangedCB(string column, bool newSortOrder)
+{
+    //DebugTN(__FUNCTION__,column,newSortOrder);
+    lastSortedColumn=column;
+    lastSortedOrder=newSortOrder;
+    TheTable.sort(newSortOrder, column);
+}
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="TheTable" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9 8.999999999999982</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">9 9</prop>
+    <prop name="Size">132 92</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">True</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">#1</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="SelectionChanged" isEscaped="1"><![CDATA[synchronized main()
+{
+    mixed selectedKey=getSelectedKey();
+    triggerEvent(&quot;rowSelected&quot;, selectedKey);
+}
+]]></script>
+    <script name="HeaderClicked" isEscaped="1"><![CDATA[main(string column)
+{
+    ColumnHeaderClicked(column);
+}
+]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[main(int row, string column)
+{
+    mixed key=TheTable.rowHeader(row);
+    triggerEvent(&quot;doubleClicked&quot;, key);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="BusyIndicator" shapeType="GENERIC" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20.75 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="minimumSize">-1 50</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Minimum" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Noto Sans,-1,16,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">20.75 100</prop>
+    <prop name="Size">108 51</prop>
+    <prop name="ObjectType">AttentionEffect.ewo</prop>
+    <extended>
+     <prop type="COLOR" name="color1">{170,170,170}</prop>
+     <prop type="ENUM" name="effectType">2</prop>
+    </extended>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP7" serial="0">
+   <properties>
+    <prop idx="0" name="shapeSerial">0</prop>
+    <prop idx="1" name="shapeSerial">2</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">0</prop>
+    <prop name="layoutRightMargin">0</prop>
+    <prop name="layoutTopMargin">0</prop>
+    <prop name="layoutBottomMargin">0</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

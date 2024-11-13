@@ -1,0 +1,425 @@
+#uses "CtrlPv2Admin"
+#uses "fwInstallation/fwInstallationManager.ctl"
+
+#uses "fwElmb/fwElmbConstants.ctl"
+#uses "fwElmb/fwElmbUser.ctl"
+#uses "fwElmb/fwElmb.ctl"
+
+main()
+{
+// Local Variables
+// ---------------
+  bool bRawExists = false;
+
+  int iPos;
+  int i, j;
+	
+  dyn_bool dbIsStandard;
+  dyn_bool dbIsRaw;
+  dyn_bool dbStandardIsStandard = makeDynBool(true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true);
+  dyn_bool dbStandardIsRaw = makeDynBool(true,
+                                         false,
+                                         false,
+                                         false,
+                                         false,
+                                         false,
+                                         false,
+                                         false,
+                                         false,
+                                         false,
+                                         false);
+	
+  dyn_string dsDpTypes;
+  dyn_string dsElements;
+  dyn_string dsTypes;
+  dyn_string dsFunctions;
+  dyn_string dsParameters;
+  dyn_string dsPrefix;
+  dyn_string dsDescriptions;
+  dyn_string dsPDOdps;
+  dyn_string dsStandardTypes = makeDynString("Raw ADC Value",
+                                             "Direct ADC Voltage",
+                                             "Voltage Divider",
+                                             "Current",
+                                             "NTC 10 kOhm",
+                                             "Ptx 2-wire",
+                                             "Ptx 4-wire",
+                                             "RC_Temperature",
+                                             "RC_Humidity",
+                                             "RC_SupplyVoltage",
+                                             "RC_TurbineCurrent");
+  dyn_string dsStandardFunctions = makeDynString(ELMB_NO_INFO,
+                                                 "%c1*%x1",
+                                                 "%c1*%x1",
+                                                 "%c1/%x1",
+                                                 "1/(1.129241e-3+2.341077e-4*log(1.e-6*%c1*%x1/(2.5-1.e-6*%c1))+8.775468e-8*pow(log(%x1*1.e-6*%c1/(2.5-1.e-6*%c1)),3))-273.15",
+                                                 "(3.9083e-3-pow((1.5275e-5+2.31e-6*(1-%x1*1.e-6*%c1/(%x2*(2.5-1.e-6*%c1)))),0.5))/1.155e-6",
+                                                 "(3.9083e-3-pow((1.5275e-5+2.31e-6*(1-%c2*%x1/(%c1*%x2))),0.5))/1.155e-6",
+                                                 "(3740/(12.46-log((32768/(0.013107*%c1))-1)))-273",
+                                                 "161*(((0.013107*%c1)/65536)-0.16)",
+                                                 "20*(0.013107*%c1)/65536",
+                                                 "((0.013107*%c1)+6810)/16730");
+  dyn_string dsStandardParameters = makeDynString(ELMB_NO_INFO,
+                                                  "1.0",
+                                                  "100.0",
+                                                  "1.0",
+                                                  "1000000.0",
+                                                  "1000000.0|100.0",
+                                                  "100.0|100.0",
+                                                  ELMB_NO_INFO,
+                                                  ELMB_NO_INFO,
+                                                  ELMB_NO_INFO,
+                                                  ELMB_NO_INFO);
+  dyn_string dsStandardPrefix = makeDynString(ELMB_AI_PREFIX,
+                                              "voltage_",
+                                              "DIVIDER_",
+                                              "CURRENT_",
+                                              "NTC_",
+                                              "PT_2W_",
+                                              "PT_4W_",
+                                              "RC_Temperature_",
+                                              "RC_Humidity_",
+                                              "RC_SupplyVoltage_",
+                                              "RC_TurbineCurrent_");
+  dyn_string dsStandardDescriptions = makeDynString(ELMB_NO_INFO,
+                                                    "Multiplication factor",
+                                                    "Attenuation factor",
+                                                    "Adapter resistance in Ohms (I = V/R)",
+                                                    "Adapter pre-resistor in Ohms",
+                                                    "Adapter pre-resistor in Ohms|Characteristic sensor resistance at 0 C",
+                                                    "Adapter pre-resistor (Rs) in Ohms|Characteristic sensor resistance at 0 C",
+                                                    ELMB_NO_INFO,
+                                                    ELMB_NO_INFO,
+                                                    ELMB_NO_INFO,
+                                                    ELMB_NO_INFO);
+  dyn_string dsStandardPDOdps = makeDynString(ELMB_NO_INFO,
+                                              ELMB_NO_INFO,
+                                              ELMB_NO_INFO,
+                                              ELMB_NO_INFO,
+                                              ELMB_NO_INFO,
+                                              ELMB_NO_INFO,
+                                              ELMB_NO_INFO,
+                                              ELMB_NO_INFO,
+                                              ELMB_NO_INFO,
+                                              ELMB_NO_INFO,
+                                              ELMB_NO_INFO);
+  dyn_string dsElmbs;
+  dyn_string dsDOs;
+  dyn_string dsDIConfigs;
+  dyn_string dsExceptionInfo;
+	
+// Executable Code
+// ---------------
+    DebugN("fwElmb: post install file");
+
+//modify FwDeviceDefinition subscription convention according to parameter set in FwElmbUser
+ fwElmb_adaptSubscriptionsInDeviceDefinition(g_fwElmbUserSetting_useBusNameInSubscription);
+//////
+
+  string uaDp = "_OPCUACANOPENSERVER";
+  bool created;
+  if(!dpExists(uaDp)) {
+
+    dpCreate(uaDp,"_OPCUAServer");
+
+    created=TRUE;
+  }
+
+  if (isRedundant())
+    if(!dpExists(uaDp+"_2"))
+        dpCreate(uaDp+"_2","_OPCUAServer");
+
+  if (created) {
+
+    dpSet(uaDp + ".Config.ConnInfo","opc.tcp://localhost:48010");
+    dpSet(uaDp + ".Config.ReconnectTimer",10);
+    dpSet(uaDp + ".Config.Security.MessageMode",0);
+    dpSet(uaDp + ".Config.Security.Policy",0);
+    dpSet(uaDp + ".Config.Separator",".");
+    dpSet(uaDp + ".Config.Active",TRUE);
+  }
+else
+DebugN ("OPCUA Client configuration exists. Check whether it fits your system!");
+ 
+  // Add a control manager with the correct number into console
+  fwInstallationManager_append(true,
+                               "Control manager for ELMB invalid channels check",
+                               "WCCOActrl",
+                               "always",
+                               30, 2, 1,
+                               "fwElmb/fwElmbCheckInvalid.ctl -num 70");
+
+  //Wait until Managers are started
+  delay(30);
+
+  // Configure the OPC server to map invalid bits to quality flag and
+  // a value of 10 seconds for the alive timer
+  
+	
+  // Check if the sensor information DP exists, and if not, create it
+  if (!dpExists(ELMB_SENSOR_INFO_NAME))
+    dpCreate(ELMB_SENSOR_INFO_NAME, ELMB_SENSOR_INFO_TYPE_NAME);
+		
+  // Now check what data is contained
+  dpGet(ELMB_SENSOR_INFO_NAME + ".types", dsTypes,
+        ELMB_SENSOR_INFO_NAME + ".functions", dsFunctions,
+        ELMB_SENSOR_INFO_NAME + ".parameters", dsParameters,
+        ELMB_SENSOR_INFO_NAME + ".prefix", dsPrefix,
+        ELMB_SENSOR_INFO_NAME + ".parameterDescriptions", dsDescriptions,
+        ELMB_SENSOR_INFO_NAME + ".isStandard", dbIsStandard,
+        ELMB_SENSOR_INFO_NAME + ".isRaw", dbIsRaw,
+        ELMB_SENSOR_INFO_NAME + ".pdoDp", dsPDOdps);
+				
+  // Add default names for any functions which do not have type names
+  i = 1;
+  while (dynlen(dsFunctions) > dynlen(dsTypes))
+    dynAppend(dsTypes, "Sensor_" + i);
+	
+  // Remove any extra type names if there is not function for it
+  while (dynlen(dsTypes) > dynlen(dsFunctions))
+    dynRemove(dsTypes, dynlen(dsTypes));
+	
+  // For the rest of information for a sensor, it is not important if there are
+  // too many entries, but it would cause errors if there are too few. Therefore,
+  // we only need to (possibly) append some data
+  while (dynlen(dsFunctions) > dynlen(dsParameters))
+    dynAppend(dsParameters, ELMB_NO_INFO);
+  i = 1;
+  while (dynlen(dsFunctions) > dynlen(dsPrefix))
+    dynAppend(dsPrefix, "Prefix_" + i);
+  while (dynlen(dsFunctions) > dynlen(dsDescriptions))
+    dynAppend(dsDescriptions, ELMB_NO_INFO);
+		
+  // We now have a relatively consistent collection of sensors that were in the system
+  // Loop through these sensors, and append any that are not found in the 'Standard'
+  // set
+  for (i = 1; i <= dynlen(dsTypes); i++) {
+    // Does this sensor already exist?
+    if (dynContains(dsStandardTypes, dsTypes[i]) <= 0) {
+      dynAppend(dsStandardTypes, dsTypes[i]);
+      dynAppend(dsStandardFunctions, dsFunctions[i]);
+      dynAppend(dsStandardParameters, dsParameters[i]);
+      dynAppend(dsStandardPrefix, dsPrefix[i]);
+      dynAppend(dsStandardDescriptions, dsDescriptions[i]);
+      dynAppend(dbStandardIsStandard, false);
+      if (bRawExists) {
+        dynAppend(dbStandardIsRaw, dbIsRaw[i]);
+        if (dpExists(dsPDOdps[i]))
+          dynAppend(dsStandardPDOdps, dsPDOdps[i]);
+        else
+          dynAppend(dsStandardPDOdps, ELMB_NO_INFO);
+      } else {
+        dynAppend(dbStandardIsRaw, false);
+        dynAppend(dsStandardPDOdps, ELMB_NO_INFO);
+      }
+    }
+  }
+	
+  // Enter the completed set of sensor information back into the DP
+  dpSetWait(ELMB_SENSOR_INFO_NAME + ".types", dsStandardTypes,
+            ELMB_SENSOR_INFO_NAME + ".functions", dsStandardFunctions,
+            ELMB_SENSOR_INFO_NAME + ".parameters", dsStandardParameters,
+            ELMB_SENSOR_INFO_NAME + ".prefix", dsStandardPrefix,
+            ELMB_SENSOR_INFO_NAME + ".parameterDescriptions", dsStandardDescriptions,
+            ELMB_SENSOR_INFO_NAME + ".isStandard", dbStandardIsStandard,
+            ELMB_SENSOR_INFO_NAME + ".isRaw", dbStandardIsRaw,
+            ELMB_SENSOR_INFO_NAME + ".pdoDp", dsStandardPDOdps);
+  
+  // If middleware kind (DA or UA) info is not available in FwElmbGlobal DP then try to infer it
+  if (!dpExists ("_FwElmbGlobal"))
+  {
+    DebugTN("fwElmb: middleware kind (OPC-UA or OPC-DA) was not defined for the project. However note that since fwElmb 5.3.0 only OPC-UA is supported.");
+    fwElmb_setMiddlewareKind( FWELMB_MIDDLEWARE_OPCUA );
+  }  
+    
+  //Set ELMB definition type to default if empty
+  for (i = 1; i <= dynlen(dsElmbs); i++) {
+    string elmbType = "";
+    dpGet(dsElmbs[i] + ".type",elmbType);
+    if(elmbType == "")
+      dpSet(dsElmbs[i] + ".type","ELMB");
+  }
+
+   // here we have to create a DP of FwElmbType type, that contains a mapping of the standard
+   // ELMB with its nodeType
+   // cannot do it during DP import because the path would differ between Linux and Windows
+   string ELMB_nodeType_path = getPath(CONFIG_REL_PATH, "fwElmb/") + "OPCUA_nodeType_ELMB.xml";
+   
+   if (!dpExists("FwElmbType_ELMB"))
+   {
+     dpCreate ("FwElmbType_ELMB", "FwElmbType");
+     dpSet ("FwElmbType_ELMB.name", "ELMB");
+     dpSet ("FwElmbType_ELMB.path", ELMB_nodeType_path);
+   }
+  
+   //Copy OPC UA Certificate that was generated by server, if applicable
+   if (_UNIX)   
+   {
+     DebugN ("Now an OPC UA Certificate will be copied to WinCC OA Certificate Store ... ");
+     string serverCertificatePath="/opt/OpcUaCanOpenServer/bin/PKI/CA/certs/opcuacanopenserver.der";
+     if (isfile(serverCertificatePath))
+     {
+       // get the destination
+       string destination;
+       if (paCfgReadValue(getPath(CONFIG_REL_PATH, "config"), "opcua", "certificateStore", destination) == 0)
+       {
+         // destination points to the directory containing PKI directory
+         destination=destination+"/PKI/CA/certs/";
+         // perform copy
+         // we use UNIX copy instead of PVSS one because we want to copy to a file which name is a result of SHA1 operation
+         // otherwise getting a text result of SHA1 would not be so easy.
+         string copy_command = "cp "+serverCertificatePath+" "+destination+"`sha1sum "+serverCertificatePath+" | cut --delimiter=\\\\  -f1 `.der";
+         DebugN ("I will issue this command now: "+copy_command);
+         int result=system(copy_command);
+         DebugN ("The result was: "+result);
+         if (result != 0)
+         {
+           DebugN ("Oooops... copy indicated failure in copying the certificate. ");
+         }
+         else
+           DebugN ("Certificate copied.");
+       }
+       else
+         DebugN ("Oooops... seems that path to certificateStore is not defined in your config file. Maybe you don't have fwAtlas at least 5.0.2 ?? ");
+     }
+     else
+     {
+       DebugN ("Ooops ... the source certificate doesn't exist. I was looking here: "+serverCertificatePath);
+     }
+   }
+   
+  // Add some defaults for internal FwElmb -- only if never edited by user
+  time t;
+  dpGet ("_FwElmbGlobal.opcUaConnectionLostInvalidatesChannels:_original.._stime", t);
+  if (year(t) == 1970) // the default for never-edited DP
+  {
+    dpSet ("_FwElmbGlobal.opcUaConnectionLostInvalidatesChannels", true);
+  }
+  
+
+  // Add alert attributes
+  dyn_string argdsExceptionInfo;
+  fwElmb_createOpcServerAlertHandling(getSystemName(), argdsExceptionInfo);
+  if (dynlen(argdsExceptionInfo)>0) DebugTN(argdsExceptionInfo);
+  fwElmb_createBusesAlertHandling (argdsExceptionInfo);
+  if (dynlen(argdsExceptionInfo)>0) DebugTN(argdsExceptionInfo);
+  fwElmb_createNodesAlertHandling(argdsExceptionInfo);
+  if (dynlen(argdsExceptionInfo)>0) DebugTN(argdsExceptionInfo);
+
+  // Warn the user if any FwElmbAi DPEs has .smooth on Value - as this could raise a lot of issues with invalid bits got stuck on it (i.e. JIRA OPCUA-423)
+  if (fwElmb_getMiddlewareKind() == FWELMB_MIDDLEWARE_OPCUA)
+  {
+    dyn_string dsAIs = dpNames( getSystemName() + "*", ELMB_AI_TYPE_NAME );
+    for (int i=1; i<=dynlen(dsAIs); i++)
+    {
+      string smoothing_config = dsAIs[i]+".value:_smooth.._type";
+      int type;
+      dpGet( smoothing_config, type );
+      if (type != 0)
+      {
+        DebugTN("Following FwElmbAi has .smooth config - it is likely to cause problems with stuck invalid bit: "+dsAIs[i]);
+      }
+    }     
+  }
+  
+  // Fix for broken AI Config dp_fcts ...
+  // https://its.cern.ch/jira/browse/OPCUA-749
+  fwElmbUser_checkOrFixAiConfigDpFct (dsExceptionInfo, /*recreate*/ false);  
+
+  //------------------------------------------------------------------------------------
+  //RequestedState post-install script to include OPCUA addresses to requestedState DPEs
+
+  string deviceType = "FwElmbNode";
+  fwDevice_initialize(); // Initialize fwDevice library
+
+  dyn_string exceptionInfo;
+  dyn_string addressParams;
+  // Get new default address parameters for FwElmbNode devices
+  fwDevice_getAddressDefaultParams(deviceType, addressParams, exceptionInfo);
+
+  if(!exceptionInfo.isEmpty()){
+      DebugTN(exceptionInfo);
+      return;
+  }
+
+  dyn_string devices = dpNames("ELMB/*", deviceType); // get DPs of devices to be updated
+
+  //Variables for OPCUA address config
+  string OPCServerName = "OPCUACANOPENSERVER";
+  int driverNum = 9;
+  string opcKind = "1";
+  int mode = 6;
+
+  string probeElem = ".state.value";
+  for(int i=0;i<devices.count();i++){
+      string device = devices.at(i);
+      string opcItemName;
+
+      //Separate Node name
+      string name;
+      name = substr(devices.at(i), strpos(devices.at(i), ":") + 1);
+      dyn_string parsedDpName = strsplit(name, "/");
+
+      //Generate OPCUA item name and OpcUaSubscription
+      string opcItemName = "ns=2;s=" + parsedDpName[sizeof(parsedDpName) - 1] + "." + parsedDpName[sizeof(parsedDpName)] + ".requestedState";
+      string opcSubscription = "UAsub_Value_" +  parsedDpName[sizeof(parsedDpName) - 1];
+      DebugN(opcItemName);
+      DebugN(opcSubscription);
+
+      bool hasAddress, isAddressActive;
+      dyn_anytype config;
+      // Read current address configuration from another DPE of this device
+      fwPeriphAddress_get(device + probeElem, hasAddress, config, isAddressActive, exceptionInfo);
+      if(!exceptionInfo.isEmpty()){
+          DebugTN(device, exceptionInfo, "Skipping");
+          exceptionInfo.clear();
+          continue;
+      }
+      if(!hasAddress){
+          DebugTN(device, "Missing address config on probe element, skipping");
+          continue;
+      }
+      if(config.count() < fwPeriphAddress_OPCUA_SERVER_NAME){
+          DebugTN(device, "Unexpected address config format on probe element, skipping");
+          continue;
+      }
+
+      fwPeriphAddress_setOPCUA(devices.at(i) + ".requestedState", OPCServerName, driverNum,
+                                opcItemName, opcSubscription, opcKind, 1, 5, mode, "", exceptionInfo);
+      DebugN("requestedState Dpe OPCUA address updated successfully for node " + devices.at(i));
+
+      if(!exceptionInfo.isEmpty()){
+          DebugTN(device, exceptionInfo);
+          exceptionInfo.clear();
+      }
+  }
+  DebugTN("DONE");
+  
+  
+  if (dynlen(dsExceptionInfo) > 0) {
+    DebugN("Post installation script executed with errors:");
+    DebugN(dsExceptionInfo);
+  } else {
+    DebugN("Post installation script successfully executed. Have fun!!!!");
+  }
+
+
+  DebugN("***************************************************");
+  DebugN("*                                                 *");
+  DebugN("* If you find any problems please report them to: *");
+  DebugN("*                                                 *");
+  DebugN("*              atlas-dcs@cern.ch                  *");
+  DebugN("*                                                 *");
+  DebugN("***************************************************");
+
+}

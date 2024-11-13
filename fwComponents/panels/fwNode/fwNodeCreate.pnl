@@ -1,0 +1,968 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">460 373</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 18</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+/*
+	Parameters:
+		$sDpName, $sParentDpName, $sNodeType
+		
+	Use cases:
+	
+	1) Create node
+		a) 	If $sParentDpName exists then it is taken as the parent,
+			then only nodes of type fwNode_TYPE_LOGICAL can be created
+		b) 	If $sParentDpName not defined or it is empty,
+			then only nodes of type fwNode_TYPE_VENDOR and fwNode_TYPE_LOGICAL_ROOT can be created
+			$sNodeType can be specified to restrict the type
+			
+		In both cases $sDpName can specify a default name
+			
+	2) Modify node
+		a)	If $sDpName is of type fwNode_TYPE_VENDOR, 
+			then panels and dp types can be modified
+		b)	If $sDpName is of type fwNode_TYPE_LOGICAL_ROOT or fwNode_TYPE_LOGICAL, 
+			then only panels can be modified
+*/
+
+string parentDpName;
+bool isCreate;
+
+// Either creates the node or just sets the node panels
+apply(dyn_string &amp;exceptionInfo)
+{
+	string alias, parentAlias;
+	dyn_errClass err;		
+	
+	// if it is not a node creation, just set the associated panels
+	if(!isCreate)
+	{
+		dpSet($sDpName + &quot;.navigatorPanels&quot;, makeDynString(navigatorPanelText.text),
+				$sDpName + &quot;.editorPanels&quot;, makeDynString(editorPanelText.text),
+				$sDpName + &quot;.dpTypes&quot;, childrenDpTypes.items);
+		return;
+	}
+	
+	// get the parent alias
+	if (parentDpName == &quot;&quot;)
+	{
+		parentAlias = &quot;&quot;;
+	}
+	else
+	{
+		parentAlias = dpGetAlias(parentDpName + &quot;.&quot;);
+	}
+	
+	switch(nodeType.text)
+	{
+		case fwNode_TYPE_VENDOR:
+			fwNode_createVendor(	nodeNameText.text, makeDynString(editorPanelText.text), 
+										makeDynString(navigatorPanelText.text),
+										childrenDpTypes.items, exceptionInfo);
+			break;
+		case fwNode_TYPE_LOGICAL:
+		case fwNode_TYPE_LOGICAL_ROOT:
+			fwNode_createLogical(nodeAliasText.text, parentAlias, makeDynString(editorPanelText.text), 
+										makeDynString(navigatorPanelText.text), exceptionInfo);
+			break;
+		default:
+			break;
+	}
+}
+
+displayControls(string nodeType)
+{
+	bool logicalVisible;
+	
+	switch(nodeType)
+	{
+		case fwNode_TYPE_VENDOR:
+			logicalVisible = FALSE;
+			setInputFocus(myModuleName(), myPanelName(), &quot;nodeNameText&quot;);
+			break;
+		case fwNode_TYPE_LOGICAL:
+		case fwNode_TYPE_LOGICAL_ROOT:
+			setInputFocus(myModuleName(), myPanelName(), &quot;nodeAliasText&quot;);
+			logicalVisible = TRUE;
+			break;
+		default:
+			break;
+	}
+	
+	nodeAliasLabel.visible = logicalVisible;
+	nodeAliasText.visible = logicalVisible;
+		
+	nodeNameLabel.visible = !logicalVisible;
+	nodeNameText.visible = !logicalVisible;
+	
+	childrenDpTypes.visible = !logicalVisible;
+	childrenDpTypesButton.visible = !logicalVisible;
+	childrenDpTypesLabel.visible = !logicalVisible;
+	
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	string nodeTypeVar;
+	dyn_string navigatorPanels, editorPanels, nodeDpTypes, exceptionInfo;
+	dyn_string nodeTypes = makeDynString(fwNode_TYPE_VENDOR, fwNode_TYPE_LOGICAL, fwNode_TYPE_LOGICAL_ROOT);
+	
+//	DebugN($sDpName, $sParentDpName, $sNodeType);
+	
+	// check in which mode the panel was opened (see description in general)
+	
+	// if device is passed, then it is a modification
+	if(isDollarDefined(&quot;$sDpName&quot;))
+	{
+		if(dpExists($sDpName))
+		{
+			if(dpTypeName($sDpName) != &quot;FwNode&quot;)
+			{
+				fwException_raise(	exceptionInfo,
+									&quot;ERROR&quot;,
+									&quot;The device passed as parameter is not of type FwNode (&quot; + $sDpName + &quot;)&quot;,
+									&quot;&quot;);
+				fwExceptionHandling_display(exceptionInfo);
+				return;
+			}
+			
+			isCreate = FALSE;
+
+			nodeNameText.text = $sDpName;
+			nodeNameText.enabled = FALSE;
+			
+			// get the current operation and configuration panel
+			fwNode_getPanels($sDpName, fwDEN_MODE_NAVIGATOR, navigatorPanels, exceptionInfo);
+			fwNode_getPanels($sDpName, fwDEN_MODE_EDITOR, editorPanels, exceptionInfo);
+			
+			// get the node type
+			fwNode_getType($sDpName, nodeTypeVar, exceptionInfo);
+			nodeType.text = nodeTypeVar;
+			displayControls(nodeTypeVar);
+			nodeType.enabled = FALSE;
+
+			if(nodeTypeVar == fwNode_TYPE_VENDOR)
+			{
+				fwNode_getDpTypes($sDpName, nodeDpTypes, exceptionInfo);
+				childrenDpTypes.items = nodeDpTypes;
+			}
+		}
+	}
+	else
+	{
+		isCreate = TRUE;
+	}
+	
+//	DebugN(&quot;isCreate &quot; + isCreate);
+	if(isCreate)
+	{
+		if(isDollarDefined(&quot;$sParentDpName&quot;))
+		{
+			if(dpExists($sParentDpName))
+			{
+				if(dpTypeName($sParentDpName) != &quot;FwNode&quot;)
+				{
+					fwException_raise(exceptionInfo,
+											&quot;ERROR&quot;,
+											&quot;The device passed as parameter is not of type FwNode (&quot; + $sParentDpName + &quot;)&quot;,
+											&quot;&quot;);
+					fwExceptionHandling_display(exceptionInfo);
+					return;
+				}
+				
+				parentDpName = $sParentDpName;
+			}
+		}
+		
+		if(isDollarDefined(&quot;$sNodeType&quot;))
+		{
+			if(dynContains(nodeTypes, $sNodeType) &gt; 0)
+			{
+				nodeType.text = $sNodeType;
+				displayControls($sNodeType);
+				nodeType.enabled = FALSE;
+			}
+			else
+			{
+				fwException_raise(exceptionInfo,
+										&quot;ERROR&quot;,
+										&quot;Unsupported node type (&quot; + $sNodeType + &quot;)&quot;,
+										&quot;&quot;);
+				fwExceptionHandling_display(exceptionInfo);
+				return;
+			}
+		}
+		else
+		{
+			// initialize node type combobox
+			nodeType.items = nodeTypes;
+			nodeType.selectedPos(0);
+			displayControls(nodeType.text);
+		}
+
+		// get default operation and configuration panels
+		fwDevice_getDefaultOperationLogicalPanels(&quot;FwNode&quot;, navigatorPanels, exceptionInfo);
+		fwDevice_getDefaultConfigurationLogicalPanels(&quot;FwNode&quot;, editorPanels, exceptionInfo);
+	}
+	
+	// display operation and configuration panels
+	navigatorPanelText.text = navigatorPanels[1];
+	editorPanelText.text = editorPanels[1];	
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 18</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-160-100-100-*-*-iso8859-1|-19,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Create Node</prop>
+     <prop name="en_US.iso88591">Create Node</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="nodeNameLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">28 91</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">30 88</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Node Name:</prop>
+     <prop name="en_US.iso88591">Node Name:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">28 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">30 157</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Navigator Panel:</prop>
+     <prop name="en_US.iso88591">Navigator Panel:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">28 195</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">30 192</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Editor Panel:</prop>
+     <prop name="en_US.iso88591">Editor Panel:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text4" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">190 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">192 162</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">editorPanels</prop>
+     <prop name="en_US.iso88591">editorPanels</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="childrenDpTypesLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">28 234</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">30 231</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Children DP types:</prop>
+     <prop name="en_US.iso88591">Children DP types:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="nodeTypeLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">28 53</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">30 50</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Node Type:</prop>
+     <prop name="en_US.iso88591">Node Type:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="nodeAliasLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">28 125</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">30 122</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Node Alias:</prop>
+     <prop name="en_US.iso88591">Node Alias:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="nodeType" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">130 50</prop>
+    <prop name="Size">281 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+	displayControls(this.text);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="nodeNameText" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 86</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">130 86</prop>
+    <prop name="Size">281 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="nodeAliasText" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">130 120</prop>
+    <prop name="Size">281 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="navigatorPanelButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1230 355</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DFace</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,16,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-140-100-100-*-*-iso8859-1|-16,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">420 155</prop>
+    <prop name="Size">31 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">fileselektor.xpm</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string selectedPanel;
+	
+	panelSelector(selectedPanel);
+	
+	selectedPanel = substr(selectedPanel, 0, strpos(selectedPanel, &quot;.&quot;));
+	
+	navigatorPanelText.text(selectedPanel);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="editorPanelButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1230 390</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DFace</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,16,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-140-100-100-*-*-iso8859-1|-16,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">420 190</prop>
+    <prop name="Size">31 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">fileselektor.xpm</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string selectedPanel;
+	
+	panelSelector(selectedPanel);
+	
+	selectedPanel = substr(selectedPanel, 0, strpos(selectedPanel, &quot;.&quot;));
+	
+	editorPanelText.text(selectedPanel);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="childrenDpTypesButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1230 429</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DFace</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,16,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-140-100-100-*-*-iso8859-1|-16,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">420 229</prop>
+    <prop name="Size">31 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">dpsel.xpm</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string selectedDpTypes, exceptionInfo;
+	
+	selectedDpTypes = childrenDpTypes.items;
+	//DebugN(selectedDpTypes);
+	fwGeneral_DpTypeSelector(selectedDpTypes, &quot;&quot;, exceptionInfo, TRUE, &quot;&quot;);
+	//DebugN(selectedDpTypes);
+	childrenDpTypes.items = selectedDpTypes;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="okButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">220 339</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">220 339</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Ok</prop>
+     <prop name="en_US.iso88591">Ok</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+	
+	apply(exceptionInfo);
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+	else
+		PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="applyButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">300 339</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">300 339</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+     <prop name="en_US.iso88591">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+	
+	apply(exceptionInfo);
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cancelButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">380 339</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">380 339</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="navigatorPanelText" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 155</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">130 155</prop>
+    <prop name="Size">281 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="editorPanelText" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">130 190</prop>
+    <prop name="Size">281 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="childrenDpTypes" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">140 229</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">140 229</prop>
+    <prop name="Size">271 101</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   <prop name="en_US.iso88591">okCancel</prop>
+  </prop>
+  <prop name="Size">429 318</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">16 10</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">VBox</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[string theType;
+vector&lt; shared_ptr&lt;void&gt; &gt; vecDataPtr;
+vector&lt; mixed &gt; vecData;
+mapping mappingData;
+
+public void setData(dyn_mixed data)
+{
+  // to pass more than a single parameter via FwPanel::invokeMethod we pack them into a dyn_mixed
+  // @0 - type of data, e.g. &quot;dyn_string&quot;, &quot;mapping&quot; or &quot;vector&lt;object&gt;&quot; or vector&lt;objectPtr&gt;
+  // @1 - the data
+  // @2 - the member to act as a key, if we have a vector&lt;object&gt; case
+  // @3 - the member to be displayed, if we have a vector&lt;object&gt; case
+
+  vecData.clear();
+  vecDataPtr.clear();
+  mappingData.clear();
+
+
+  if (data.count()==0) {
+    TheList.setDataWithDynString(makeDynString()); // just clear the list...
+    return;
+  }
+
+  theType=data.at(0);
+  if (theType==&quot;mapping&quot;) {
+    mappingData=data.at(1);
+    TheList.setDataWithMapping(data.at(1));
+  } else if (theType==&quot;dyn_string&quot;) {
+    mappingData=data.at(1);
+    TheList.setDataWithDynString(data.at(1));
+  } else if (theType==&quot;vector&lt;object&gt;&quot;) {
+    vecData = data.at(1);
+    for (int i=0;i&lt;vecData.count();i++) {
+      string key=fwGetMember(vecData.at(i),data.at(2));
+      string dispValue=fwGetMember(vecData.at(i),data.at(3));
+      mappingData[key]=dispValue;
+    }
+    TheList.setDataWithMapping(mappingData);
+  } else if (theType==&quot;vector&lt;objectPtr&gt;&quot;) {
+    vecDataPtr = data.at(1);
+    for (int i=0;i&lt;vecDataPtr.count();i++) {
+      string key=fwGetMember(vecDataPtr.at(i),data.at(2));
+      string dispValue=fwGetMember(vecDataPtr.at(i),data.at(3));
+      mappingData[key]=dispValue;
+    }
+    TheList.setDataWithMapping(mappingData);
+  } else {
+    FwException::raise(&quot;Selection list cannot handle data of unsupported type &quot;+theType);
+  }
+}
+
+public void setSelectedKey(string selectedKey)
+{
+  TheList.selectByKey(selectedKey);
+}
+
+public string getSelectedKey()
+{
+  return TheList.getSelectedKey;
+}
+
+void applyClose()
+{
+  string selectedKey=TheList.getSelectedKey();
+  int rc = (selectedKey!=&quot;&quot;) ? 1:0;
+  PanelOffReturn(makeDynFloat(rc), makeDynString(selectedKey));
+}
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    Text1.text=$text;
+    if (isDollarDefined(&quot;$header&quot;)) {
+        string txt=getDollarValue(&quot;$header&quot;);
+        Header.text=txt;
+        Header.visible=(txt!=&quot;&quot;);
+    }
+
+    setInputFocus(myModuleName(),myPanelName(),&quot;TheList&quot;);
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="OKButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">260 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">260 220</prop>
+    <prop name="Size">70 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">Ok</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    applyClose();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="CancelButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">455 252</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">339 220</prop>
+    <prop name="Size">70 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+//    PanelOffReturn(makeDynFloat(0), makeDynString(origValue));
+    PanelOffReturn(makeDynFloat(0), makeDynString());
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9 210</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">9 210</prop>
+    <prop name="Size">211 31</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="Text1" shapeType="TEXT_EDIT" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Noto Sans,-1,16,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">20 50</prop>
+    <prop name="Size">381 44</prop>
+    <extended>
+     <prop type="ENUM" name="textFormat">2</prop>
+     <prop type="ENUM" name="textInteractionFlags">13</prop>
+     <prop type="ENUM" name="sizeAdjustPolicy">1</prop>
+     <prop type="CHAR_STRING" name="placeholderText">$text</prop>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="Header" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">19.99999999999997 15.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.117647058823529 0 0 1 -2.352941176470585 0</prop>
+    <prop name="Location">19.99999999999997 15.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">$header</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER3" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">120.5882352941176 22.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">120.5882352941176 22.5</prop>
+    <prop name="Size">277 13</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="5" Name="TheList" referenceId="4">
+   <properties>
+    <prop name="FileName">objects/fwStdUi/fwSelectionList.pnl</prop>
+    <prop name="Location">50 123</prop>
+    <prop name="Geometry">2.5 0 0 1 -35 7</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+   </properties>
+  </reference>
+ </shapes>
+ <groups>
+  <layout parentSerial="5" Name="LAYOUT_GROUP2" serial="1">
+   <properties>
+    <prop idx="1" name="shapeSerial">1</prop>
+    <prop idx="2" name="shapeSerial">2</prop>
+    <prop idx="0" name="shapeSerial">4</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="5" Name="LAYOUT_GROUP4" serial="3">
+   <properties>
+    <prop idx="1" name="shapeSerial">10</prop>
+    <prop idx="0" name="shapeSerial">9</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP8" serial="5">
+   <properties>
+    <prop idx="1" name="shapeSerial">5</prop>
+    <prop idx="3" name="groupSerial">1</prop>
+    <prop idx="0" name="groupSerial">3</prop>
+    <prop idx="2" name="groupSerial">4</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

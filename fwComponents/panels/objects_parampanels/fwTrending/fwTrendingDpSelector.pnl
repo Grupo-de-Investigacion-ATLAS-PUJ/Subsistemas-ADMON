@@ -1,0 +1,615 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Trending Object Configuration</prop>
+   <prop name="en_US.iso88591">Trending Object Configuration</prop>
+  </prop>
+  <prop name="Size">430 290</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[string DP_DOLLAR_NAME;
+string DP_TYPE;
+
+fillTable(dyn_string templateParameters, dyn_string values, dyn_string &amp;exceptionInfo)
+{
+	int i, length, rows;
+//	parameterTable.currentCell(0, 2);
+	parameterTable.deleteAllLines;
+	
+	length = dynlen(templateParameters);
+	for(i=1; i&lt;=length; i++)
+	{
+		parameterTable.appendLine(&quot;parameter&quot;, templateParameters[i], &quot;dp&quot;, &quot; ...&quot;, &quot;value&quot;, values[i]);
+		rows = parameterTable.lineCount;
+		parameterTable.cellBackColRC(rows-1, &quot;value&quot;, &quot;_Window&quot;);
+	}
+	
+	parameterTable.lineVisible(0);
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int i, length, pos;
+	string refName, dp, dpDollarName;
+	dyn_string dollars, values, temp, templateParameters, paramNames, paramValues, exceptionInfo;
+	dyn_dyn_string parameters, configurationData;
+
+	getDollarParams(refName, dollars, values);
+	
+	if(strpos($refFilename, &quot;fwTrendingPageOpenButton&quot;) &gt;= 0)
+	{
+		panelHeading.text = &quot;Trending Page Button Configuration&quot;;
+		dpText.text = &quot;Page/Template:&quot;;
+		DP_TYPE = fwTrending_PAGE;
+		DP_DOLLAR_NAME = &quot;$pageName&quot;;
+	}
+	else if(strpos($refFilename, &quot;fwTrendingPlotOpenButton&quot;) &gt;= 0)
+	{
+		panelHeading.text = &quot;Trending Plot Button Configuration&quot;;
+		dpText.text = &quot;Plot/Template:&quot;;
+		DP_TYPE = fwTrending_PLOT;
+		DP_DOLLAR_NAME = &quot;$plotName&quot;;
+	}	
+	else
+	{
+		panelHeading.text = &quot;Trending Faceplate Configuration&quot;;
+		dpText.text = &quot;Plot/Template:&quot;;
+		DP_TYPE = fwTrending_PLOT;
+		DP_DOLLAR_NAME = &quot;$sDpName&quot;;
+	}	
+
+	dp = values[dynContains(dollars, DP_DOLLAR_NAME)];
+
+	if(dp == DP_DOLLAR_NAME)
+		return;
+			
+	RefNameTextField.text = refName;
+	PageNameTextField.text = dp;
+	
+	if(dpExists(dp))
+	{	
+		if(DP_TYPE == fwTrending_PAGE)
+			fwTrending_getPage(dp, configurationData, exceptionInfo);
+		else
+			fwTrending_getPlot(dp, configurationData, exceptionInfo);
+	
+		fwTrending_getAllTemplateParametersForConfiguration(configurationData, DP_TYPE, templateParameters, exceptionInfo);
+		_fwTrending_splitParameters(values[dynContains(dollars, &quot;$templateParameters&quot;)], parameters);
+		
+		length = dynlen(parameters[1]);
+		for(i=1; i&lt;=length; i++)
+		{
+			if(dynContains(templateParameters, parameters[1][i])&gt;0)
+				paramValues[dynContains(templateParameters, parameters[1][i])] = parameters[2][i];
+		}
+	}
+
+	length = dynlen(templateParameters);
+
+	if(dynlen(paramValues) != length)
+		paramValues[length] = &quot;&quot;;
+		
+	for(i=1; i&lt;=length; i++)
+	{
+		if(paramValues[i] == &quot;&quot;)
+			paramValues[i] = fwTrending_TEMPLATE_OPEN + templateParameters[i] + fwTrending_TEMPLATE_CLOSE;
+	}
+
+	fillTable(templateParameters, paramValues, exceptionInfo);
+
+	if(dynlen(exceptionInfo)&gt;0)
+		fwExceptionHandling_display(exceptionInfo);
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="dpText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 82</prop>
+    <prop name="Size">107 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Page/Template:</prop>
+     <prop name="en_US.iso88591">Page/Template:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text5" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">60 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 52</prop>
+    <prop name="Size">107 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Reference name:</prop>
+     <prop name="en_US.iso88591">Reference name:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="panelHeading" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 27</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-160-100-100-*-*-iso8859-1|-19,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Trending (Page Button/Faceplate) Configuration</prop>
+     <prop name="en_US.iso88591">Trending (Page Button/Faceplate) Configuration</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="RefNameTextField" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">296 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">130 50</prop>
+    <prop name="Size">241 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PageNameTextField" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">130 80</prop>
+    <prop name="Size">241 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Button3" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">380 82</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">380 82</prop>
+    <prop name="Size">21 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">...</prop>
+     <prop name="en_US.iso88591">...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	int i, length;
+	string dp;
+	dyn_string paramValues, templateParameters, exceptionInfo;
+	dyn_dyn_string configurationData;
+	
+	dpSelector(dp, false, &quot;ALL_SYSTEM_NAME_SYS&quot;, &quot;&quot;, DP_TYPE);
+	
+	if(dp == PageNameTextField.text)
+		return;
+		
+	if(dpExists(dp))
+	{
+		PageNameTextField.text = dp;
+		if(DP_TYPE == fwTrending_PAGE)
+			fwTrending_getPage(dp, configurationData, exceptionInfo);
+		else
+			fwTrending_getPlot(dp, configurationData, exceptionInfo);
+	
+		fwTrending_getAllTemplateParametersForConfiguration(configurationData, DP_TYPE, templateParameters, exceptionInfo);
+		
+		length = dynlen(templateParameters);
+		if(length &gt; 0)
+		{
+			paramValues[length] = &quot;&quot;;
+			for(i=1; i&lt;=length; i++)
+				paramValues[i] = fwTrending_TEMPLATE_OPEN + templateParameters[i] + fwTrending_TEMPLATE_CLOSE;
+		}
+		
+		fillTable(templateParameters, paramValues, exceptionInfo);
+	}
+
+	if(dynlen(exceptionInfo)&gt;0)
+		fwExceptionHandling_display(exceptionInfo);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="Button1" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">230 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">230 250</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	int i, length;
+	string refName, parameters, parameterName, parameterValue, dpType;
+	dyn_string dollars, values, exceptionInfo;
+	
+	length = parameterTable.lineCount;
+	for(i=0; i&lt;length; i++)
+	{
+		parameterName = parameterTable.cellValueRC(i, &quot;parameter&quot;);
+		parameterValue = parameterTable.cellValueRC(i, &quot;value&quot;);
+		
+		if((strpos(parameterValue, fwTrending_TEMPLATE_OPEN) != 0) &amp;&amp;
+				(strpos(parameterValue, fwTrending_TEMPLATE_CLOSE) != (strlen(parameterValue) - 1)))
+			parameters += parameterName + &quot;=&quot; + parameterValue + &quot;,&quot;;
+	}
+	
+	getDollarParams(refName, dollars, values);
+
+	values = makeDynString();
+	values[dynlen(dollars)] = &quot;&quot;;
+	values[dynContains(dollars, DP_DOLLAR_NAME)] = PageNameTextField.text;
+	values[dynContains(dollars, &quot;$templateParameters&quot;)] = parameters;
+
+	refName = RefNameTextField.text;
+	
+	if(refName == &quot;&quot;)
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The reference name can not be blank.&quot;, &quot;&quot;);
+	else if(strpos(refName, &quot;.&quot;) &gt;= 0)
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The reference name can not contain the . character.&quot;, &quot;&quot;);
+	
+	if(strpos($refFilename, &quot;OpenButton&quot;) &lt; 0)
+		values[dynContains(dollars, &quot;$sRefName&quot;)] = refName + &quot;.&quot;;
+
+	if(dynlen(exceptionInfo) &gt; 0)
+	{
+		fwExceptionHandling_display(exceptionInfo);
+		return;
+	}
+	
+//	dollars[1] = DP_DOLLAR_NAME;
+//	dollars[2] = &quot;$templateParameters&quot;;
+//	dollars[3] = &quot;$sRefName&quot;;
+
+//	values[1] = PageNameTextField.text;
+//	values[2] = parameters;
+//	values[3] = refName + &quot;.&quot;;
+	
+	if(DP_TYPE == fwTrending_PAGE)
+		dpType = &quot;Page&quot;;
+	else
+		dpType = &quot;Plot&quot;;
+	
+	if(values[dynContains(dollars, DP_DOLLAR_NAME)] == &quot;&quot;)
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;You must select a &quot; + dpType + &quot; data point.&quot;, &quot;&quot;);
+	else if(!dpExists(values[dynContains(dollars, DP_DOLLAR_NAME)]))
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The selected &quot; + dpType + &quot; data point does not exist.&quot;, &quot;&quot;);
+
+	if(dynlen(exceptionInfo) &gt; 0)
+	{
+		fwExceptionHandling_display(exceptionInfo);
+		return;
+	}
+
+	setDollarParams(refName, dollars, values);
+	closeDialog();
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="Button2" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">510 390</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">330 250</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+  closeDialog();
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="parameterTable" shapeType="TABLE">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">20 120</prop>
+    <prop name="Size">401 111</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">26</prop>
+    <prop name="RowHeaderWidth">73</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">parameter</prop>
+     <prop name="Width">132</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Template Parameter</prop>
+      <prop name="en_US.iso88591">Template Parameter</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">dp</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">DP</prop>
+      <prop name="en_US.iso88591">DP</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">value</prop>
+     <prop name="Width">215</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Value</prop>
+      <prop name="en_US.iso88591">Value</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+	string dpName;
+	
+	if(column == &quot;dp&quot;)
+	{
+		dpSelector(dpName, false, &quot;ALL_SYSTEM_NAME_SYS&quot;);
+		if(dpName!=&quot;&quot;)
+			this.cellValueRC(row, &quot;value&quot;, dpName);
+	}
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	this.namedColumnEditable(&quot;parameter&quot;, FALSE);
+	this.namedColumnEditable(&quot;dp&quot;, FALSE);
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

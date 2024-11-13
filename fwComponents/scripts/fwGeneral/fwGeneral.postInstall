@@ -1,0 +1,157 @@
+#uses "fwGeneral/fwGeneral.ctl"
+
+main()
+{
+	fwInstallation_throw("fwGeneral.postInstall: Start","INFO");
+
+	createAlarmOnFwDeprecated();
+
+	int iError;
+
+	// FWCORE-3317, try to remove WCCILproxy only if it exists
+	dyn_dyn_mixed info;
+	int rc=fwInstallationManager_pmonGetManagers(info);
+	dyn_string mgrTypes=info[FW_INSTALLATION_MANAGER_TYPE];
+	if (dynContains(mgrTypes,"WCCILproxy")) {
+	    fwInstallation_throw("fwGeneral.postInstall script: stop/disable the Multiplexing Proxy manager", "INFO");
+	    iError=fwInstallationManager_setMode("WCCILproxy", "", "manual");
+	    if (iError) fwInstallation_throw("fwGeneral.postInstall: Failed to disable the MultiplexingProxy manager ("+iError+")", "ERROR",10);
+	    delay(1,0);
+	    iError=fwInstallationManager_command("STOP", "WCCILproxy","");
+	    if (iError) fwInstallation_throw("fwGeneral.postInstall: Failed to stop the MultiplexingProxy manager ("+iError+")", "ERROR",10);
+	    delay(1,0);
+
+	    // make sure we will avoid the reverting action fwInstallationManager_executeAllReconfigurationActions
+	    dyn_string dsManager, dsStartMode, dsCommandLine;
+	    dyn_int diSecKill, diRestartCount, diResetMin;
+	    iError= fwInstallationManager_getReconfigurationActions(dsManager, dsStartMode, diSecKill, diRestartCount, diResetMin, dsCommandLine);
+	    if (iError) fwInstallation_throw("fwGeneral.postInstall: Could not get the list of reconfiguration actions ("+iError+")", "ERROR",10);
+	    for(int i=1; i<=dynlen(dsManager); i++) {
+		if (dsManager[i]=="WCCILproxy") {
+		    iError=fwInstallationManager_deleteReconfigurationAction(dsManager[i], dsStartMode[i], diSecKill[i], diRestartCount[i], diResetMin[i], dsCommandLine[i]);
+		    if (iError) fwInstallation_throw("fwGeneral.postInstall: Could not reset reconfiguration action for MultiplexingProxy manager ("+iError+")", "ERROR",10);
+		    break;
+		}
+	    }
+	}
+  // Create fwGeneral dp and set default values if this dp doesn't exist yet
+  if(!dpExists(FW_GENERAL_DP) && createFwGeneralConfigurationDp() != 0) 
+  {
+    fwInstallation_throw("fwGeneral.postInstall: Aborting postInstall script due to error during creation of fwGeneral dp.", "ERROR", 10);
+    return;
+  }
+
+  // FWCORE-3403: ensure that the argument for the Windows help browser command is escaped in quotes
+  if ( 0 !=  quoteFwGeneralHelpBrowserWindowsCommandArgument() )
+  {
+    return;
+  }
+  
+ 
+  fwInstallation_throw("fwGeneral.postInstall: Finished","INFO");
+
+}
+
+void createAlarmOnFwDeprecated()
+{
+    // FWCORE-3408; we may not use DPL file, because the Fw alarm classes are not yet available
+    // hence, we do it in the postInstall script
+
+    string dpe="fwDeprecated.count";
+    if (!dpExists(dpe)) {
+	fwInstallation_throw("fwGeneral.postInstall: Datapoint element "+dpe+" does not exist.","ERROR");
+	return;
+    }
+
+    // check if alert was declared there at all
+    int alType;
+    dpGet(dpe+":_alert_hdl.._type",alType);
+    if ( alType != 0) return; // already declared/configured; don't touch
+
+    // otherwise, create one
+
+    dyn_mixed alarmObject;
+    dyn_string exceptionInfo;
+
+	if (isFunctionDefined("fwAlertConfig_objectCreateAnalog")) {
+    	fwAlertConfig_objectCreateAnalog(
+                alarmObject,
+                makeDynString("","Deprecated function calls reported","Deprecated function call list overflow"), //the text for the 2 ranges
+                makeDynFloat(0,1,_fwGeneral_maxDeprecatedLogEntries), //the 3 ranges. The 1st value must always be 0.
+                makeDynString("","_fwWarningNack.","_fwFatalNack."), //classes
+                "fwGeneral/fwDeprecatedList.pnl", //alarm panel
+                makeDynString(""), //$-params to pass to the alarm panel, if necessary
+                "", //alarm help, if needed
+                makeDynBool(0,1,1), //value included (1 means ">=", 0 means ">", 1st element ignored).
+                exceptionInfo); //exception info returned here
+
+    	if (dynlen(exceptionInfo)<1) fwAlertConfig_objectSet(dpe, alarmObject, exceptionInfo);
+    	if (dynlen(exceptionInfo)<1) fwAlertConfig_activate(dpe, exceptionInfo);
+	
+    	if (dynlen(exceptionInfo)) fwInstallation_throw("Could not configure alert on "+dpe+"."+(string)exceptionInfo,"WARNING");
+    } else {
+    	fwInstallation_throw("Did not configure alert on "+dpe+". because fwConfigs library is not available","WARNING");
+    }
+}
+
+int createFwGeneralConfigurationDp()
+{
+  if(dpCreate(FW_GENERAL_DP, FW_GENERAL_DPT) != 0)
+  {
+    fwInstallation_throw("fwGeneral.postInstall: Failed to create fwGeneral configuration datapoint", "ERROR", 10);
+    return -1;
+  }
+  
+  dyn_string exInfo;
+  fwGeneral_setHelpUseInternalBrowser(FW_GENERAL_DEFAULT_HELP_USE_INTERNAL_BROWSER, exInfo);
+  fwGeneral_setHelpExtBrowserCommand(FW_GENERAL_DEFAULT_HELP_EXT_BROWSER_COMMAND_LIN,
+                                     FW_GENERAL_DEFAULT_HELP_EXT_BROWSER_COMMAND_WIN, exInfo);
+  if(dynlen(exInfo) > 0)
+  {
+    fwInstallation_throw("fwGeneral.postInstall: Failed to set default values to fwGeneral configuration datapoint", "ERROR", 10);
+    return -1;
+  }
+  
+  return 0;
+}
+
+int quoteFwGeneralHelpBrowserWindowsCommandArgument()
+{
+  if ( !dpExists(FW_GENERAL_HELP_BROWSER_CMD_WIN_DPE) )
+  {
+    fwInstallation_throw("fwGeneral.postInstall: Aborting postInstall script, DPE '" + FW_GENERAL_HELP_BROWSER_CMD_WIN_DPE +"' does not exist.", "ERROR", 10);
+    return -1;
+  }
+
+  string sDpWinCmd;
+  dyn_errClass err; 
+
+  dpGet(FW_GENERAL_HELP_BROWSER_CMD_WIN_DPE, sDpWinCmd); // read the stored command
+
+  err = getLastError(); //test whether an error occurred 
+  if ( dynlen(err) > 0 ) 
+  { 
+    fwInstallation_throw("fwGeneral.postInstall: Aborting postInstall script, could not read DPE '" + FW_GENERAL_HELP_BROWSER_CMD_WIN_DPE +"'.", "ERROR", 10);
+    return -1;
+  } 
+    
+  if ( strpos(sDpWinCmd, "\"$1\"") < 0  &&  strpos(sDpWinCmd, "$1") >= 0 )
+  // if the Windows command argument is unescaped, i.e. $1 instead of "$1"
+  {
+    strreplace(sDpWinCmd, "$1", "\"$1\""); // enquote the command argument
+
+    dpSet(FW_GENERAL_HELP_BROWSER_CMD_WIN_DPE, sDpWinCmd); // stored the amended command
+
+    err = getLastError(); //test whether an error occurred 
+    if ( dynlen(err) > 0 ) 
+    { 
+      fwInstallation_throw("fwGeneral.postInstall: Aborting postInstall script, could not write DPE '" + FW_GENERAL_HELP_BROWSER_CMD_WIN_DPE +"'.", "ERROR", 10);
+      return -1;
+    } 
+
+   	fwInstallation_throw("fwGeneral.postInstall: Replaced unquoted argument for the Windows help browser command.","INFO");
+      
+  } //end if ( strpos(...) ... )
+
+  return 0;
+}

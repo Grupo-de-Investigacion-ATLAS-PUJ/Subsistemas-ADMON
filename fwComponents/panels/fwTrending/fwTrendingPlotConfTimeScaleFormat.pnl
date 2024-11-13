@@ -1,0 +1,627 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   <prop name="en_US.iso88591"></prop>
+  </prop>
+  <prop name="Size">302 364</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[makePreview()
+{
+  if(txtFormat1.text==&quot;&quot; &amp;&amp; txtFormat2.text==&quot;&quot;)
+    TREND1.timeFormat(0,TRUE,fwTrending_DEFAULT_AXII_X_FORMAT,txtFormat2.text);
+  else
+    TREND1.timeFormat(0,FALSE,txtFormat1.text,txtFormat2.text);
+}
+
+ApplyCancelOKButtonClick(string returnVal)
+{
+  switch(returnVal)
+  {
+    case &quot;OK&quot;:
+      PanelOffReturn(makeDynFloat(0.0), makeDynString(txtFormat1.text,txtFormat2.text));
+    break;
+    case &quot;Cancel&quot;:
+      PanelOffReturn(makeDynFloat(0.0), makeDynString(&quot;Cancel&quot;));
+    break;
+  }
+}
+
+enableFields(bool enable)
+{
+  txtFormat1.enabled = enable;
+  txtFormat2.enabled = enable;
+  if(!enable)
+  {
+    txtFormat1.text = &quot;&quot;;
+    txtFormat2.text = &quot;&quot;;
+  }
+}
+
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  string sFormat = $format;
+  dyn_string dsFormat;
+  strreplace(sFormat, &quot; | &quot;, &quot;|&quot;);
+	 dsFormat = strsplit(sFormat, &quot;|&quot;);
+  
+  if(dynlen(dsFormat)==1 &amp;&amp; (dsFormat[1] == fwTrending_DEFAULT_AXII_X_FORMAT || dsFormat[1] == &quot;&quot;))
+  {
+    rdMode.number = 0;
+    enableFields(false);
+  }
+  else
+  {
+    rdMode.number = 1;
+    		strreplace(sFormat, &quot; | &quot;, &quot;|&quot;);
+				dsFormat = strsplit(sFormat, &quot;|&quot;);
+      txtFormat1.text = dsFormat[1];
+      if(dynlen(dsFormat)&gt;1)
+        txtFormat2.text = dsFormat[2];
+    enableFields(true);
+  }    
+  makePreview();
+}
+
+
+
+
+]]></script>
+ </events>
+ <shapes>
+  <shape layerId="0" Name="Text2" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 8</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,69,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,69,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Time scale format</prop>
+     <prop name="en_US.iso88591">Time scale format</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="rdMode" shapeType="RADIO_BOX">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">101 61</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Default</prop>
+       <prop name="en_US.iso88591">Default</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Custom</prop>
+       <prop name="en_US.iso88591">Custom</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  enableFields((bool)button);
+  makePreview();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="FRAME1" shapeType="FRAME">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 113</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.12 0 0 1.149425287356321 -23.59999999999999 -19.88505747126432</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Custom format</prop>
+     <prop name="en_US.iso88591">Custom format</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 113</prop>
+    <prop name="Size">251 88</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="txtFormat1" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">79.63946869070207 140</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">MS Shell Dlg 2,8.25,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">80 140</prop>
+    <prop name="Size">191 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[main()
+{
+  makePreview();
+}]]></script>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string ds;
+  dyn_float  df;
+  string     form, form2;
+
+  form = this.text;
+  ChildPanelOnCentralModalReturn(&quot;gedi/EP_timeFormatSelector.pnl&quot;,
+    &quot;Time Format Selector&quot;,
+    makeDynString(form),df,ds);
+  if (df[1]==-1) return;
+
+  form=ds[1];
+  this.text=form;
+  makePreview();  
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="TextTemplate" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">33 191</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">30 140</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Line 1</prop>
+     <prop name="en_US.iso88591">Line 1</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="txtFormat2" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">79.63946869070207 170</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">MS Shell Dlg 2,8.25,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">80 170</prop>
+    <prop name="Size">191 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[main()
+{
+  makePreview();
+}]]></script>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string ds;
+  dyn_float  df;
+  string     form, form2;
+
+  form = this.text;
+  ChildPanelOnCentralModalReturn(&quot;gedi/EP_timeFormatSelector.pnl&quot;,
+    &quot;Time Format Selector&quot;,
+    makeDynString(form),df,ds);
+  if (df[1]==-1) return;
+
+  form=ds[1];
+  this.text=form;
+  makePreview();  
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT3" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">33 221</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">30 170</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Line 2</prop>
+     <prop name="en_US.iso88591">Line 2</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT4" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">23 281</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">20 230</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Preview</prop>
+     <prop name="en_US.iso88591">Preview</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="ButtonOK" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">90 320</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 320</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{
+	ApplyCancelOKButtonClick(&quot;OK&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ButtonCancel" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">200 320</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Hotkey">Esc</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 320</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	ApplyCancelOKButtonClick(&quot;Cancel&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="TREND1" shapeType="TREND">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10.00000000000001 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">MS Shell Dlg 2,8.25,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 250</prop>
+    <prop name="Size">281 51</prop>
+    <prop name="TimeTrend">True</prop>
+    <prop name="Logarithmic">False</prop>
+    <prop name="ShowToolBox">False</prop>
+    <prop name="ShowLegend">False</prop>
+    <prop name="Vertical">False</prop>
+    <prop name="ShowGrid">False</prop>
+    <prop name="ShowBackgroundGrid">True</prop>
+    <prop name="TimeRange">7200</prop>
+    <prop name="ScrollPercent">90</prop>
+    <prop name="LegendFont">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">MS Shell Dlg 2,8.25,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="ScaleFont">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">MS Shell Dlg 2,8.25,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="DefaultFont">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">MS Shell Dlg 2,8.25,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="TrendArea">
+     <prop name="PixmapFile"></prop>
+     <prop name="TrendCurve" type="ValueOverTime">
+      <prop name="Name">#1_1</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">2</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8">#1_1</prop>
+       <prop name="en_US.iso88591">#1_1</prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">False</prop>
+      <prop name="AutoScale">False</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">Red</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+     </prop>
+     <prop name="TimeScaleOneLine">True</prop>
+     <prop name="TimeScale">
+      <prop name="Format1">%H:%M:%S</prop>
+      <prop name="Format2">%x</prop>
+      <prop name="AutoFormat">True</prop>
+      <prop name="Visible">True</prop>
+      <prop name="Position">Bottom</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="cmHelp" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">260 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Help on Time Scale format</prop>
+     <prop name="en_US.iso88591">Help on Time Scale format</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">260 10</prop>
+    <prop name="Size">27 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop SharedPixmap="1" name="Image">
+     <prop name="BackgroundPixmap">help_2.xpm</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string path;
+  path = getPath(HELP_REL_PATH,&quot;/PVSSHelp.chm&quot;);
+  system(&quot;hh.exe \&quot;&quot;+path+&quot;::/Control_Grafik/Control_Grafik-225.htm\&quot;&quot;);
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

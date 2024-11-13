@@ -1,0 +1,55 @@
+main()
+{
+  DebugTN("fwElmbUser.init: starting script");
+
+  // Create _FwElmb*UserDefined DPTs which are embedded in DPTs, since we can not
+  // import these as dpl file in order not to overwrite user modifications
+  //
+
+  //  dyn_string dptList = dpTypes("FwElmb*");
+  dyn_string dpts;
+/*
+  string installationPath;
+  dpGet("fwInstallationInfo.installationDirectoryPath:_original.._value", installationPath);
+  string dplist;
+  bool result = fileToString(installationPath+"/dplist/fwElmbDPT.dpl", dplist);
+  if (!result) {
+    DebugTN("fwElmbUser.init: Error reading fwElmb type dpl file ./dplist/fwElmbDPT.dpl");
+    return;
+  }
+  
+  dyn_string lines = strsplit(dplist, "\n");
+  dyn_string dpts;
+  for (int i=1; i<=dynlen(lines); ++i) {
+    string line = lines[i];
+    if (strpos(line, "userDefined")==-1) continue; // look for userDefined leaf in DPTs
+        DebugTN("line >"+line+"<");
+    string dpt = substr(line, strpos(line, ":")+1, strpos(line, "UserDefined")-strpos(line, ":")-1);
+    DebugTN("dpt is >"+dpt+"<");
+    dynAppend(dpts, dpt+"UserDefined");
+  }
+*/
+
+  dpts = makeDynString("_FwElmbCANbusUserDefined", "_FwElmbNodeUserDefined",
+	"_FwElmbDiUserDefined", "_FwElmbAoUserDefined", "_FwElmbDoUserDefined",
+	"_FwElmbAiUserDefined", "_FwElmbDoBytesUserDefined");
+
+  dyn_string existingUserDefList = dpTypes("_FwElmb*UserDefined");
+
+
+  for (int i = 1; i <= dynlen(dpts); i++) {
+    string dptName = dpts[i];
+    if (!dynContains(existingUserDefList, dptName)) {
+      dyn_dyn_string elements = makeDynString(dptName, "");
+      dyn_dyn_int types = makeDynInt(DPEL_STRUCT);
+      if (dpTypeCreate(elements, types) != 0) {
+        DebugTN("fwElmbUser.init: Error creating data point type " + dptName);
+      }
+      else {
+        DebugTN("fwElmbUser.init: Created missing user defined data point type " + dptName);
+      }
+    }
+  }
+     
+  DebugTN("fwElmbUser.init finished.");
+}

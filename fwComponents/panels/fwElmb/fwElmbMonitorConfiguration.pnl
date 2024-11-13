@@ -1,0 +1,533 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">617 177</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">290 20</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwElmb/fwElmb.ctl&quot;
+
+void pnlSetValues()
+{
+// Local Variables
+// ---------------
+	int i;
+
+	dyn_bool dbValues;
+
+	dyn_string dsArguments;
+	dyn_string dsValues;
+	dyn_string dsArgumentsToSet;
+
+// Executable Code
+// ---------------
+	// Get the data from the two list boxes, and reduce it to the actual
+	// operations requested
+	dsArguments = lstArguments.items;
+	dsValues = lstValues.items;
+
+	// Check the two arrays are the same length
+	if (dynlen(dsArguments) != dynlen(dsValues)) {
+		DebugN(&quot;Inconsistent arguments to values: &quot; + dynlen(dsArguments) + &quot; arguments, &quot; + dynlen(dsValues) + &quot; values&quot;);
+	} else {
+		// Loop backwards through the array (as the last operations are the
+		// ones that matter)
+		for (i = dynlen(dsArguments); i &gt; 0; i--) {
+			if (dynContains(dsArgumentsToSet, dsArguments[i]) == 0) {
+				dynAppend(dsArgumentsToSet, dsArguments[i]);
+				if (dsValues[i] == &quot;TRUE&quot;)
+					dynAppend(dbValues, true);
+				else
+					dynAppend(dbValues, false);
+			}
+		}
+
+//		DebugN(dsArgumentsToSet);
+//		DebugN(dbValues);
+
+		// Set all the values
+		dpSet(dsArgumentsToSet, dbValues);
+
+		// Now set the 'refresh' flag so that information in the control script is updated
+		dpSet(ELMB_MONITOR_DPNAME + &quot;.refresh&quot;, true);
+	}
+
+	// Return to calling routine
+	return;
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	const int X_ORIGIN = 0;
+	const int Y_ORIGIN = 0;
+	const int BORDER = 10;
+	
+	int i, j, k;
+	int x = X_ORIGIN;
+	int y = Y_ORIGIN;
+	int xMax = X_ORIGIN;
+	int yMax = Y_ORIGIN;
+	int btnW, btnH;
+	int btnX, btnY;
+	int txtW, txtH;
+	int txtX, txtY;
+	
+	string sReference;
+	
+	dyn_int diSizeTitle;
+	dyn_int diSizeInfo;
+	
+	dyn_string dsItems;
+	dyn_string dsTemp;
+	dyn_string dsTypes = makeDynString(ELMB_CAN_BUS_TYPE_NAME, ELMB_TYPE_NAME);
+	dyn_string dsTitles = makeDynString(&quot;Bus Name&quot;, &quot;ELMB Name&quot;);
+	dyn_string dsTitleReferences = makeDynString(&quot;busTitle&quot;, &quot;elmbTitle&quot;);
+
+// Executable Code
+// ---------------
+	// Loop through all items the panel has to show
+	for (i = 1; i &lt;= dynlen(dsTypes); i++) {
+		// Get all in the system
+		dsItems = dpNames(&quot;*&quot;, dsTypes[i]);
+		
+		// Check if any exist
+		if (dynlen(dsItems) &gt; 0) {
+		
+			// Add the title
+			addSymbol(myModuleName(), myPanelName(),
+								&quot;fwElmb/objects/fwElmbMonitorSetupTitleRef.pnl&quot;, dsTitleReferences[i],
+								makeDynString(&quot;$sTitle:&quot; + dsTitles[i]),
+								x, y,
+								0.0, 1.0, 1.0);
+								
+			// Get size of the title reference panel
+			diSizeTitle = getPanelSize(&quot;fwElmb/objects/fwElmbMonitorSetupTitleRef.pnl&quot;);
+			
+			// Adjust the size for the border (x only needs to worry about the
+			// left border, but y needs to worry about border at top AND bottom)
+			for (j = 1; j &lt;= dynlen(diSizeTitle); j++)
+				diSizeTitle[j] -= (BORDER * j);
+		
+			// Increase the y coordinate for the next 'row'
+			y += diSizeTitle[2];
+		
+			// Now get the size of the information reference panel
+			diSizeInfo = getPanelSize(&quot;fwElmb/objects/fwElmbMonitorSetupRef.pnl&quot;);
+			for (j = 1; j &lt;= dynlen(diSizeInfo); j++)
+				diSizeInfo[j] -= (BORDER * j);
+							
+			// Now loop through all items, adding the panel references
+			for (j = 1; j &lt;= dynlen(dsItems); j++) {
+		
+				// Split the name to be used as a reference
+				dsTemp = strsplit(dsItems[j], fwDevice_HIERARCHY_SEPARATOR);
+				sReference = dsTemp[dynlen(dsTemp)];
+			
+				// Add the panel reference
+				addSymbol(myModuleName(), myPanelName(),
+									&quot;fwElmb/objects/fwElmbMonitorSetupRef.pnl&quot;, sReference,
+									makeDynString(&quot;$sDpName:&quot; + dsItems[j]),
+									x, y,
+									0.0, 1.0, 1.0);
+								
+				// Increase the y coordinate for the next panel
+				y += diSizeInfo[2];
+			}	// End of loop for rows in column
+		
+			// This column is finished so check for maximum y
+			if (y &gt; yMax)
+				yMax = y;
+			
+			// Reset the y coordinate for the next column
+			y = Y_ORIGIN;
+			
+			// Set the values for x and the current maximum x
+			if (diSizeTitle[1] &gt; diSizeInfo[1])
+				xMax += diSizeTitle[1];
+			else
+				xMax += diSizeInfo[1];
+				
+			// Add slight offset for clarity for next symbol
+			x = xMax + BORDER;
+			
+		} // End if for any items existing
+	} // End of loop for columns in panel
+		
+	// Add single border (but for left, right, top and bottom) back
+	// to full panel size
+	xMax += (2 * BORDER);
+	yMax += (2 * BORDER);
+	
+	// Get the size of the OK button
+	getValue(&quot;cmdOK&quot;, &quot;size&quot;, btnW, btnH);
+	
+	// Set all buttons to the same size
+	setValue(&quot;cmdApply&quot;, &quot;size&quot;, btnW, btnH);
+	setValue(&quot;cmdCancel&quot;, &quot;size&quot;, btnW, btnH);
+	setValue(&quot;cmdActivate&quot;, &quot;size&quot;, btnW, btnH);
+	setValue(&quot;cmdStop&quot;, &quot;size&quot;, btnW, btnH);
+	
+	// Add room for the button
+	yMax += BORDER + btnH;
+	
+	// Position the buttons correctly
+	btnX = xMax - BORDER - btnW;
+	btnY = yMax - BORDER - btnH;
+	setValue(&quot;cmdCancel&quot;, &quot;position&quot;, btnX, btnY);
+	btnX = xMax - (2 * BORDER) - (2 * btnW);
+	setValue(&quot;cmdApply&quot;, &quot;position&quot;, btnX, btnY);
+	btnX = xMax - (3 * BORDER) - (3 * btnW);
+	setValue(&quot;cmdOK&quot;, &quot;position&quot;, btnX, btnY);
+	btnX = X_ORIGIN + BORDER;
+	setValue(&quot;cmdActivate&quot;, &quot;position&quot;, btnX, btnY);
+	btnX = X_ORIGIN + (2 * BORDER) + btnW;
+	setValue(&quot;cmdStop&quot;, &quot;position&quot;, btnX, btnY);
+	
+	// Set the panel size
+	setPanelSize(myModuleName(), myPanelName(), false, xMax, yMax);
+
+	// Return to calling routine
+	return;
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="cmdOK" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">290 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">290 20</prop>
+    <prop name="Size">71 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	// Set the values
+	pnlSetValues();
+	
+	// Close the panel
+	PanelOff();
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="lstArguments" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 70</prop>
+    <prop name="Size">161 41</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+  </shape>
+  <shape Name="lstValues" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">190 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">190 70</prop>
+    <prop name="Size">181 41</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+  </shape>
+  <shape Name="cmdApply" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">370 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">370 20</prop>
+    <prop name="Size">71 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	// Set the values
+	pnlSetValues();
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">450 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">450 20</prop>
+    <prop name="Size">71 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	// Close the panel
+	PanelOff();
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdActivate" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 20</prop>
+    <prop name="Size">71 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	bool bActive;
+
+// Executable Code
+// ---------------
+	// Toggle the value
+	dpGet(&quot;fwElmbMonitor.active&quot;, bActive);
+	dpSet(&quot;fwElmbMonitor.active&quot;, !bActive);
+
+	// Return to calling routine
+	return;
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	dpConnect(&quot;cbkElmbMonitoringActive&quot;, &quot;fwElmbMonitor.active&quot;);
+}
+
+void cbkElmbMonitoringActive(string argsDpe, bool argbActive)
+{
+	if (argbActive)
+		this.text = &quot;Deactivate&quot;;
+	else
+		this.text = &quot;Activate&quot;;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdStop" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">100 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">100 20</prop>
+    <prop name="Size">71 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	dpSet(&quot;fwElmbMonitor.exit&quot;, true);
+
+	// Return to calling routine
+	return;
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	dpConnect(&quot;cbkElmbMonitoringRunning&quot;, &quot;fwElmbMonitor.running&quot;);
+}
+
+void cbkElmbMonitoringRunning(string argsDpe, bool argbRunning)
+{
+	if (argbRunning) {
+		this.text = &quot;Stop&quot;;
+		this.enabled = true;
+	} else {
+		this.text = &quot;Stopped&quot;;
+		this.enabled = false;
+	}
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

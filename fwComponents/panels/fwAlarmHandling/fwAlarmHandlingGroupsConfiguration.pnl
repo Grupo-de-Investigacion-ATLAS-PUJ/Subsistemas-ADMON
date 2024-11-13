@@ -1,0 +1,1141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">1040 732</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+
+dyn_dyn_mixed matrix;
+bool modified;
+const int fwAlarmHandlingGroups_TABLE_COL_NAME = 0;
+const int fwAlarmHandlingGroups_TABLE_COL_VALUE = 1;
+const int fwAlarmHandlingGroups_TABLE_COL_TYPE = 2;
+
+int fwAlarmHandlingGroups_filterActive;
+
+void loadSettings()
+{
+  dyn_string exceptionInfo;
+  dyn_string dsDpeGroups, dsDpeSys, dsDpeAlias, dsDpeDpes, dsDpeFsmCU, dsDpeGroupNames;
+  dyn_string dsSystems, dsDpes, dsDpesOfOneSys, dsFsmCu, dsAliases, dsOrderedGroups, dsMergedGroups;
+  string sGroupId, sSysName, sGroupName, sSys;
+  int i,j,k;
+  
+  TREE1.clear();
+  addItemToTree(&quot;&quot;,&quot;Groups&quot;,&quot;Groups&quot;,fwAlarmHandlingGroups_TYPE_ROOT);
+  sSys = getSystemName();
+  dsDpeGroups = dpNames(sSys+fwAlarmHandlingGroups_CONFIG_DP+&quot;*&quot;,fwAlarmHandlingGroups_CONFIG_DPTYPE);
+  
+  //if it exists, take the group order list
+  if(dpExists(fwAlarmHandlingGroups_ORDER_DP))
+  {
+    dpGet(fwAlarmHandlingGroups_ORDER_DP, dsOrderedGroups);
+    if(dynlen(dsOrderedGroups))
+    {
+      for(i=1 ; i&lt;=dynlen(dsOrderedGroups) ; i++)
+      {
+        if(dpExists(sSys+fwAlarmHandlingGroups_CONFIG_DP+dsOrderedGroups[i]))
+          dynAppend(dsMergedGroups , sSys+fwAlarmHandlingGroups_CONFIG_DP+dsOrderedGroups[i]);
+      }          
+      //if there are dpes not appearing in the ordered list, append them to the bottom of the list
+      if(dynlen(dsMergedGroups) &lt; dynlen(dsDpeGroups))
+      for(i=1 ; i&lt;=dynlen(dsDpeGroups) ; i++)
+      {
+        if(!dynContains(dsMergedGroups,dsDpeGroups[i]))
+          dynAppend(dsMergedGroups , dsDpeGroups[i]);
+      }   
+      dsDpeGroups = dsMergedGroups;
+    }
+  }
+  else
+  {
+    dpCreate(fwAlarmHandlingGroups_SETUP_DP, fwAlarmHandlingGroups_SETUP_DPTYPE);
+  }
+//   DebugN(&quot;dsDpeGroups:&quot;,dsDpeGroups);
+  for(i=1 ; i&lt;=dynlen(dsDpeGroups) ; i++)
+  {
+      dynAppend(dsDpeSys , dsDpeGroups[i]+&quot;.systems&quot;);
+      dynAppend(dsDpeAlias , dsDpeGroups[i]+&quot;.aliases&quot;);
+      dynAppend(dsDpeDpes , dsDpeGroups[i]+&quot;.dpes&quot;);
+      dynAppend(dsDpeFsmCU , dsDpeGroups[i]+&quot;.fsmCu&quot;);
+  }  
+  //load the configs
+  if(dynlen(dsDpeGroups))
+  {
+    for(i=1 ; i&lt;=dynlen(dsDpeSys) ; i++)
+    {
+      //group
+      //take the group name 
+      sGroupName = dpGetDescription(dsDpeGroups[i]+&quot;.&quot;,-2);
+      sGroupId = fwAlarmHandlingScreenGroups_getGroupId(dsDpeGroups[i]);
+      addItemToTree(&quot;Groups&quot;,sGroupId,sGroupId,fwAlarmHandlingGroups_TYPE_GROUP);
+      setItemValue(sGroupId, sGroupName);
+      //systems
+      dpGet(dsDpeSys[i],dsSystems);
+      for(j=1 ; j&lt;=dynlen(dsSystems) ; j++)
+        addItemToTree(sGroupId,sGroupId+&quot;.&quot;+dsSystems[j],dsSystems[j],fwAlarmHandlingGroups_TYPE_SYS);
+      //dpes
+      dpGet(dsDpeDpes[i],dsDpes);
+      for(j=1 ; j&lt;=dynlen(dsDpes) ; j++)
+      {
+          if(dynlen(dsSystems)&gt;=j &amp;&amp; dsDpes[j]!=&quot;&quot;)
+          {
+            addItemToTree(sGroupId+&quot;.&quot;+dsSystems[j],sGroupId+&quot;.&quot;+dsSystems[j]+&quot;.dpes&quot;,fwAlarmHandlingGroups_TYPE_DP,fwAlarmHandlingGroups_TYPE_DP);
+            setItemValue(sGroupId+&quot;.&quot;+dsSystems[j]+&quot;.dpes&quot;,dsDpes[j]);
+          }
+      }
+      //aliases
+      dpGet(dsDpeAlias[i],dsAliases);
+      for(j=1 ; j&lt;=dynlen(dsAliases) ; j++)
+      {
+          if(dynlen(dsSystems)&gt;=j &amp;&amp; dsAliases[j]!=&quot;&quot;)
+          {
+            addItemToTree(sGroupId+&quot;.&quot;+dsSystems[j],sGroupId+&quot;.&quot;+dsSystems[j]+&quot;.alias&quot;,fwAlarmHandlingGroups_TYPE_ALIAS,fwAlarmHandlingGroups_TYPE_ALIAS);
+            setItemValue(sGroupId+&quot;.&quot;+dsSystems[j]+&quot;.alias&quot;,dsAliases[j]);
+          }
+      }
+      //fsm cu
+      dpGet(dsDpeFsmCU[i],dsFsmCu);
+      for(j=1 ; j&lt;=dynlen(dsFsmCu) ; j++)
+        addItemToTree(sGroupId,sGroupId+&quot;.&quot;+dsFsmCu[j],dsFsmCu[j],fwAlarmHandlingGroups_TYPE_FSMCU);     
+    }
+  }
+  modified = false;
+}
+
+
+void saveSettings()
+{
+  dyn_string exceptionInfo;
+  dyn_string dsDpeGroups;
+  dyn_string dsGroups, dsGroupsNames, dsSystems, dsDpes, dsDpesOfOneSys, dsFsmCu, dsAliases, dsTmp;
+  string sGroupId, sSysName, sType, sDpGroupName, sGroupName;
+  int i,j,k, lastIndex,ret;
+  
+  dsGroups = TREE1.children(&quot;Groups&quot;);
+  //get groups
+  for(i=1 ; i&lt;=dynlen(dsGroups) ; i++)
+  {
+    dynClear(dsSystems);
+    dynClear(dsFsmCu);
+    dynClear(dsDpes);
+    dynClear(dsAliases);
+    sGroupName = getItemValue(dsGroups[i]);
+    dsGroupsNames[i] = getItemName(dsGroups[i]);
+    dsTmp = TREE1.children(dsGroups[i]);
+    //get systems
+    for(j=1 ; j&lt;=dynlen(dsTmp) ; j++)
+    {
+      sType = getItemType(dsTmp[j]);
+      switch(sType)
+      {
+        case fwAlarmHandlingGroups_TYPE_SYS:
+          dynAppend(dsSystems, getItemName(dsTmp[j]));
+          dynAppend(dsDpes,&quot;&quot;);
+          dynAppend(dsAliases,&quot;&quot;);
+          lastIndex = dynlen(dsDpes);
+          dsDpesOfOneSys = TREE1.children(dsTmp[j]);
+          //get dpes and aliases
+          for(k=1 ; k&lt;=dynlen(dsDpesOfOneSys) ; k++)
+          {
+            switch(getItemType(dsDpesOfOneSys[k]))
+            {
+              case fwAlarmHandlingGroups_TYPE_DP:
+                dsDpes[lastIndex] = getItemValue(dsDpesOfOneSys[k]);
+              break;
+              case fwAlarmHandlingGroups_TYPE_ALIAS:
+                dsAliases[lastIndex] = getItemValue(dsDpesOfOneSys[k]);
+              break;
+            }
+          }          
+        break;
+//         case fwAlarmHandlingGroups_TYPE_FSMCU:
+//           dynAppend(dsFsmCu, getItemName(dsTmp[j]));
+//         break;
+      }
+    }
+    for(j=1 ; j&lt;=dynlen(dsTmp) ; j++)
+    {
+      sType = getItemType(dsTmp[j]);
+      switch(sType)
+      {
+        case fwAlarmHandlingGroups_TYPE_FSMCU:
+          dynAppend(dsFsmCu, getItemName(dsTmp[j]));
+        break;
+      }
+    }    
+    sDpGroupName = fwAlarmHandlingGroups_CONFIG_DP+dsGroupsNames[i];
+    if(!dpExists(sDpGroupName))
+      ret = dpCreate(sDpGroupName,fwAlarmHandlingGroups_CONFIG_DPTYPE);
+    if(ret==0)
+    {
+      dpSetWait(sDpGroupName+&quot;.systems&quot;,dsSystems,
+                sDpGroupName+&quot;.dpes&quot;,dsDpes,
+                sDpGroupName+&quot;.aliases&quot;,dsAliases,
+                sDpGroupName+&quot;.fsmCu&quot;,dsFsmCu);   
+      dpSetDescription(sDpGroupName+&quot;.&quot;,sGroupName);
+    }
+    else
+    {
+      fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Config dp type &quot;+fwAlarmHandlingGroups_CONFIG_DPTYPE+&quot; does not exist. try reinstalling _fwAlarmHandling&quot;, &quot;&quot;);
+      fwExceptionHandling_display(exceptionInfo);      
+    }
+  }
+  //upon user choice, create custom order (or not)
+  if(!dpExists(fwAlarmHandlingGroups_SETUP_DP))
+    dpCreate(fwAlarmHandlingGroups_SETUP_DP, fwAlarmHandlingGroups_SETUP_DPTYPE);
+  if(dpExists(fwAlarmHandlingGroups_ORDERMODE_DP))
+  {
+      dpSet(fwAlarmHandlingGroups_ORDERMODE_DP,radioOrder.number);
+  }
+  saveGroupsOrder(dsGroupsNames);
+//   DebugN(&quot;dsDpeGroups:&quot;,dsDpeGroups);
+  //delete the groups dpes that have been removed from the panel
+  dsDpeGroups = dpNames(getSystemName()+fwAlarmHandlingGroups_CONFIG_DP+&quot;*&quot;,fwAlarmHandlingGroups_CONFIG_DPTYPE);
+  for(i=1 ; i&lt;=dynlen(dsDpeGroups) ; i++)
+  {
+//     DebugN(&quot;dsGroups:&quot;,dsGroupsNames);
+//     DebugN(&quot;dynContains(dsGroups,&quot;+ fwAlarmHandlingScreenGroups_getGroupId(dsDpeGroups[i])+&quot;):&quot;,dynContains(dsGroups, fwAlarmHandlingScreenGroups_getGroupId(dsDpeGroups[i])));
+    if(!dynContains(dsGroupsNames, fwAlarmHandlingScreenGroups_getGroupId(dsDpeGroups[i])))
+      dpDelete(dsDpeGroups[i]);
+  }
+  modified = false;
+}
+
+
+addItemToTree(string father, string id, string label, string type)
+{
+  string s_dpIcon;
+ 
+  s_dpIcon = GetDpIcon(type);
+  if(father==&quot;&quot; || TREE1.itemExists(father))
+  {
+    TREE1.appendItem(father,id,label);
+    TREE1.setIcon(id,fwAlarmHandlingGroups_TABLE_COL_NAME,s_dpIcon);
+    TREE1.setText(id,fwAlarmHandlingGroups_TABLE_COL_TYPE,type);
+    TREE1.setOpen(id,(type==fwAlarmHandlingGroups_TYPE_ROOT));
+    TREE1.setColumnWidth(fwAlarmHandlingGroups_TABLE_COL_TYPE,0);
+    TREE1.hideColumn(fwAlarmHandlingGroups_TABLE_COL_TYPE);
+    modified = true;
+  }
+}
+
+setItemValue(string id, string value)
+{
+  if(TREE1.itemExists(id))
+  {
+    TREE1.setText(id,fwAlarmHandlingGroups_TABLE_COL_VALUE,value);
+    modified = true;
+  }
+}
+
+setItemName(string id, string name)
+{
+  if(TREE1.itemExists(id))
+  {
+    TREE1.setText(id,fwAlarmHandlingGroups_TABLE_COL_NAME,name);
+    modified = true;
+  }
+}
+
+string getItemName(string id)
+{
+  string name;
+  if(TREE1.itemExists(id))
+    name = TREE1.getText(id,fwAlarmHandlingGroups_TABLE_COL_NAME);
+  return name;
+}
+
+string getItemValue(string id)
+{
+  string val;
+  if(TREE1.itemExists(id))
+    val = TREE1.getText(id,fwAlarmHandlingGroups_TABLE_COL_VALUE);
+  return val;
+}
+
+string getItemType(string id)
+{
+  string val;
+  if(TREE1.itemExists(id))
+    val = TREE1.getText(id,fwAlarmHandlingGroups_TABLE_COL_TYPE);
+  return val;
+}
+
+
+string GetDpIcon(string type)
+{
+  string s_dpIcon;
+  switch (type)
+  {
+    case	fwAlarmHandlingGroups_TYPE_GROUP	:  s_dpIcon = &quot;dptree/blobstruct.png&quot;;  break;
+    case	fwAlarmHandlingGroups_TYPE_SYS	:  s_dpIcon = &quot;dptree/system.png&quot;;  break;
+    case	fwAlarmHandlingGroups_TYPE_DP	:  s_dpIcon = &quot;dptree/dp.png&quot;;  break;
+    case	fwAlarmHandlingGroups_TYPE_ALIAS	:  s_dpIcon = &quot;dptree/ref.png&quot;;  break;
+    case	fwAlarmHandlingGroups_TYPE_FSMCU	:  s_dpIcon = &quot;cu_icon.gif&quot;;  break;
+    case	fwAlarmHandlingGroups_TYPE_ROOT	:  s_dpIcon = &quot;dptree/struct.png&quot;;  break;
+    default :   s_dpIcon = &quot;dptree/dp.png&quot;;  break;
+  }
+  if(isfile(getPath(PICTURES_REL_PATH, s_dpIcon)))
+    return getPath(PICTURES_REL_PATH, s_dpIcon);
+  else
+    return getPath(PICTURES_REL_PATH,&quot;dpTree/dp.png&quot;);
+}
+
+
+
+editFilter(string id, string mode)
+{
+  dyn_string dsRet;
+  dyn_float dfRet;  
+  string sCurrentValue, sFilterMode;  
+  string nodeName=getItemName(id);
+
+  switch(mode)
+  {
+    case fwAlarmHandlingGroups_TYPE_DP:
+      sFilterMode = &quot;.dpes&quot;;
+    break;
+    case fwAlarmHandlingGroups_TYPE_ALIAS:
+      sFilterMode = &quot;.alias&quot;;
+    break;
+    default:
+    return;
+  }    
+
+  sCurrentValue = getItemValue(id+sFilterMode);
+//   DebugN(&quot;id:&quot;,id,&quot;mode:&quot;,mode,&quot;sCurrentValue:&quot;,sCurrentValue);
+  ChildPanelOnReturn(&quot;fwAlarmHandling/fwAlarmHandlingGroupsConfigurationDp.pnl&quot;,
+                     &quot;GroupEdit&quot;,makeDynString(&quot;$sMode:&quot;+mode,&quot;$sSystemFilter:&quot;+nodeName,&quot;$sFilter:&quot;+sCurrentValue),0,0,dfRet,dsRet);  
+  if(dynlen(dsRet))
+  {
+    if(!TREE1.itemExists(id+sFilterMode))
+      addItemToTree(id, id+sFilterMode, mode, mode);
+    setItemValue(id+sFilterMode,dsRet[1]);
+  }  
+  modified = true;
+}
+
+editNode(string id, string mode, bool addNew=false)
+{
+  dyn_string dsRet;
+  dyn_float dfRet;  
+  string sFilterMode, nodeId;  
+  string nodeName=getItemName(id);
+  string sLabel=getItemValue(id);
+  bool modifyOnly;
+  
+  if(addNew)
+    nodeName=&quot;&quot;;
+//   DebugN(&quot;id:&quot;,id,&quot;mode:&quot;,mode,&quot;nodeName:&quot;,nodeName);
+  switch(mode)
+  {
+    case fwAlarmHandlingGroups_TYPE_FSMCU:
+      ChildPanelOnModalReturn(&quot;fwAlarmHandling/fwAlarmHandlingGroupsConfigurationFSMCU.pnl&quot;,
+                         &quot;GroupEdit&quot;,makeDynString(&quot;$sMode:&quot;+mode,&quot;$sSystemFilter:&quot;+nodeName,&quot;$sFilter:&quot;+nodeName),0,0,dfRet,dsRet);  
+    break;
+    case fwAlarmHandlingGroups_TYPE_GROUP:
+      ChildPanelOnModalReturn(&quot;fwAlarmHandling/fwAlarmHandlingGroupsConfigurationGroup.pnl&quot;,
+                         &quot;GroupEdit&quot;,makeDynString(&quot;$sMode:&quot;+mode,&quot;$sSystemFilter:&quot;+nodeName,&quot;$sFilter:&quot;+nodeName,&quot;$sLabel:&quot;+sLabel),0,0,dfRet,dsRet);  
+    break;
+    default:
+      ChildPanelOnModalReturn(&quot;fwAlarmHandling/fwAlarmHandlingGroupsConfigurationSys.pnl&quot;,
+                         &quot;GroupEdit&quot;,makeDynString(&quot;$sMode:&quot;+mode,&quot;$sSystemFilter:&quot;+nodeName,&quot;$sFilter:&quot;+nodeName),0,0,dfRet,dsRet);  
+    break;
+  }
+  if(dynlen(dsRet))
+    if(strlen(dsRet[1]))
+    {
+      nodeId = id+&quot;.&quot;+dsRet[1];
+      if(!TREE1.itemExists(nodeId))
+      {
+        if(!addNew)
+          setItemName(id, dsRet[1]);
+        else
+        {
+          if(getItemType(id)==fwAlarmHandlingGroups_TYPE_ROOT)
+            addItemToTree(id, dsRet[1], dsRet[1], mode); 
+          else
+            addItemToTree(id, nodeId, dsRet[1], mode); 
+        } 
+      }
+      modified = true;
+    }
+  if(dynlen(dsRet)&gt;1)//add label
+  {
+    setItemValue(dsRet[1], dsRet[2]);
+    modified = true;
+  }
+}
+
+
+void moveNodeUp(string id)
+{
+  string sIdUp;
+  sIdUp = TREE1.itemAbove(id);
+  sIdUp = TREE1.itemAbove(sIdUp);
+  if(getItemType(sIdUp)!=fwAlarmHandlingGroups_TYPE_ROOT)
+    TREE1.moveItem(id, sIdUp);
+}
+
+void moveNodeDown(string id)
+{
+  string sIdDown;
+  sIdDown = TREE1.itemBelow(id);
+  TREE1.moveItem(id, sIdDown);
+}
+
+
+void closePanel()
+{
+  if(isDollarDefined(&quot;$bCalledFromAS&quot;))
+  {
+    bool reopenAS = false;
+    reopenAS = getDollarValue(&quot;$bCalledFromAS&quot;);
+    if(reopenAS)   
+      ModuleOnWithPanel(&quot;fwAS&quot;,
+                        0, 0, 0, 0, 1, 1, &quot;&quot;,
+                        &quot;fwAlarmHandling/fwAlarmHandlingGroupsScreen.pnl&quot;,
+                        &quot;&quot;,
+                        makeDynString(&quot;&quot;));    
+  }
+  PanelOff();
+}  
+
+
+void reorderNodes(string id)
+{
+  string sNodesList, sNode;
+  dyn_string exc, dsRet, dsChildren;
+  dyn_float dfRet;
+  const string kTmp = &quot;_temporaryNode&quot;;
+  int i,j;
+  bool ok=true;
+  
+  //can reorder only after saving
+  if(modified)
+  {
+    fwGeneral_openMessagePanel(&quot;Settings must be saved before proceeding. \nDo you want to save?&quot;,ok,exc,&quot;Save settings&quot;);
+    if(ok)
+    {
+      saveSettings();
+      loadSettings();      
+    }            
+  }
+  
+  if(ok)
+  {
+    fwGeneral_dynStringToString( TREE1.children(id), sNodesList);
+    ChildPanelOnModalReturn(&quot;fwAlarmHandling/fwAlarmHandlingGroupsConfigurationOrder.pnl&quot;,
+                            &quot;GroupsOrder&quot;,makeDynString(&quot;$sNodesList:&quot;+sNodesList),0,0,dfRet,dsRet);  
+    if(dynlen(dsRet))
+    {
+      //update custom order
+      saveGroupsOrder(dsRet);
+      loadSettings();
+    }
+  }
+}
+
+
+void saveGroupsOrder(dyn_string groupList)
+{
+  if(dynlen(groupList))
+  {    if(!dpExists(fwAlarmHandlingGroups_SETUP_DP))
+      dpCreate(fwAlarmHandlingGroups_SETUP_DP, fwAlarmHandlingGroups_SETUP_DPTYPE);
+    if(dpExists(fwAlarmHandlingGroups_ORDERMODE_DP))
+    {
+        dpSet(fwAlarmHandlingGroups_ORDER_DP,groupList);
+    }  
+  }
+}
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  setScaleStyle(SCALE_NONE);
+  while(TREE1.columns &lt; 3)
+    delay(0,100);
+  loadSettings();
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">20 10</prop>
+    <prop name="Size">496 26</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Alarm Screen Groups Configuration</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text(&quot;Alarm Screen Groups Configuration&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">920 690</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">920 690</prop>
+    <prop name="Size">107 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  closePanel();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON7" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">760 690</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">760 690</prop>
+    <prop name="Size">107 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Ok</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  saveSettings();
+  closePanel();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON13" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">640 690</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">640 690</prop>
+    <prop name="Size">107 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  saveSettings();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="TREE1" shapeType="TREE" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20.00000000000014 89.99999999999997</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="AcceptDrops">True</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 90</prop>
+    <prop name="Size">1011 581</prop>
+    <extended>
+     <prop type="BOOL" name="autoScroll">False</prop>
+     <prop type="BOOL" name="showDropIndicator">False</prop>
+     <prop type="BOOL" name="itemsExpandable">True</prop>
+     <prop type="BOOL" name="allColumnsShowFocus">False</prop>
+     <prop type="BOOL" name="animated">True</prop>
+     <prop type="BOOL" name="alternatingRowColors">True</prop>
+     <prop type="ENUM" name="horizontalScrollBarPolicy">1</prop>
+     <prop type="ENUM" name="contextMenuPolicy">1</prop>
+     <prop type="ENUM" name="selectionMode">0</prop>
+     <prop type="ENUM" name="resizeMode">0</prop>
+     <prop type="ENUM" name="resizePolicy">1</prop>
+     <prop type="ENUM" name="layoutDirection">0</prop>
+     <prop type="ENUM" name="defaultRenameAction">0</prop>
+     <prop type="ENUM" name="vScrollBarMode">0</prop>
+     <prop type="INT" name="itemMargin">3</prop>
+     <prop type="INT" name="midLineWidth">0</prop>
+     <prop type="INT" name="margin">0</prop>
+     <prop type="ENUM" name="hScrollBarMode">1</prop>
+     <prop type="BOOL" name="rootIsDecorated">True</prop>
+     <prop type="ENUM" name="frameShadow">16</prop>
+     <prop type="ENUM" name="frameShape">1</prop>
+     <prop type="INT" name="lineWidth">0</prop>
+     <script name="expanded" isEscaped="1"><![CDATA[expanded(string id)
+{
+//   txt_showHide.text = &quot;1;&quot;+id;
+}]]></script>
+     <script name="collapsed" isEscaped="1"><![CDATA[collapsed(string id)
+{
+//   txt_showHide.text = &quot;0;&quot;+id;
+}]]></script>
+     <script name="rightClicked" isEscaped="1"><![CDATA[rightClicked(string id, int column)
+{
+  int answer;
+  dyn_string menu;
+  int itemStatus;
+  string type = getItemType(id);
+  int enableReorder;
+
+  switch(type)
+  {
+    case fwAlarmHandlingGroups_TYPE_ROOT:
+      enableReorder = (dynlen(TREE1.children(id))&gt;1) ? 1 : 0;//if there are children, enable the Reorder option
+      popupMenu(makeDynString(&quot;PUSH_BUTTON,Add Group,1,1&quot;,
+                              &quot;PUSH_BUTTON,Reorder Groups,2,&quot;+enableReorder),answer);  
+      switch(answer)
+      {
+        case(1):
+          editNode(id,fwAlarmHandlingGroups_TYPE_GROUP, 1);
+        break;
+        case(2):
+          reorderNodes(id);
+        break;
+      }    
+    break;
+    case fwAlarmHandlingGroups_TYPE_GROUP:
+      popupMenu(makeDynString(&quot;PUSH_BUTTON,Edit,2,1&quot;,
+                              &quot;SEPARATOR&quot;,
+                              &quot;PUSH_BUTTON,Delete,1,1&quot;,                              
+                              &quot;SEPARATOR&quot;,
+                              &quot;CASCADE_BUTTON,Add,3,1&quot;,
+                              &quot;Add&quot;,
+                              &quot;PUSH_BUTTON,System name,4,1&quot;,
+                              &quot;PUSH_BUTTON,FSM Control Unit,5,1&quot;),answer);  
+      switch(answer)
+      {
+        case(1):
+          TREE1.removeItem(id);
+        break;
+        case(2):
+          editNode(id,fwAlarmHandlingGroups_TYPE_GROUP);
+        break;
+        case(4):
+          editNode(id,fwAlarmHandlingGroups_TYPE_SYS, 1);
+        break;
+        case(5):
+          editNode(id,fwAlarmHandlingGroups_TYPE_FSMCU, 1);
+        break;
+        case(6):
+          reorderNodes(id);
+        break;
+      }    
+    break;
+    case fwAlarmHandlingGroups_TYPE_SYS:
+      popupMenu(makeDynString(&quot;PUSH_BUTTON,Edit,2,1&quot;,
+                              &quot;SEPARATOR&quot;,
+                              &quot;PUSH_BUTTON,Delete,1,1&quot;,                              
+                              &quot;SEPARATOR&quot;,
+                              &quot;CASCADE_BUTTON,Add,3,1&quot;,
+                              &quot;Add&quot;,
+                              &quot;PUSH_BUTTON,Dpe,3,1&quot;,
+                              &quot;PUSH_BUTTON,Alias,4,1&quot;),answer);  
+      switch(answer)
+      {
+        case(1)://remove node
+          TREE1.removeItem(id);
+        break;
+        case(2):
+          editNode(id,fwAlarmHandlingGroups_TYPE_SYS);
+        break;
+        case(3)://add dpe
+          editFilter(id,fwAlarmHandlingGroups_TYPE_DP);
+        break;
+        case(4)://add dpe
+          editFilter(id,fwAlarmHandlingGroups_TYPE_ALIAS);
+        break;
+      }    
+    break;
+    case fwAlarmHandlingGroups_TYPE_DP: 
+    case fwAlarmHandlingGroups_TYPE_ALIAS:
+      popupMenu(makeDynString(&quot;PUSH_BUTTON,Edit,2,1&quot;,
+                              &quot;SEPARATOR&quot;,
+                              &quot;PUSH_BUTTON,Delete,1,1&quot;
+                              ),answer);  
+      switch(answer)
+      {
+        case(1):
+          TREE1.removeItem(id);
+        break;
+        case(2):
+          editFilter(TREE1.parent(id),type);
+        break;
+      } 
+    break;
+    case fwAlarmHandlingGroups_TYPE_FSMCU:
+      popupMenu(makeDynString(&quot;PUSH_BUTTON,Delete,1,1&quot;),answer);  
+      switch(answer)
+      {
+        case(1):
+          TREE1.removeItem(id);
+        break;
+      } 
+    break;
+  }
+}]]></script>
+     <script name="doubleClicked" isEscaped="1"><![CDATA[doubleClicked(string id, int column)
+{
+  string type = TREE1.getText(id,fwAlarmHandlingGroups_TABLE_COL_TYPE);
+
+  switch(type)
+  {
+    case fwAlarmHandlingGroups_TYPE_ROOT: 
+    break;
+    case fwAlarmHandlingGroups_TYPE_GROUP:
+          editNode(id,fwAlarmHandlingGroups_TYPE_GROUP);
+    break;
+    case fwAlarmHandlingGroups_TYPE_SYS:
+          editNode(id,fwAlarmHandlingGroups_TYPE_SYS); 
+    break;
+    case fwAlarmHandlingGroups_TYPE_DP: case fwAlarmHandlingGroups_TYPE_ALIAS:
+          editFilter(TREE1.parent(id),type);
+    break;
+    case fwAlarmHandlingGroups_TYPE_FSMCU:
+    break;
+  }
+}]]></script>
+    </extended>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main() 
+{
+    this.addColumn(&quot;Name&quot;); 
+    this.addColumn(&quot;Value&quot;); 
+    this.addColumn(&quot;Type&quot;);
+    this.setColumnWidthMode(0,1);//auto
+    this.setColumnWidthMode(1,0);//fixed
+    this.setColumnWidthMode(2,0);//fixed        
+    this.setColumnWidth(fwAlarmHandlingGroups_TABLE_COL_NAME,200);
+    this.setColumnWidth(fwAlarmHandlingGroups_TABLE_COL_VALUE,6000);
+    this.setColumnWidth(fwAlarmHandlingGroups_TABLE_COL_TYPE,0);
+    this.hideColumn(fwAlarmHandlingGroups_TABLE_COL_TYPE);
+    this.showHeader(false);
+    this.acceptDrops(true);
+}
+
+
+
+
+
+
+
+]]></script>
+    <script name="DragDrop" isEscaped="1"><![CDATA[main(string information, int dragType, string id)
+{
+//   LoadConfigsOnTree(dpSubStr(information,DPSUB_SYS_DP_EL)); 
+//   DebugN(&quot;drag drop&quot;,information, dragType, id);
+}
+
+
+
+
+]]></script>
+    <script name="DragStart" isEscaped="1"><![CDATA[main(int keys, string id)
+{
+//   DebugN(&quot;drag started&quot;,keys, id);
+}
+
+]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  //a
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">370 122</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">370 122</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="radioOrder" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">417.9999999999998 42</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">530 50</prop>
+    <prop name="Size">211 22</prop>
+    <prop name="Vertical">False</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Alphabetic</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Custom</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int iOrderMode;
+  if(dpExists(fwAlarmHandlingGroups_ORDERMODE_DP))
+  {
+      dpGet(fwAlarmHandlingGroups_ORDERMODE_DP,iOrderMode);
+      setValue(&quot;radioOrder&quot;,&quot;number&quot;,iOrderMode);
+  }  
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="FRAME1" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 42</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.7931034482758622 0 0 1 496.2068965517242 -12</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Order in Alarm Screen</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 42</prop>
+    <prop name="Size">291 49</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="cmHelp" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">604 10</prop>
+    <prop name="Geometry">1 0 0 1 401.0000000000001 -8</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwAlarmHandling/fwAlarmHandlingGroupsConfiguration</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="cmPanel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">890 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">890 40</prop>
+    <prop name="Size">141 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Sound/Panel setup...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[// SimpleCtrlScriptStart {invalid}
+main()
+{
+  EP_childPanelOn();
+}
+
+EP_childPanelOn()
+{
+  ChildPanelOnCentralModal(&quot;fwAlarmHandling/fwAlarmHandlingGroupsPanelSetup.pnl&quot;,
+      &quot;&quot;,
+      makeDynString(&quot;&quot;));
+}
+
+// SimpleCtrlScript {EP_childPanelOn}
+// Function {ChildPanelOnCentralModal}
+// File {fwAlarmHandling/fwAlarmHandlingGroupsAlertSoundSetup.pnl}
+// Panel {}
+// Parent {}
+// Module {}
+// OffsetX {0}
+// OffsetY {0}
+// SimpleCtrlScriptEnd {EP_childPanelOn}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmImEx" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 690</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Import/Export groups configs and panel/sound settings</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 690</prop>
+    <prop name="Size">121 31</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Import/Export</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Import</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">2</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Export</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+  const string PREFIX = &quot;fwAlarmHandlingGroupsExport_&quot;;
+  string sProjName, sFile;
+  dyn_string exceptionInfo;
+  bool ok;
+
+  sProjName = fwAlarmHandlingScreenGroups_getProjectName();
+  if(sProjName==&quot;&quot;)
+  {
+    fwException_raise(exceptionInfo, &quot;WARNING&quot;, &quot;fwAlarmHandlingGroupsConfiguration.pnl - could not get the loal project name. The Import/Export cannot be performed&quot;,&quot;&quot;);
+    return;
+  }
+  switch(id)
+  {
+    case 1://import
+      ok=true;
+      if(dynlen(TREE1.children(&quot;Groups&quot;))&gt;0)
+        fwGeneral_openMessagePanel(&quot;Warning: importing groups will merge\nnew groups with the existing ones.\nDo you want to continue?&quot;,ok,exceptionInfo,&quot;Importing&quot;,false);
+      if(!ok)
+      {
+        fwGeneral_openMessagePanel(&quot;Import Aborted&quot;,ok,exceptionInfo,&quot;Importing&quot;,true);
+        return;
+      }
+      fileSelector(sFile, getPath(DPLIST_REL_PATH),false,PREFIX+&quot;*&quot;);
+      if(isfile(sFile))
+      {
+        if(strpos(sFile,PREFIX)&lt;0)
+          fwGeneral_openMessagePanel(&quot;The file name must begin with &quot;+PREFIX,ok,exceptionInfo,&quot;&quot;,true);
+        openProgressBar(&quot;Groups Import&quot;, &quot;copy.gif&quot;, &quot;Importing Groups config and setup from &quot;,sFile, &quot; Be patient!&quot;, 1); 
+        saveSettings();
+        system(fwInstallation_getWCCOAExecutable(&quot;ascii&quot;) + &quot; -in &quot;+sFile+&quot; -proj &quot;+ sProjName );
+        loadSettings();
+        closeProgressBar();
+      }
+    break;
+
+    case 2://export      
+      fileSelector(sFile, getPath(DPLIST_REL_PATH),false,PREFIX+&quot;*&quot;,false);
+      if(strlen(sFile))
+      {
+        //if prefix does not exist, add it to file name
+        if(strpos(sFile,PREFIX)&lt;0)
+        {
+          string sTmp;
+          dyn_string dsTmp;
+          dsTmp = strsplit(sFile,&quot;/&quot;);
+          sTmp = dsTmp[dynlen(dsTmp)];
+          sTmp = PREFIX+sTmp;
+          dsTmp[dynlen(dsTmp)] = sTmp;
+          fwGeneral_dynStringToString(dsTmp, sFile, &quot;/&quot;);
+        }          
+        openProgressBar(&quot;Groups Export&quot;, &quot;copy.gif&quot;, &quot;Exporting Groups config and setup to &quot;,sFile, &quot; Be patient!&quot;, 1); 
+        saveSettings();
+        string command = fwInstallation_getWCCOAExecutable(&quot;ascii&quot;) + &quot; -filterDp \&quot;&quot;+fwAlarmHandlingGroups_SETUP_DP+
+                         &quot;*;\&quot; -filterDp \&quot;&quot;+fwAlarmHandlingGroups_CONFIG_DP+
+                         &quot;*;\&quot; -out \&quot;&quot;+sFile+&quot;\&quot; -proj \&quot;&quot;+ sProjName +&quot;\&quot; -filter DAO&quot;;
+        system(command);
+        closeProgressBar();
+      }
+    break;
+  }
+}
+
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

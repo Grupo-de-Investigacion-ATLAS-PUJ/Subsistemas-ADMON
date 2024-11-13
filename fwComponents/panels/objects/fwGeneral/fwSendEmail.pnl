@@ -1,0 +1,786 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.iso88591"></prop>
+   <prop name="en_GB.iso88591"></prop>
+  </prop>
+  <prop name="Size">401 533</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">20 30</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[const string FWGENERIC_EMAILDP = &quot;_fwKnownEmails&quot;;
+    
+void setEnabled( bool e )
+{
+  fromEd.enabled(e);
+  toEd.enabled(e);
+  subjectEd.enabled(e);
+  
+  bodyEd.enabled(e);
+  
+  attachTbl.enabled(e);
+  attachOKBtn.enabled(e);
+  attachDelBtn.enabled(e);
+  
+  sendBtn.enabled(e);
+  cancelBtn.enabled(e);
+}
+
+string getAttachments()
+{
+  dyn_string files = attachTbl.getColumnN( 0 );
+  string ret;
+  string sSeparator = &quot;\&quot;&quot;;
+  for( int ii = 1; ii &lt;= dynlen( files ); ++ii )
+  {
+    ret += &quot; &quot; + sSeparator + files[ii] + sSeparator;
+  }
+  
+  if (_WIN32)
+  {
+    strreplace(ret, &quot;/&quot;, &quot;\\&quot;);
+  } 
+  
+  return ret;
+}
+
+bool send()
+{
+  dyn_anytype daa;
+  string fromUser = fromEd.text;
+  string toUser = toEd.text;
+  string subject = subjectEd.text;
+  string body = bodyEd.text;
+  if( &quot;&quot; == body )
+    body = &quot; &quot;;
+
+
+  //ENS-11967 Because of windows we need to translate the return carriage
+  if (_WIN32)
+  {
+    strreplace(body, &quot;\n&quot;, &quot;\\n&quot;);  
+  }
+  
+  string filePath = getAttachments();
+  string smtpServer = &quot;cernmx.cern.ch&quot;;
+ 
+  string emailCommand = PVSS_PATH + &quot;bin/sendEmail -f &quot; + fromUser + &quot; &quot; +
+                        &quot;-t &quot; + toUser + &quot; &quot; +
+                        &quot;-u &quot; + &quot;\&quot;&quot; + subject + &quot;\&quot;&quot; + &quot; &quot; +
+                        &quot;-m &quot; + &quot;\&quot;&quot; + body + &quot;\&quot;&quot; + &quot; &quot; +
+                        &quot;-a &quot; + filePath + &quot; &quot; +
+                        &quot;-s &quot; + smtpServer + &quot; &quot;+
+                        &quot;-o tls=no&quot;;
+  
+//   DebugN(&quot;emailCommand = &quot; + emailCommand);
+    
+  int ret = system(emailCommand);
+  return ( 0 == ret );
+}
+
+void warning( string text )
+{
+  dyn_float df; dyn_string ds;
+  ChildPanelOnReturn(&quot;vision/MessageWarning&quot;, 
+                     &quot;Error&quot;, 
+                     makeDynString(&quot;$1:&quot;+text), 
+                     300, 200, df, ds);
+}
+
+bool prompt( string text )
+{
+  dyn_float df; dyn_string ds;
+  ChildPanelOnReturn(&quot;vision/MessageInfo&quot;, 
+                     &quot;Question&quot;, 
+                     makeDynString(&quot;$1:&quot;+text,
+                                   &quot;$2:Yes&quot;,
+                                   &quot;$3:No&quot;), 
+                     300, 200, df, ds);
+  return &quot;true&quot; == ds[1];
+}
+
+bool checkFields()
+{
+  string sSpecialCharactersToAvoidInToField = &quot;*[;!?+\&quot;'`%&amp;/\\(){}*^]*&quot;;
+  string sSpecialCharactersToAvoidInSubjectField = &quot;*[;!?+\&quot;'`%&amp;/\\()^]*&quot;;
+  string sSpecialCharactersToAvoidInBodyField = &quot;*[&amp;]*&quot;;
+  
+  if( &quot;&quot; == toEd.text )
+  {
+    warning(&quot;Please provide at least one receipient&quot;);
+    return false;
+  }
+  
+  if( false == patternMatch( &quot;*@*.*&quot;, toEd.text ) )
+  {
+    warning(&quot;Wrong e-mail address format&quot;);
+    return false;
+  }
+  
+  if ( true == patternMatch( sSpecialCharactersToAvoidInToField, toEd.text))
+  {
+    warning(&quot;Use space or comma to separate multiple addresses&quot;);
+    return false;
+  }
+  
+  if ( true == patternMatch( sSpecialCharactersToAvoidInSubjectField, subjectEd.text))
+  {
+    warning(&quot;Do not use special characters in subject field &quot;+sSpecialCharactersToAvoidInSubjectField);
+    return false;
+  }
+  
+  if ( true == patternMatch( sSpecialCharactersToAvoidInBodyField, bodyEd.text))
+  {
+    warning(&quot;Do not use special characters in body field &quot;+sSpecialCharactersToAvoidInBodyField);
+    return false;
+  }
+    
+  
+  if( &quot;&quot; == subjectEd.text &amp;&amp; !prompt(&quot;Do you really want to send e-mail without subject?&quot;) )
+  {
+    return false;
+  }
+  
+  if( &quot;&quot; == bodyEd.text &amp;&amp; !prompt(&quot;Do you really want to send an empty e-mail?&quot;) )
+  {
+    return false;
+  }
+  
+  if( 0 == attachTbl.lineCount &amp;&amp; (
+      true == patternMatch( &quot;*attach*&quot;, bodyEd.text ) ||
+      true == patternMatch( &quot;*Attach*&quot;, bodyEd.text ) ||
+      true == patternMatch( &quot;*joindr*&quot;, bodyEd.text ) || //parlez  vous francais?
+      true == patternMatch( &quot;*Joindr*&quot;, bodyEd.text ) 
+      ) &amp;&amp; !prompt(&quot;Looks like you've mentioned some attachments in the message, but nothing is attached. Do you really want to send this e-mail?&quot;))
+  {
+    return false;
+  }
+      
+  return true;
+}
+
+void initKnownEmailAddresses()
+{
+  dyn_string known_emails;
+  
+  if (dpExists(FWGENERIC_EMAILDP) == false)
+  {
+    return;
+  }
+  
+  dpGet(FWGENERIC_EMAILDP+&quot;.list&quot;, known_emails);
+  toEd.deleteAllItems();
+
+  //if there are already some emails
+  //we put a first blank entry so user the 
+  //feel like entering a new address  
+  if (dynlen(known_emails)&gt;0)
+  {
+    dynInsertAt( known_emails, &quot;&quot;, 1);
+  }
+  
+  toEd.items(known_emails);
+}
+
+void saveNewEmailAddresses()
+{
+  toEd.enabled( false);
+  dyn_string known_emails;
+  if (dpExists(FWGENERIC_EMAILDP) == false)
+  {
+    return;
+  }
+  dpGet(FWGENERIC_EMAILDP+&quot;.list&quot;, known_emails);
+  dyn_string new_addresses = strsplit( toEd.text(), &quot; &quot;);
+  dynAppend( known_emails, new_addresses);
+  dynSort( known_emails);
+  dynUnique( known_emails );
+  dpSetWait( FWGENERIC_EMAILDP+&quot;.list&quot;, known_emails);
+  toEd.enabled( true);
+}
+
+
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  initKnownEmailAddresses();
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="subjectLbl" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 90</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Subject</prop>
+     <prop name="en_GB.iso88591">Subject</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="fromLbl" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">12 12</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">From</prop>
+     <prop name="en_GB.iso88591">From</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="toLbl" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">12 52</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 52</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">To</prop>
+     <prop name="en_GB.iso88591">To</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="fromEd" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">70 8</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">70 8</prop>
+    <prop name="Size">321 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  string userName;
+  fwAccessControl_getUserName( userName );
+  this.text = userName + &quot;@cern.ch&quot;;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="subjectEd" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">70 86</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">70 86</prop>
+    <prop name="Size">321 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="bodyEd" shapeType="TEXT_EDIT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 130</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 130</prop>
+    <prop name="Size">381 211</prop>
+   </properties>
+  </shape>
+  <shape Name="attachTbl" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20.00000000000006 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 370</prop>
+    <prop name="Size">321 111</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">17</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">Path</prop>
+     <prop name="Width">300</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">Path</prop>
+      <prop name="en_GB.iso88591">Path</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+      <prop name="en_GB.iso88591"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.tableMode(TABLE_SELECT_MULTIPLE);
+  this.selectByClick(TABLE_SELECT_LINE);
+  this.rowHeight(15);  
+  
+  dyn_string dsAttachements = strsplit($attach, &quot;,&quot;);  
+  for( int i=1; i&lt;=dynlen(dsAttachements); i++)
+  {
+    this.appendLine(&quot;Path&quot;, dsAttachements[i] );
+    this.adjustColumn(0);
+  }
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="attachOKBtn" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">350 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">350 370</prop>
+    <prop name="Size">31 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Insert_end_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string fileName;
+  int ret = fileSelector( fileName, PROJ_PATH, false );
+  if( ret == -1 )
+    return;
+  
+  attachTbl.appendLine(&quot;Path&quot;, fileName );
+  attachTbl.adjustColumn(0);
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="attachDelBtn" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">350 410</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">350 410</prop>
+    <prop name="Size">31 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/delete_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="MouseReleased" isEscaped="1"><![CDATA[main()
+{
+  dyn_int selected = attachTbl.getSelectedLines();
+  dynSort( selected );
+  int count = dynlen(selected);
+  for( int ii = 1; ii &lt;= count; ++ii )
+  {
+    attachTbl.deleteLineN( selected[ii]-ii+1 );
+  }
+  attachTbl.adjustColumn(0);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="sendBtn" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">270 496</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">270 496</prop>
+    <prop name="Size">121 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Send</prop>
+     <prop name="en_GB.iso88591">Send</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  if( false == checkFields() )
+  {
+    return;
+  }
+  
+  statusLbl.text = &quot;Sending...&quot;;
+  setEnabled( false );
+  
+  bool ok = send();
+  
+  if( true == ok )
+  {
+    saveNewEmailAddresses();
+    PanelOff();
+  }
+  
+  setEnabled( true );
+  statusLbl.text = &quot;Error&quot;;
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="attachFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 352</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.09375 0 -35</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Attachments</prop>
+     <prop name="en_GB.iso88591">Attachements</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 352</prop>
+    <prop name="Size">381 129</prop>
+   </properties>
+  </shape>
+  <shape Name="cancelBtn" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 496</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 496</prop>
+    <prop name="Size">121 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Cancel</prop>
+     <prop name="en_GB.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOff();
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="statusLbl" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 500</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 500</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_GB.iso88591">Sans,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591"></prop>
+     <prop name="en_GB.iso88591"></prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="toEd" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">70 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Addresses must be separated by space for multiple recipients</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">70 50</prop>
+    <prop name="Size">321 27</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">True</prop>
+   </properties>
+   <events>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main()
+{
+
+  int current_item = toEd.selectedPos-1;
+  DebugTN(current_item);
+  int can_be_deleted = current_item &lt; 1 ? 0 : 1;    
+  DebugTN(can_be_deleted);
+  
+  int answer;
+  dyn_string menu = makeDynString(&quot;PUSH_BUTTON, Remove email from saved list, 1, &quot;+can_be_deleted);
+  popupMenu( menu, answer);
+  
+  if (answer==1)
+  {        
+    dyn_string emails;
+    dpGet( &quot;any_user.list&quot;, emails);
+    dynRemove( emails, current_item);
+    dpSetWait( &quot;any_user.list&quot;, emails);
+    initKnownEmailAddresses();
+  }
+  
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

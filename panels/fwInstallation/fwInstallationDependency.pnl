@@ -1,0 +1,623 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">476 289</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">120 20</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">HBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">0</prop>
+ </properties>
+ <events>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  // Overwriting default panel Close script to disable closing of the panel when Close button is clicked.
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[/**
+  This panel displays the list of the components which require the component being deleted ( component deletion )
+  or the list with components which are not installed and required by the component being installed ( component installation ).
+
+  Required $-parameters:
+
+  $strDependentNames - string - the names of components, separated with &quot;|&quot;, which require the component being deleted ( deleting ), the names of components=versions, separated by &quot;|&quot;, which require the comonent being installed (installing)
+  $componentName - string - the name of the component which requires other components ( installing ) or is required by other components ( deleting )
+
+  Panels called from this panel:
+
+  none
+*/
+
+// ------------------------------------------------------------------------------------------------
+
+main()
+{
+  dyn_string dsComponentNames;
+  dyn_string dsComponentVersions;
+  if(isDollarDefined(&quot;$fileComponentName&quot;) &amp;&amp; isDollarDefined(&quot;$fileComponentVersion&quot;)){
+    dsComponentNames = getList($fileComponentName);
+    dsComponentVersions = getList($fileComponentVersion);
+  }
+  int dsComponentNamesLen = dynlen(dsComponentNames);
+
+  int countAvailableToInstall;
+  dyn_string dsDependentComponents = getList($strDependentNames);
+  int dsDependentComponentsLen = dynlen(dsDependentComponents);
+  for(int i=1;i&lt;=dsDependentComponentsLen;i++){
+    string sDependentComponentName, sRequiredVersion;
+    fwInstallation_parseRequiredComponentNameVersion(dsDependentComponents[i], sDependentComponentName, sRequiredVersion);
+
+    string sAvailableVersion = getAvailableVersion(sDependentComponentName, dsComponentNamesLen,
+                                                   dsComponentNames, dsComponentVersions);
+    bool matchRequirements = (sAvailableVersion != &quot;&quot;) &amp;&amp;
+            (_fwInstallation_CompareVersions(sAvailableVersion, sRequiredVersion, false, false, true) == 1);
+    if(matchRequirements){
+      countAvailableToInstall++;
+    }
+    if(sRequiredVersion == &quot;&quot;){
+      sRequiredVersion = &quot;N/A&quot;;
+    }
+    appendRequirementToTable(sDependentComponentName, sRequiredVersion, sAvailableVersion, matchRequirements);
+  }
+  updateRequiredComponentsTable();
+  fwInstallation_ui_setTableAlternatingRowColors(getShape(&quot;requiredComponentsTable&quot;));
+
+  updateTopLabel($componentName, dsDependentComponentsLen &gt; 1);
+  updateAvailabilityInfoLabel(countAvailableToInstall, dsDependentComponentsLen);
+  updateActionButtons(countAvailableToInstall, dsDependentComponentsLen);
+}
+
+void appendRequirementToTable(string requiredComponentName, string requiredComponentVersion, string availableComponentVersion, bool matchRequirements){
+  requiredComponentsTable.appendLine(&quot;name&quot;, requiredComponentName, &quot;requiredVersion&quot;, requiredComponentVersion,
+                                     &quot;availableVersion&quot;, availableComponentVersion);
+  if(matchRequirements){
+    return;
+  }
+  int lineNum = requiredComponentsTable.lineCount();
+  requiredComponentsTable.cellForeColRC(lineNum - 1, &quot;name&quot;, &quot;red&quot;);
+  requiredComponentsTable.cellForeColRC(lineNum - 1, &quot;requiredVersion&quot;, &quot;red&quot;);
+  requiredComponentsTable.cellForeColRC(lineNum - 1, &quot;availableVersion&quot;, &quot;red&quot;);
+}
+
+void updateRequiredComponentsTable(){
+  requiredComponentsTable.adjustColumn(0);
+  requiredComponentsTable.adjustColumn(1);
+  requiredComponentsTable.columnStretchable(2, true);
+}
+
+void updateTopLabel(string componentName, bool multipleRequired){
+  txtWarning1.text = componentName + &quot; requires the following component version&quot; + (multipleRequired?&quot;s&quot;:&quot;&quot;) + &quot;:&quot;;
+}
+
+void updateAvailabilityInfoLabel(int availableComponentsNum, int requiredComponentsNum){
+  if(availableComponentsNum == requiredComponentsNum){
+    return;
+  }
+  string availablilityInfoText = (availableComponentsNum&lt;=0?&quot;None of the&quot;:
+                                  ((string)availableComponentsNum + &quot;/&quot; + (string)requiredComponentsNum));
+  availablilityInfoText += &quot; required components &quot; + (availableComponentsNum&gt;1?&quot;are&quot;:&quot;is&quot;) + &quot; available in required version.&quot;;
+
+  txtAvailabilityInfo.text = availablilityInfoText;
+  txtAvailabilityInfo.color = &quot;red&quot;;
+}
+
+void updateActionButtons(int availableComponentsNum, int requiredComponentsNum){
+  if(availableComponentsNum == 0){
+    installAllButton.visible = false;
+  }else if(availableComponentsNum != requiredComponentsNum){
+    installAllButton.text = &quot;Install available&quot;;
+  }
+}
+
+dyn_string getList(string elementsString){
+  return strsplit(elementsString, &quot;|&quot;);
+}
+
+string getAvailableVersion(string componentName, int dsComponentsLen, const dyn_string &amp;dsComponentNames, const dyn_string &amp;dsComponentVersions){
+  for(int i=1;i&lt;=dsComponentsLen;i++){
+    if(patternMatch(componentName, dsComponentNames[i])){
+      return dsComponentVersions[i];
+    }
+  }
+  return &quot;&quot;;
+}
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="txtWarning1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">75.5 9.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">77.5 11.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Component requires the following component versions:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="installButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">229.6630434782609 229.625</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Install only original component without any dependencies</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">134.5 186.5</prop>
+    <prop name="Size">171 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Install without dependencies</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_float dfVal = makeDynFloat(1);
+  dyn_string dsVal = makeDynString(&quot;Install_Delete&quot;);
+
+  // return values to the parent panel
+  PanelOffReturn(dfVal, dsVal);
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cancelButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">392.5 186.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">No component will be installed</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">392.5 186.5</prop>
+    <prop name="Size">75 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_float dfVal = makeDynFloat(1);
+  dyn_string dsVal = makeDynString(&quot;DoNotInstall_DoNotDelete&quot;);
+
+  // return values to the parent panel
+  PanelOffReturn(dfVal, dsVal);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="installAllButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">311.5 186.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Install all available component versions</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">311.5 186.5</prop>
+    <prop name="Size">75 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Install all</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_float dfVal = makeDynFloat(1);
+  dyn_string dsVal = makeDynString(&quot;InstallAll_DeleteAll&quot;);
+
+  // return values to the parent panel
+  PanelOffReturn(dfVal, dsVal);
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="requiredComponentsTable" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">69 35</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">69 35</prop>
+    <prop name="Size">398 119</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Horizontal</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">name</prop>
+     <prop name="Width">235</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">requiredVersion</prop>
+     <prop name="Width">75</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Required</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Required version</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">availableVersion</prop>
+     <prop name="Width">75</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Available</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Available version</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="backgroundRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">110 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.7972972972972973 0 0 0.9121338912133892 0 0</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">75 240</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="warningIcon" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">40 40</prop>
+    <prop name="maximumSize">40 40</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[none,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[fit,any,pictures/StandardIcons/Attention_40.png]]</prop>
+    <prop name="Geometry">1.026315789473684 0 0 1.026315789473684 -10.02631578947368 7.894736842105267</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 80</prop>
+    <prop name="Size">39 39</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">395 9</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">395 9</prop>
+    <prop name="Size">72 20</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="txtAvailabilityInfo" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">71 162</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">71 162</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">All required components are available</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER2" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">297 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">297 160</prop>
+    <prop name="Size">170 20</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER3" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">69 186</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">69 186</prop>
+    <prop name="Size">59 24</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="4" Name="LAYOUT_GROUP1" serial="0">
+   <properties>
+    <prop idx="0" name="shapeSerial">1</prop>
+    <prop idx="1" name="shapeSerial">21</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="4" Name="LAYOUT_GROUP2" serial="1">
+   <properties>
+    <prop idx="0" name="shapeSerial">18</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="4" Name="LAYOUT_GROUP3" serial="2">
+   <properties>
+    <prop idx="0" name="shapeSerial">22</prop>
+    <prop idx="1" name="shapeSerial">23</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="4" Name="LAYOUT_GROUP4" serial="3">
+   <properties>
+    <prop idx="0" name="shapeSerial">24</prop>
+    <prop idx="1" name="shapeSerial">6</prop>
+    <prop idx="2" name="shapeSerial">11</prop>
+    <prop idx="3" name="shapeSerial">5</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP5" serial="4">
+   <properties>
+    <prop idx="0" name="groupSerial">0</prop>
+    <prop idx="3" name="groupSerial">3</prop>
+    <prop idx="1" name="groupSerial">1</prop>
+    <prop idx="2" name="groupSerial">2</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">9</prop>
+    <prop name="layoutBottomMargin">9</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP6" serial="5">
+   <properties>
+    <prop name="shapeSerial">19</prop>
+    <prop idx="0" name="shapeSerial">20</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

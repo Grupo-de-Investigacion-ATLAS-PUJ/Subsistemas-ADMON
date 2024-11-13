@@ -1,0 +1,1233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Manual Peer Importation</prop>
+  </prop>
+  <prop name="Size">700 610</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">100 210</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[const string SOURCE_DIR_TEXT = &quot;Enter path to XML files ...&quot;;
+mapping g_mXmlFilePath, g_mXmlFilePathRemoved;
+
+// ------------------------------------------------------------------------------------------------
+
+void enablePanel(bool enable)
+{
+  btnSelectSourceDir.enabled = enable;
+  btnCancel.enabled = enable;
+  btnSync.enabled = enable;
+  cbScanRecursively.enabled = enable;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void init()
+{
+  bool found = false;
+  tblComponentsToBeInstalled.deleteAllLines();
+  tblComponentsToBeRemoved.deleteAllLines();
+
+  dyn_string componentsToBeInstalledInfo = strsplit($componentsToBeInstalled, &quot;%&quot;);
+  dyn_string componentsToBeRemovedInfo = strsplit($componentsToBeRemoved, &quot;%&quot;);
+
+  txtSourceDir.text = SOURCE_DIR_TEXT;
+  txtSourceDir.foreCol = &quot;grey&quot;;
+
+  initTables();
+  initUi();
+
+  for(int i =1; i &lt;= dynlen(componentsToBeInstalledInfo); i++)
+  {
+    strreplace(componentsToBeInstalledInfo[i], &quot; &quot;, &quot;&quot;);
+    dyn_string componentInfo = strsplit(componentsToBeInstalledInfo[i], &quot;|&quot;);
+
+    //check that the component XML file can be accessed:
+    if(access(componentInfo[FW_INSTALLATION_DB_COMPONENT_DESC_FILE_IDX], R_OK))
+    {
+      fwInstallation_throw(&quot;Component XML file is not readable: &quot; + componentInfo[FW_INSTALLATION_DB_COMPONENT_DESC_FILE_IDX], &quot;WARNING&quot;, 10);
+      found = false;
+    }
+    else
+    {
+      found = true;
+    }
+
+    if(componentInfo[7] == &quot;TRUE&quot;)
+    {
+      tblComponentsToBeInstalled.appendLine(&quot;component&quot;, &quot;_&quot; + componentInfo[FW_INSTALLATION_DB_COMPONENT_NAME_IDX],
+                                          &quot;version&quot;, componentInfo[FW_INSTALLATION_DB_COMPONENT_VERSION_IDX]);
+      g_mXmlFilePath[i-1] = componentInfo[FW_INSTALLATION_DB_COMPONENT_DESC_FILE_IDX];
+    }
+    else
+    {
+      tblComponentsToBeInstalled.appendLine(&quot;component&quot;, componentInfo[FW_INSTALLATION_DB_COMPONENT_NAME_IDX],
+                                          &quot;version&quot;, componentInfo[FW_INSTALLATION_DB_COMPONENT_VERSION_IDX]);
+      g_mXmlFilePath[i-1] = componentInfo[FW_INSTALLATION_DB_COMPONENT_DESC_FILE_IDX];
+    }
+
+    int n = (tblComponentsToBeInstalled.lineCount()-1); //line number
+
+    if(!found)
+    {
+      tblComponentsToBeInstalled.cellBackColRC(n, &quot;component&quot;, &quot;red&quot;);
+      tblComponentsToBeInstalled.cellBackColRC(n, &quot;version&quot;, &quot;red&quot;);
+    }
+  }
+
+  for(int i =1; i &lt;= dynlen(componentsToBeRemovedInfo); i++)
+  {
+    strreplace(componentsToBeRemovedInfo[i], &quot; &quot;, &quot;&quot;);
+    dyn_string componentInfo = strsplit(componentsToBeRemovedInfo[i], &quot;|&quot;);
+    //check that the component XML file can be accessed:
+    if(access(componentInfo[FW_INSTALLATION_DB_COMPONENT_DESC_FILE_IDX], R_OK))
+    {
+      fwInstallation_throw(&quot;Component XML file is not readable: &quot; + componentInfo[FW_INSTALLATION_DB_COMPONENT_DESC_FILE_IDX], &quot;WARNING&quot;, 10);
+      found = false;
+    }
+    else
+    {
+      found = true;
+    }
+
+    if(componentInfo[7] == &quot;TRUE&quot;)
+    {
+      tblComponentsToBeRemoved.appendLine(&quot;component&quot;, &quot;_&quot; + componentInfo[FW_INSTALLATION_DB_COMPONENT_NAME_IDX],
+                                          &quot;version&quot;, componentInfo[FW_INSTALLATION_DB_COMPONENT_VERSION_IDX]);
+      g_mXmlFilePathRemoved[i-1] = componentInfo[FW_INSTALLATION_DB_COMPONENT_DESC_FILE_IDX];
+    }
+    else
+    {
+      tblComponentsToBeRemoved.appendLine(&quot;component&quot;, componentInfo[FW_INSTALLATION_DB_COMPONENT_NAME_IDX],
+                                          &quot;version&quot;, componentInfo[FW_INSTALLATION_DB_COMPONENT_VERSION_IDX]);
+      g_mXmlFilePathRemoved[i-1] = componentInfo[FW_INSTALLATION_DB_COMPONENT_DESC_FILE_IDX];
+    }
+
+    int n = (tblComponentsToBeRemoved.lineCount()-1); //line number
+
+    if(!found)
+    {
+      tblComponentsToBeRemoved.cellBackColRC(n, &quot;component&quot;, &quot;red&quot;);
+      tblComponentsToBeRemoved.cellBackColRC(n, &quot;version&quot;, &quot;red&quot;);
+    }
+  }
+
+  tblComponentsToBeInstalled.deleteSelection();
+  tblComponentsToBeRemoved.deleteSelection();
+}
+
+// ------------------------------------------------------------------------------------------------
+
+initTables()
+{
+  tblComponentsToBeInstalled.tableMode(TABLE_SELECT_BROWSE);
+  tblComponentsToBeInstalled.selectByClick(TABLE_SELECT_LINE);
+  tblComponentsToBeRemoved.tableMode(TABLE_SELECT_BROWSE);
+  tblComponentsToBeRemoved.selectByClick(TABLE_SELECT_LINE);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+initUi()
+{
+  LayerOff(3);
+  LayerOff(4);
+  LayerOff(5);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void locateXmlFile(int row)
+{
+  string sDescFile = g_mXmlFilePath[row];
+  string component = tblComponentsToBeInstalled.cellValueRC(row, &quot;component&quot;);
+  string version = tblComponentsToBeInstalled.cellValueRC(row, &quot;version&quot;);
+
+  dyn_string ds = strsplit(sDescFile, &quot;/&quot;);
+  sDescFile = ds[dynlen(ds)];
+
+  string newDescFile;
+  string sPath;
+  string dp = fwInstallation_getInstallationDp();
+  dpGet(dp + &quot;.lastSourcePath&quot;, sPath);
+
+  if(access(sPath, F_OK) &lt; 0) //directory does not exist
+    sPath = PROJ_PATH;
+
+  fileSelector(newDescFile, sPath, false, sDescFile);
+  if(newDescFile != &quot;&quot;)
+  {
+    if (_WIN32)
+    {
+      strreplace( newDescFile, &quot;/&quot;, &quot;//&quot; );
+    }
+
+    strreplace(newDescFile, &quot;//&quot;, &quot;/&quot; );
+    //check the version of the component
+    dyn_string values;
+    dyn_anytype attribs;
+
+    fwInstallationXml_getTag(newDescFile, &quot;name&quot;, values, attribs);
+    string xmlComponent = &quot;&quot;;
+    if(dynlen(values)) xmlComponent = values[1];
+
+    dynClear(values);
+    dynClear(attribs);
+
+    fwInstallationXml_getTag(newDescFile, &quot;version&quot;, values, attribs);
+    string xmlVersion = &quot;&quot;;
+    if(dynlen(values)) xmlVersion = values[1];
+
+    if(component != xmlComponent)
+    {
+      ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;Invalid component name&quot;, makeDynString(&quot;$1:Name mismatch. XML: &quot; + xmlComponent + &quot; differs from: &quot; + component + &quot;\nThis component cannot be installed&quot;));
+      return;
+    }
+
+    if(version != xmlVersion)
+    {
+      ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;Invalid component version&quot;, makeDynString(&quot;$1:Version mismatch. XML: &quot; + xmlVersion + &quot; differs from: &quot; + version + &quot;\nThis component cannot be installed&quot;));
+      return;
+    }
+
+    g_mXmlFilePath[row] = newDescFile;
+    tblComponentsToBeInstalled.cellBackColRC(row, &quot;component&quot;, &quot;_Window&quot;);
+  }
+}
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  init();
+}
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="tblComponentsToBeInstalled" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9.999999999999989 55</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 55</prop>
+    <prop name="Size">330 291</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">component</prop>
+     <prop name="Width">240</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Component</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">version</prop>
+     <prop name="Width">70</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Version</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  string sComponentName = this.getLineN(row)[1];
+  string sColor = this.cellBackColRC(row, column);
+
+  LayerOff(2);
+  LayerOn(3);
+
+  locateXMLButton.enabled(TRUE);
+
+  xmlFilePathField.text = g_mXmlFilePath[row];
+  detailFrame.text = &quot;Details of &quot; + sComponentName;
+
+  if(&quot;red&quot; == sColor)
+  {
+    xmlStateRectangle.backCol(sColor);
+    xmlStateLabel.text = &quot;XML file not accessible: &quot; + sComponentName + &quot; will not be installed.&quot;;
+  }
+  else
+  {
+    xmlStateRectangle.backCol(&quot;green&quot;);
+    xmlStateLabel.text = &quot;XML file OK.&quot;;
+  }
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">614.9999999999998 575</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">615 575</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOffReturn(makeDynFloat(0.), makeDynString(&quot;Cancel&quot;));
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnSync" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">408 575</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">408 575</prop>
+    <prop name="Size">200 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Import (I know what I'm doing)</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string descFiles = makeDynString();
+  dyn_string allDescFiles = makeDynString();
+  dyn_string wrongComponents = makeDynString();
+  dyn_string allComponents = makeDynString();
+  dyn_string wrongVersions = makeDynString();
+  dyn_string allVersions = makeDynString();
+
+  for(int i = 0 ; i &lt; tblComponentsToBeInstalled.lineCount(); i++)
+  {
+    dynAppend(allDescFiles,  g_mXmlFilePath[i]);
+    dynAppend(allComponents, tblComponentsToBeInstalled.cellValueRC(i, &quot;component&quot;));
+    dynAppend(allVersions, tblComponentsToBeInstalled.cellValueRC(i, &quot;version&quot;));
+  }
+
+  //are all files readable?
+  for(int i = 1; i &lt;= dynlen(allDescFiles); i++)
+  {
+DebugN(access(allDescFiles[i], R_OK));
+
+
+    if(access(allDescFiles[i], R_OK))
+    {
+      dynAppend(wrongComponents, allComponents[i]);
+      dynAppend(wrongVersions, allVersions[i]);
+    }
+    else
+    {
+      dynAppend(descFiles, allDescFiles[i]);
+    }
+  }
+
+  dyn_string ds;
+  dyn_float df;
+
+  DebugN(&quot;wrongComponents, wrongVersions, descFiles&quot;, wrongComponents, wrongVersions, descFiles);
+
+  if(dynlen(wrongComponents))
+  {
+    ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallation_reduSyncShowWrongComponents.pnl&quot;,
+                                   &quot;Confirm ...&quot;,
+                                   makeDynString(&quot;$wrongComponents:&quot; + wrongComponents, &quot;$wrongVersions:&quot; + wrongVersions),
+                                   df, ds);
+  }
+
+  int deleteFiles = cbDeleteFiles.state(0);
+  if((dynlen(wrongComponents) == 0 &amp;&amp; dynlen(descFiles))||
+     dynlen(df) &amp;&amp; df[1] == 1. &amp;&amp; dynlen(descFiles)) PanelOffReturn(makeDynFloat(1., deleteFiles), descFiles);
+  else PanelOffReturn(makeDynFloat(0.), makeDynString());
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="installLocalLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 35</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 35</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">To be installed locally:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="removeLocalLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">360 35</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">360 35</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">To be removed locally:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="tblComponentsToBeRemoved" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">802 87</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">360 55</prop>
+    <prop name="Size">330 291</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">component</prop>
+     <prop name="Width">240</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Component</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">version</prop>
+     <prop name="Width">70</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Version</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  string sComponentName = this.getLineN(row)[1];
+  string sColor = this.cellBackColRC(row, column);
+
+  LayerOff(2);
+  LayerOn(3);
+
+  locateXMLButton.enabled(FALSE);
+
+  xmlFilePathField.text = g_mXmlFilePathRemoved[row];
+  detailFrame.text = &quot;Details of &quot; + sComponentName;
+
+  if(&quot;red&quot; == sColor)
+  {
+    xmlStateRectangle.backCol(sColor);
+    xmlStateLabel.text = &quot;XML file not accessible: &quot; + sComponentName + &quot; will not be installed.&quot;;
+  }
+  else
+  {
+    xmlStateRectangle.backCol(&quot;green&quot;);
+    xmlStateLabel.text = &quot;XML file OK.&quot;;
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="globalSettingsFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 422</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">6.008849557522123 0 0 1.890625 -50.08849557522123 -354.84375</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Global settings</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 422</prop>
+    <prop name="Size">114 65</prop>
+   </properties>
+  </shape>
+  <shape Name="globalComponentDirectory" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21.00000000000001 465.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">21.00000000000001 465.0000000000001</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Component directory:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtSourceDir" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">430.0000000000001 371</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 485</prop>
+    <prop name="Size">629 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[main()
+{
+  string systemName;
+  bool scanRecursively = cbScanRecursively.state(0);
+
+  if(shapeExists(&quot;cbSystem&quot;))
+    systemName = cbSystem.text;
+  else
+    systemName = &quot;&quot;;
+
+  fwInstallation_getComponentsInfo(&quot;tblAvailableComponents&quot;, &quot;txtSourceDir&quot;, systemName, scanRecursively);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  if(this.text == &quot;&quot; || this.text == &quot; &quot;)
+  {
+    this.text = SOURCE_DIR_TEXT;
+    this.foreCol = &quot;grey&quot;;
+  }
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  if(this.text == SOURCE_DIR_TEXT)
+  {
+    this.text = &quot;&quot;;
+    this.foreCol = &quot;_3DText&quot;;
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cbDeleteFiles" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">190 511</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 534</prop>
+    <prop name="Size">250 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Delete files after component removal</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="cbScanRecursively" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">545 493</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">535 463</prop>
+    <prop name="Size">121 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Scan recursively</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="btnSelectSourceDir" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">183 230.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">653 483</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Open_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sPath;
+  bool scanRecursively = cbScanRecursively.state(0);
+  string dp = fwInstallation_getInstallationDp();
+
+  txtSourceDir.foreCol = &quot;_3DText&quot;;
+  dpGet(dp + &quot;.lastSourcePath&quot;, sPath);
+  folderSelector(sPath);
+
+  if(sPath != 0)
+  {
+      sPath += &quot;/&quot;;
+     if (_WIN32) strreplace( sPath, &quot;/&quot;, &quot;//&quot; );
+     strreplace( sPath, &quot;//&quot;, &quot;/&quot; );
+     txtSourceDir.text = sPath;
+     dpSet(&quot;fwInstallationInfo.lastSourcePath&quot;, sPath);
+  }
+
+  enablePanel(false);
+  // refresh the graphic tables with components
+  dyn_string allFiles;
+
+  if(cbScanRecursively.state(0))
+    allFiles = fwInstallation_getFileNamesRec(sPath, &quot;*.xml&quot;);
+  else
+    allFiles = getFileNames(sPath, &quot;*.xml&quot;);
+
+  for(int i = 0; i&lt; tblComponentsToBeInstalled.lineCount(); i++)
+  {
+    string sDescFile =  g_mXmlFilePath[i];
+    string component = tblComponentsToBeInstalled.cellValueRC(i, &quot;component&quot;);
+    string version = tblComponentsToBeInstalled.cellValueRC(i, &quot;version&quot;);
+
+    dyn_string pathElements = strsplit(sDescFile, &quot;/&quot;);
+    sDescFile = pathElements[dynlen(pathElements)];
+    int found = -1;
+    string newDescFile = &quot;&quot;;
+    string fullPathFilename;
+
+    for(int j = 1; j &lt;= dynlen(allFiles); j++)
+    {
+      strreplace(allFiles[j], &quot;\\&quot;, &quot;/&quot;);
+      fullPathFilename = sPath + allFiles[j];
+      if(patternMatch(&quot;*/&quot; + sDescFile, fullPathFilename))
+      {
+        //check the version of the component
+        dyn_string values;
+        dyn_anytype attribs;
+
+        dynClear(values);
+        dynClear(attribs);
+
+        fwInstallationXml_getTag(fullPathFilename, &quot;name&quot;, values, attribs);
+        string xmlComponent = &quot;&quot;;
+        if(dynlen(values)) xmlComponent = values[1];
+
+        dynClear(values);
+        dynClear(attribs);
+
+        fwInstallationXml_getTag(fullPathFilename, &quot;version&quot;, values, attribs);
+        string xmlVersion = &quot;&quot;;
+        if(dynlen(values)) xmlVersion = values[1];
+
+        dyn_string ds;
+        dyn_float df;
+
+        if(component != xmlComponent)
+        {
+          ChildPanelOnCentralModalReturn(&quot;vision/MessageInfo1&quot;, &quot;Invalid component name&quot;, makeDynString(&quot;$1:&quot;+component+&quot;: name mismatch.\nXML: &quot; + xmlComponent + &quot; differs from: &quot; + component + &quot;.\nThis component cannot be installed&quot;), df, ds);
+          continue;
+        }
+
+        if(version != xmlVersion)
+        {
+          ChildPanelOnCentralModalReturn(&quot;vision/MessageInfo1&quot;, &quot;Invalid component version&quot;, makeDynString(&quot;$1:&quot;+component+&quot;: version mismatch.\nXML: &quot; + xmlVersion + &quot; differs from: &quot; + version + &quot;.\nThis component cannot be installed&quot;), df, ds);
+          continue;
+        }
+
+        found = i;
+        newDescFile = fullPathFilename;
+        break;
+      }
+    }
+
+    if(found &gt;= 0 &amp;&amp; newDescFile != &quot;&quot;)
+    {
+      g_mXmlFilePath[found] = newDescFile;
+      tblComponentsToBeInstalled.cellBackColRC(found, &quot;component&quot;, &quot;_Window&quot;);
+    }
+  }
+
+  enablePanel(true);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="separator" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21.00000000000001 522</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">darkgrey</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">21 522</prop>
+    <prop name="End">678 522</prop>
+   </properties>
+  </shape>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">7.999999999999986 2</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">9.999999999999986 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Manual Peer Synchronization</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="noComponentBg" shapeType="RECTANGLE" layerId="1">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 48</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_WindowAlternate</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 1 7.105427357601002e-15 20</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 336</prop>
+    <prop name="Size">680 77</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="noComponentText" shapeType="PRIMITIVE_TEXT" layerId="1">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">348 382</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">350 384</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Please select a component.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="xmlStateRectangle" shapeType="RECTANGLE" layerId="2">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">270 310</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 1 614 88.00000000000006</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 290</prop>
+    <prop name="Size">16 16</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="xmlStateLabel" shapeType="PRIMITIVE_TEXT" layerId="2">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">627 378</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">627 378</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">XML file not accessible: Component will not be installed.</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="xmlFilePathField" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">430.0000000000001 337</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 398</prop>
+    <prop name="Size">629 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="locateXMLButton" shapeType="PUSH_BUTTON" layerId="2">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">183 143.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Locate the path of the xml file</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">653 396</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Open_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int iRow = tblComponentsToBeInstalled.getSelectedLines()[1];
+
+  locateXmlFile(iRow);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="detailFrame" shapeType="FRAME" layerId="2">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 282</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.8705128205128205 0 0 0.6440677966101694 1.294871794871802 174.3728813559322</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Details of component</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 282</prop>
+    <prop name="Size">781 119</prop>
+   </properties>
+  </shape>
+  <shape Name="xmlPathLabel" shapeType="PRIMITIVE_TEXT" layerId="2">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21.00000000000001 378.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">21.00000000000001 378.0000000000001</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">XML file path:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

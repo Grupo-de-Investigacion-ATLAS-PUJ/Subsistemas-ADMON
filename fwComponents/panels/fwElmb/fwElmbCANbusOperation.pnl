@@ -1,0 +1,1339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">695 567</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="PDPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+
+#uses &quot;panel.ctl&quot;
+#uses &quot;fwGeneral/fwExceptionHandling.ctl&quot;
+#uses &quot;fwGeneral/fwException.ctl&quot;
+
+#uses &quot;fwElmb/fwElmbUtils.ctl&quot;
+
+void pnlResetBusCommand(int iAction)
+{
+// Local Variables
+// ---------------
+	int iLines, i;
+  string sElmbDpName;
+
+	string sDpe = &quot;.management&quot;;
+
+// Executable Code
+// ---------------
+	// Action the command
+	//dpSet($sDpName + sDpe, iAction);
+
+	// Get all ELMBs shown
+	iLines = tabCANSystem.lineCount;
+
+  //Action reset on all ELMBs
+  for(i = 0; i &lt;= iLines-1; i++){
+     sElmbDpName = tabCANSystem.cellValueRC(i, &quot;elmbDpName&quot;);
+     dpSet(sElmbDpName + sDpe, iAction);
+  }
+
+	// Set the status text for each
+  	for (i = 0; i &lt;= iLines-1; i++)
+		tabCANSystem.cellValueRC(i, &quot;status&quot;) = &quot;wait...&quot;;
+
+	// Return to calling routine
+	return;
+
+}
+
+void pnlBusStateRequest(string iAction)
+{
+// Local Variables
+// ---------------
+	int iLines, i;
+  string sElmbDpName;
+
+	string sDpe = &quot;.requestedState&quot;;
+
+// Executable Code
+// ---------------
+	// Action the command
+	//dpSet($sDpName + sDpe, iAction);
+
+	// Get all ELMBs shown
+	iLines = tabCANSystem.lineCount;
+
+  //Action reset on all ELMBs
+  for(i = 0; i &lt;= iLines-1; i++){
+     sElmbDpName = tabCANSystem.cellValueRC(i, &quot;elmbDpName&quot;);
+     DebugN(&quot;Changing state for &quot; + sElmbDpName);
+     dpSet(sElmbDpName + sDpe, iAction);
+  }
+
+	// Set the status text for each
+  	for (i = 0; i &lt;= iLines-1; i++)
+		tabCANSystem.cellValueRC(i, &quot;status&quot;) = &quot;wait...&quot;;
+
+	// Return to calling routine
+	return;
+}
+
+void pnlResetNodeCommand(int iAction)
+{
+// Local Variables
+// ---------------
+	string sElmbName;
+	string sElmbDpName;
+	string sDpe = &quot;.management&quot;;
+
+	dyn_int diRows;
+
+// Executable Code
+// ---------------
+	// Get any selected rows
+	diRows = tabCANSystem.getSelectedLines;
+	if (dynlen(diRows) &gt; 0) {
+		// Get the first ELMB in the list
+		sElmbDpName = tabCANSystem.cellValueRC(diRows[1], &quot;elmbDpName&quot;);
+		sElmbName = tabCANSystem.cellValueRC(diRows[1], &quot;elmbName&quot;);
+
+		// Indicate the action that is about to be completed
+		txtLastAction.text = sElmbName + &quot; reset&quot;;
+		txtLastAction.visible = true;
+
+		// Action the command
+		dpSet(sElmbDpName + sDpe, iAction);
+
+		// Set the status text for the specific ELMB
+		tabCANSystem.selectLineN(diRows[1]);
+		tabCANSystem.cellValueRC(diRows[1], &quot;status&quot;) = &quot;wait...&quot;;
+	} else {
+		// Show user what&#x27;s wrong (and therefore why the action cannot be completed)
+		ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+												&quot;Warning&quot;,
+												makeDynString(&quot;No ELMB node selected&quot;));
+	}
+
+	// Return to calling routine
+	return;
+}
+
+void pnlNodeStateRequest(string state)
+{
+// Local Variables
+// ---------------
+  string sElmbName;
+  string sElmbDpName;
+  string currentStatus;
+  dyn_anytype OPValues;
+  string sDpe = &quot;.requestedState&quot;;
+  int status;
+
+  dyn_int diRows;
+
+  OPValues = makeDynAnytype(5, 133);
+
+// Executable Code
+// ---------------
+  DebugN(&quot;State requested is: &quot; + state);
+  diRows = tabCANSystem.getSelectedLines;
+  if(dynlen(diRows) &gt; 0){
+    sElmbDpName = tabCANSystem.cellValueRC(diRows[1], &quot;elmbDpName&quot;);
+    sElmbName = tabCANSystem.cellValueRC(diRows[1], &quot;elmbName&quot;);
+
+  // Action command
+  dpSet(sElmbDpName + sDpe, state);
+
+  tabCANSystem.selectLineN(diRows[1]);
+	tabCANSystem.cellValueRC(diRows[1], &quot;status&quot;) = &quot;wait...&quot;;
+
+  switch (state) {
+			case &quot;OPERATIONAL&quot;:
+				txtLastAction.text = &quot;Changing &quot; + sElmbName + &quot; to OP&quot;;
+				break;
+			case &quot;PREOPERATIONAL&quot;:
+				txtLastAction.text = &quot;Changing &quot; + sElmbName + &quot; to PREOP&quot;;
+				break;
+		}
+
+		txtLastAction.visible = true;
+
+
+	} else {
+
+		// Show user what's wrong (and therefore why the action cannot be completed)
+		ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+												&quot;Warning&quot;,
+												makeDynString(&quot;No ELMB node selected&quot;));
+	}
+
+	// Return to calling routine
+	return;
+
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="txtTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">51 41</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">schwarz</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">13 23</prop>
+    <prop name="Size">296 25</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Elmb CANbus Operation Panel</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmNode" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">400 500</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select an ELMB on the table to send a management message</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1 0 20</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Send message to selected node</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">400 440</prop>
+    <prop name="Size">284 60</prop>
+   </properties>
+  </shape>
+  <shape Name="frmBus" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">11 560</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Send management messages to all nodes on the bus</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Send message to all nodes on the bus</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">11 440</prop>
+    <prop name="Size">289 120</prop>
+   </properties>
+  </shape>
+  <shape Name="txtSyncInterval" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">37 496</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">39 498</prop>
+    <prop name="Size">117 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Sync. interval (ms):</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtNodeGuardInterval" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">37 526</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">39 528</prop>
+    <prop name="Size">147 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Node guard interval (ms):</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="Group3" referenceId="0">
+   <properties>
+    <prop name="FileName">gedi/EP_enter.ref</prop>
+    <prop name="Location">330 460</prop>
+    <prop name="Geometry">1 0 0 1 -63 36</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <reference parentSerial="-1" Name="Group4" referenceId="1">
+   <properties>
+    <prop name="FileName">gedi/EP_enter.ref</prop>
+    <prop name="Location">330 490</prop>
+    <prop name="Geometry">1 0 0 1 -63 36</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="txtLastAction" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">309 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">311 532</prop>
+    <prop name="Size">368 27</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmShowColumns" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">510 77</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Show Columns</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">510 10</prop>
+    <prop name="Size">140 70</prop>
+   </properties>
+  </shape>
+  <shape Name="tabCANSystem" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-9 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 90</prop>
+    <prop name="Size">675 341</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">26</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">elmbDpName</prop>
+     <prop name="Width">121</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">elmbDpName</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">elmbName</prop>
+     <prop name="Width">124</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Elmb Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">comment</prop>
+     <prop name="Width">124</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Comment</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">elmbId</prop>
+     <prop name="Width">27</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">ID</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">analogIn</prop>
+     <prop name="Width">28</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">AI</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Number of analog input channels of this ELMB</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">analogInSdo</prop>
+     <prop name="Width">60</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">AI_SDO</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Number of SDO analog input channels of this ELMB</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">analogOut</prop>
+     <prop name="Width">32</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">AO</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Number of analog output channels of this ELMB</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">digitalIn</prop>
+     <prop name="Width">28</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">DI</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Number of digital input channels of this ELMB</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">digitalOut</prop>
+     <prop name="Width">32</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">DO</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Number of digital output channels of this ELMB</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">bootup</prop>
+     <prop name="Width">180</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Bootup</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Bootup counter and time of the last bootup</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">status</prop>
+     <prop name="Width">84</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Status</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">ELMB status (Operational/Stopped/PreOp/Disconnected)</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">elmbError</prop>
+     <prop name="Width">180</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Error</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">ELMB error register and time of the last error message (0 means no error)</prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[#uses &quot;fwElmb/fwElmbUtils.ctl&quot;
+
+main()
+{
+// Local Variables
+// ---------------
+  int i;
+
+  string sBusName;
+
+  dyn_string dsTemp;
+  dyn_string dsExceptionInfo;
+  dyn_string dsElmbs;
+
+// Executable Code
+// ---------------
+  // Connect to the children of the view
+  this.tableMode = TABLE_SELECT_BROWSE;
+  this.selectByClick = 1;
+
+  // Get all Elmbs in this Bus
+  fwElmbUtils_getCanBusName($sDpName, true, sBusName, false);
+  dsElmbs = dpNames(sBusName + fwDevice_HIERARCHY_SEPARATOR + &quot;*&quot;, ELMB_TYPE_NAME);
+  this.deleteAllLines();
+
+  // Check if any ELMBs exist
+  if (dynlen(dsElmbs) &lt;= 0) {
+    fwException_raise(dsExceptionInfo,
+                      &quot;WARNING&quot;,
+                      &quot;No Elmbs were found on \&quot;&quot; + sBusName + &quot;\&quot;\nControls locked!&quot;, &quot;&quot;);
+    fwExceptionHandling_display(dsExceptionInfo);
+
+    // Set controls as required
+    cmdBusReset.enabled = false;
+    cmdBusStart.enabled = false;
+    cmdBusStop.enabled = false;
+    cmdNodeReset.enabled = false;
+    cmdNodeStart.enabled = false;
+    cmdNodeStop.enabled = false;
+    txtSyncIntervalValue.enabled = false;
+    txtNodeGuardIntervalValue.enabled = false;
+    txtLastAction.text = &quot;Bus empty!&quot;;
+    txtLastAction.visible = true;
+    tabCANSystem.enabled = false;
+
+  } else {
+
+    // Set controls to allow for operation
+    cmdBusReset.enabled = true;
+    cmdBusStart.enabled = true;
+    cmdBusStop.enabled = true;
+    cmdNodeReset.enabled = true;
+    cmdNodeStart.enabled = true;
+    cmdNodeStop.enabled = true;
+    txtSyncIntervalValue.enabled = true;
+    txtNodeGuardIntervalValue.enabled = true;
+    txtLastAction.text = &quot;&quot;;
+    txtLastAction.visible = false;
+    tabCANSystem.enabled = true;
+
+    // Connect to the information for each ELMB
+    for (i = 1; i &lt;= dynlen(dsElmbs); i++) {
+
+      dpConnect(&quot;cbkUpdateLine&quot;,
+                dsElmbs[i] + &quot;.state.value&quot;,
+                dsElmbs[i] + &quot;.bootup&quot;,
+                dsElmbs[i] + &quot;.bootup:_online.._stime&quot;,
+                dsElmbs[i] + &quot;.error&quot;,
+                dsElmbs[i] + &quot;.error:_online.._stime&quot;);
+
+    } // End of 'for' loop through ELMBs
+  }
+
+  // Return to calling routine
+  return;
+}
+
+void cbkUpdateLine(string argsState, int argiState,
+                   string argsBootup, int argiBootup,
+                   string argsBootupStime, string argsBootupTime,
+                   string argsError, int argiError,
+                   string argsErrorStime, string argsErrorTime)
+{
+// Local Variables
+// ---------------
+  int iAiCount;
+  int iAiSdoCount;
+  int iAoCount;
+  int iDiCount;
+  int iDoCount;
+
+  string sError;
+  string sBootup;
+  string sStatus;
+  string sElmbName;
+  string sElmbDpName;
+  string sId;
+
+  langString lsComment;
+
+  dyn_string dsTemp;
+
+// Executable Code
+// ---------------
+  // Get the name of the Elmb
+  sElmbDpName = dpSubStr(argsState, DPSUB_SYS_DP);
+  lsComment = dpGetDescription(sElmbDpName + &quot;.&quot;);
+
+  // get the number of  Ai channels
+  dsTemp = dpNames(sElmbDpName + fwDevice_HIERARCHY_SEPARATOR + &quot;*&quot;, ELMB_AI_TYPE_NAME);
+  iAiCount = dynlen(dsTemp);
+
+  // get the number of SDO Ai channels
+  dsTemp = dpNames(sElmbDpName + fwDevice_HIERARCHY_SEPARATOR + &quot;*&quot;, ELMB_AI_SDO_TYPE_NAME);
+  iAiSdoCount = dynlen(dsTemp);
+
+  // get the number of Ao channels
+  dsTemp = dpNames(sElmbDpName + fwDevice_HIERARCHY_SEPARATOR + &quot;*&quot;, ELMB_AO_TYPE_NAME);
+  iAoCount = dynlen(dsTemp);
+
+  // get the number of Di channels
+  dsTemp = dpNames(sElmbDpName + fwDevice_HIERARCHY_SEPARATOR + &quot;*&quot;, ELMB_DI_TYPE_NAME);
+  iDiCount = dynlen(dsTemp);
+
+  // get the number of Do channels
+  dsTemp = dpNames(sElmbDpName + fwDevice_HIERARCHY_SEPARATOR + &quot;*&quot;, ELMB_DO_TYPE_NAME);
+  iDoCount = dynlen(dsTemp);
+
+  // get Elmb name
+  dsTemp = strsplit(sElmbDpName, fwDevice_HIERARCHY_SEPARATOR);
+  sElmbName = dsTemp[3];
+
+  // Get the node ID
+  dpGet(sElmbDpName + &quot;.id&quot;, sId);
+
+  // Get the status
+  if ((argiState  == 0x84) || (argiState == 0x04))
+    sStatus = &quot;STOPPED&quot;;
+  else if ((argiState  == 0xff) || (argiState == 0x7f))
+    sStatus = &quot;PREOP&quot;;
+  else if ((argiState  == 0x85) || (argiState == 0x05))
+    sStatus = &quot;OP&quot;;
+  else if (argiState  == 0x01)
+    sStatus = &quot;DISCON.&quot;;
+  else
+    sStatus = &quot;UNKNOWN&quot;;
+
+  // Format the text to be displayed
+  sprintf(sError, &quot;0x%02x @ %s&quot;, argiError, argsErrorTime);
+  sBootup = argiBootup + &quot; @ &quot; + argsBootupTime;
+
+  // Update the relevant line
+  tabCANSystem.updateLine(1,
+                          &quot;elmbName&quot;, sElmbName,
+                          &quot;comment&quot;, lsComment,
+                          &quot;elmbId&quot;, sId,
+                          &quot;analogIn&quot;, iAiCount,
+                          &quot;analogInSdo&quot;, iAiSdoCount,
+                          &quot;analogOut&quot;, iAoCount,
+                          &quot;digitalIn&quot;, iDiCount,
+                          &quot;digitalOut&quot;, iDoCount,
+                          &quot;bootup&quot;, sBootup,
+                          &quot;status&quot;, sStatus,
+                          &quot;elmbError&quot;, sError,
+                          &quot;elmbDpName&quot;, sElmbDpName);
+
+  // Return to calling routine
+  return;
+}
+]]></script>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int iRow, iColumn;
+	int iReturn;
+	
+	string sName = this.name;
+	string sColumnName;
+	string sElmb;
+	
+	dyn_string dsMenu;
+
+// Executable Code
+// ---------------
+	// Get the column name that has been clicked
+	getValue(sName, &quot;currentColumn&quot;, sColumnName);
+	
+	// Check if this column should have a menu
+	if (sColumnName == &quot;elmbName&quot;) {
+		// Get the row and then the ELMB
+		getValue(sName, &quot;currentCell&quot;, iRow, iColumn);
+		getValue(sName, &quot;cellValueRC&quot;, iRow, &quot;elmbDpName&quot;, sElmb);
+		
+		if ((strlen(sElmb) &gt; 0) &amp;&amp; dpExists(sElmb)) {
+		
+			// Setup and display the menu
+			dsMenu = makeDynString(&quot;PUSH_BUTTON, Show monitor information, 1, 1&quot;);
+			if (popupMenu(dsMenu, iReturn) == 0) {
+				if (iReturn == 1) {
+				
+					// Display the correct panel
+					ChildPanelOnCentral(&quot;fwElmb/fwElmbMonitorNodeInformation.pnl&quot;,
+															&quot;Monitor Information&quot;,
+															makeDynString(&quot;$sDpName:&quot; + sElmb));
+				}
+			}
+		}
+	}
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdNodeStart" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">411 480</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select an ELMB on the table to send a management message</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">411 480</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Pre-Op</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	pnlNodeStateRequest(&quot;PREOPERATIONAL&quot;);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdNodeStop" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">500 480</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select an ELMB on the table to send a management message</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">500 480</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Op</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+		pnlNodeStateRequest(&quot;OPERATIONAL&quot;);
+
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdNodeReset" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">591 480</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select an ELMB on the table to send a management message</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">591 480</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Reset</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	pnlResetNodeCommand(129);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdBusStart" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">22 460</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">22 460</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Pre-Op</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	pnlBusStateRequest(&quot;PREOPERATIONAL&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdBusStop" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">110 460</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">110 460</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Op</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	pnlBusStateRequest(&quot;OPERATIONAL&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdBusReset" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">200 460</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 460</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Reset</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	pnlResetBusCommand(129);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtSyncIntervalValue" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">197 496</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">197 496</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int iSyncInterval;
+	
+// Executable Code
+// ---------------
+	// Get the value entered into the text field
+	iSyncInterval = txtSyncIntervalValue.text;
+	
+	dpSet($sDpName + &quot;.syncInterval&quot;, iSyncInterval);
+
+	// Return to calling routine
+	return;
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int iSyncInterval;
+	
+// Executable Code
+// ---------------
+	// Get the current value of the sync interval
+	dpGet($sDpName + &quot;.syncInterval&quot;, iSyncInterval);
+	
+	// Display the value in the text field
+	txtSyncIntervalValue.text = iSyncInterval;
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtNodeGuardIntervalValue" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">197 526</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">197 526</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int iNodeGuardInterval;
+	
+// Executable Code
+// ---------------
+	// Get the value entered into the text field
+	iNodeGuardInterval = txtNodeGuardIntervalValue.text;
+	
+	dpSet($sDpName + &quot;.nodeGuardInterval&quot;, iNodeGuardInterval);
+
+	// Return to calling routine
+	return;
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int iNodeGuardInterval;
+	
+// Executable Code
+// ---------------
+	// Get the current value of the node guard interval
+	dpGet($sDpName + &quot;.nodeGuardInterval&quot;, iNodeGuardInterval);
+	
+	// Display the value in the text field
+	txtNodeGuardIntervalValue.text = iNodeGuardInterval;
+
+	// Return to calling routine
+	return;
+
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">590 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">590 530</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff(myPanelName());
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="Group4" referenceId="2">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">638 10</prop>
+    <prop name="Geometry">1 0 0 1 20 0</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwElmb/fwElmbCANbusOperation</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="chkShowDescription" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">520 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">520 30</prop>
+    <prop name="Size">121 41</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Elmb Name</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Comment</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+	switch (button) {
+		case 0:	// ELMB name
+			if (state)
+				tabCANSystem.namedColumnVisibility(&quot;elmbName&quot;, true);
+			else
+				tabCANSystem.namedColumnVisibility(&quot;elmbName&quot;, false);
+			break;
+		case 1:	// Comment
+			if (state)
+				tabCANSystem.namedColumnVisibility(&quot;comment&quot;, true);
+			else
+				tabCANSystem.namedColumnVisibility(&quot;comment&quot;, false);
+			break;
+	}
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">410 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.391941391941392 0 0 1 -260.6959706959708 0</prop>
+    <prop name="Location">410 440</prop>
+    <prop name="Size">274 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Noto Sans,-1,12,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">To send SDO messages ELMB must be in PREOPERATIONAL mode</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

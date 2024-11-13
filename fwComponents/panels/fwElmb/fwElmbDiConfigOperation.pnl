@@ -1,0 +1,1672 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">fwElmbDiConfigOperation</prop>
+  </prop>
+  <prop name="Size">487 603</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="PDPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwGeneral/fwExceptionHandling.ctl&quot;
+
+#uses &quot;fwElmb/fwElmb.ctl&quot;
+
+#uses &quot;fwDevice/fwDevice.ctl&quot;
+
+#uses &quot;fwElmb/fwElmbUser.ctl&quot;
+
+#uses &quot;fwElmb/fwElmbUtils.ctl&quot;
+
+#uses &quot;fwGeneral/fwProgressBar.ctl&quot;
+string sElmbDp=&quot;&quot;;
+
+void refreshReadoutMethod ()
+{
+  uint readoutMethod = 0xffff;
+  dpGet( sElmbDp+&quot;/DI.readoutMethod&quot;, readoutMethod);
+  READOUT_METHOD.text( fwElmbUser_diReadoutMethodToString( readoutMethod ));
+}
+
+bool getOPCGroup(string &amp;OPCgroup)
+{
+// Local Variables
+// ---------------
+	const string REFERENCE_DELIMETER = &quot;$&quot;;
+	const string OPC_GROUPS = &quot;_OPCGroup&quot;;
+
+	bool bStatus = false;
+
+	string sAddrReference;
+
+	dyn_string dsAllOPCgroups;
+	dyn_string dsReference;
+
+// Executable Code
+// ---------------
+	// Get group name to which this DO config belongs
+	dpGet($sDpName + &quot;.enable.read:_address.._reference&quot;, sAddrReference);
+
+	// Split the value found in order to obtain the OPC group
+	dsReference = strsplit(sAddrReference, REFERENCE_DELIMETER);
+	OPCgroup = dsReference[dynlen(dsReference)-1];
+
+	// Get a list of all OPC groups defined in this system
+	dsAllOPCgroups = dpNames(&quot;*&quot;, OPC_GROUPS);
+
+	// Create the DP name with system of the group the ai config belongs
+	OPCgroup = getSystemName() + &quot;_&quot; + OPCgroup;
+
+	// Check this group actually exists
+	if (dynContains(dsAllOPCgroups, OPCgroup) &gt; 0)
+		bStatus = true;
+
+	// Return to calling routine
+	return (bStatus);
+}
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  if (!fwElmbUtils_getNodeName ($sDpName, /*fullName*/true, sElmbDp, /*withSystemName*/false))
+    DebugTN (&quot; fwElmbUtils_getNodeName failed.&quot;);
+  DebugTN (&quot;elmbDp=&quot;+sElmbDp);
+  refreshReadoutMethod ();
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="txtTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">55 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">schwarz</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Size">327 25</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Elmb Digital Input Operation Panel</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtDebounceTimer" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 182</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Debounce timer:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmDigInTransmissionType" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 400</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.10047846889952 0 0 1 -1.00478468899522 0</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Digital Input Transmission Type</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 290</prop>
+    <prop name="Size">210 110</prop>
+   </properties>
+  </shape>
+  <shape Name="txtEventTimer" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 372</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Event timer (s):</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmMode" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">48</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 280</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">41</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.855018587360595 0 0 1 1.449814126394052 0</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Global Digital Input Interrupt Enable</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 210</prop>
+    <prop name="Size">270 70</prop>
+   </properties>
+  </shape>
+  <shape Name="lblNodeID" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">53</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">45</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 52</prop>
+    <prop name="Size">47 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Node Id:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtNodeID" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">54</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">70 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">46</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">72 52</prop>
+    <prop name="Size">57 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	string sDpName = $sDpName;
+	string nodeId;
+	
+// Executable Code
+// ---------------
+	// Remove the config part from the DP name to get the ELMB DP name
+	strreplace(sDpName, fwDevice_HIERARCHY_SEPARATOR + ELMB_DI_CONFIG_NAME, &quot;&quot;);
+	
+	// Get the node ID
+	dpGet(sDpName + &quot;.id&quot;, nodeId);
+	
+	// Display the text
+	this.text = nodeId;
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="" referenceId="1">
+   <properties>
+    <prop name="FileName">fwElmb/objects/fwElmbVersionsRef.pnl</prop>
+    <prop name="Location">280 80</prop>
+    <prop name="Geometry">1 0 0 1 -40 20</prop>
+    <prop name="TabOrder">47</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sDpName</prop>
+      <prop name="Value">$sDpName</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="cmbDebounceTimer" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">160 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">160 180</prop>
+    <prop name="Size">81 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int i;
+	int iTemp;
+	
+	unsigned uDebounceTimer;
+	
+	string sTemp;
+	
+	dyn_string dsDebounceTimerValues;
+
+// Executable Code
+// ---------------
+	// Enter all allowed values into the debounce timer array
+	for (i = 0; i &lt;= 255; i++) {
+		sprintf(sTemp, &quot;%d&quot;, i);
+		dynAppend(dsDebounceTimerValues, sTemp);
+	}
+	
+	// Enter the values into the combo box
+	this.items = dsDebounceTimerValues;
+	
+	// Return to calling routine
+	return;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmbEventTimer" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">120 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">120 370</prop>
+    <prop name="Size">81 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int i;
+	int iTemp;
+	
+	unsigned uEventTimer;
+	
+	string sTemp;
+	
+	dyn_string dsEventTimerValues;
+
+// Executable Code
+// ---------------
+	// Enter all allowed values into the event timer array
+	dynAppend(dsEventTimerValues, &quot;&quot;);
+	for (i = 0; i &lt;= 32; i++) {
+		sprintf(sTemp, &quot;%d&quot;, i);
+		dynAppend(dsEventTimerValues, sTemp);
+	}
+	
+	// Enter the values into the combo box
+	this.items = dsEventTimerValues;
+	this.selectedPos = 1;
+
+	// Return to calling routine
+	return;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="radTransmissionType" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 310</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">For normal operation use -After Sync. message- On RTR transmission the data triggered by the event timer rollover</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 310</prop>
+    <prop name="Size">181 51</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">After Sync. message only</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">After RTR message</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int argiButton)
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	// Check which selection has been made
+	switch (argiButton) {
+		case 0:
+			// Make the event timer combo box disabled
+			cmbEventTimer.enabled = false;
+			txtEventTimer.enabled = false;
+			break;
+		case 1:
+			// Enable the event timer combo box
+			cmbEventTimer.enabled = true;
+			txtEventTimer.enabled = true;
+			break;
+	}
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="glbIrqMode" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">49</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 230</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">42</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 230</prop>
+    <prop name="Size">81 41</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Enable</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Disable</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="Group2" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">394 10</prop>
+    <prop name="Geometry">1 0 0 1 59 0</prop>
+    <prop name="TabOrder">44</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwElmb/fwElmbDiConfigOperation</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="cmdWrite" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">65</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">420 520</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">49</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">420 520</prop>
+    <prop name="Size">63 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Write</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+  bool bRadGlobalIrq;
+
+  int iDebounceTimer = cmbDebounceTimer.text;
+  int radGlobalIrq = glbIrqMode.number;
+  int iTransmissionTypePos = radTransmissionType.number;
+  int iTransmissionType;
+  int iEventTimer = -1;
+
+  unsigned uState;
+  unsigned uPortFInterruptMask;
+  unsigned uPortAInterruptMask;
+  unsigned uPortAInEnMask;
+  unsigned uPortCInterruptMask;
+  unsigned uPortCInEnMask;
+
+  string sElmbDpName = $sDpName;
+  string sPortFInterruptMask;
+  string sPortAInterruptMask;
+  string sPortAInEnMask;
+  string sPortCInterruptMask;
+  string sPortCInEnMask;
+
+  dyn_float df;
+
+  dyn_string ds;
+
+// Executable Code
+// ---------------
+// Check if values should be saved to EEPROM
+  ChildPanelOnCentralReturn(&quot;vision/MessageInfo3&quot;,
+                            &quot;Question&quot;,
+                            makeDynString(&quot;Save these settings to the EEPROM? \n(i.e. make default settings)&quot;, &quot;Yes&quot;, &quot;No&quot;, &quot;Cancel&quot;),
+                            df, ds);
+
+  // If cancel clicked, do not set configuration
+  if (df[1] == 2)
+    return;
+
+  // Disable necessary controls until configuration set
+  this.enabled = false;
+  cmdRead.enabled = false;
+
+  // Remove the config part from the DP name to get the ELMB DP name
+  strreplace(sElmbDpName, fwDevice_HIERARCHY_SEPARATOR + ELMB_DI_CONFIG_NAME, &quot;&quot;);
+
+  // Get current state of ELMB
+  dpGet(sElmbDpName + &quot;.state.value&quot;, uState);
+
+  // Set ELMB pre-operational
+  dpSet(sElmbDpName + &quot;.requestedState&quot;, &quot;PREOPERATIONAL&quot;);
+
+  txtMessage.text = &quot;This will take a few seconds. Please wait...&quot;;
+
+  // 'Request' an update on the values for Port F &amp; A Interrupt, and Port A Input Enable Masks
+  setValue(&quot;tglPortFInterruptMask.txtInputValue&quot;, &quot;text&quot;, &quot;&quot;);
+  setValue(&quot;tglPortAInterruptMask.txtInputValue&quot;, &quot;text&quot;, &quot;&quot;);
+  setValue(&quot;tglPortAInEnMask.txtInputValue&quot;, &quot;text&quot;, &quot;&quot;);
+
+  // iTransmissionType = 2 not set
+  if (iTransmissionTypePos == 0)
+    iTransmissionType = 1;
+  else if (iTransmissionTypePos == 1)
+    iTransmissionType = 255;
+  else
+    iTransmissionType = 2;
+
+  if ((cmbEventTimer.text != &quot;&quot;) &amp;&amp; (radTransmissionType.number == &quot;1&quot;))
+    iEventTimer = cmbEventTimer.text;
+
+  // start saving those parameters that have values
+  // mode
+  if (radGlobalIrq != 2) {
+    // enable is 0 so it's swapped
+    bRadGlobalIrq = !radGlobalIrq;
+    dpSet($sDpName + &quot;.enable.write&quot;, bRadGlobalIrq);
+    delay(0, 50);
+  }
+
+  // transmission type
+  if (iTransmissionType != 2) {
+    dpSet($sDpName + &quot;.transmissionType.write&quot;, iTransmissionType);
+    delay(0, 50);
+  }
+
+  // debounce timer
+  if (iDebounceTimer) {
+    dpSet($sDpName + &quot;.debounceTimer.write&quot;, iDebounceTimer);
+    delay(0, 50);
+  }
+
+  // event timer
+  if (iEventTimer) {
+    if ((iEventTimer != -1) &amp;&amp; (radTransmissionType.number == &quot;1&quot;)) {
+      dpSet($sDpName + &quot;.eventTimer.write&quot;, iEventTimer * 1000);
+      delay(0, 50);
+    }
+  }
+
+  // Port F Interrupt Mask
+  getValue(&quot;tglPortFInterruptMask.txtOutputValue&quot;, &quot;text&quot;, sPortFInterruptMask);
+  if (sPortFInterruptMask != &quot;Invalid&quot;) {
+    uPortFInterruptMask = sPortFInterruptMask;
+    dpSet($sDpName + &quot;.portFInterruptMask.write&quot;, uPortFInterruptMask);
+    delay(0, 50);
+  }
+
+  // Port A Interrupt Mask
+  getValue(&quot;tglPortAInterruptMask.txtOutputValue&quot;, &quot;text&quot;, sPortAInterruptMask);
+  if (sPortAInterruptMask != &quot;Invalid&quot;) {
+    uPortAInterruptMask = sPortAInterruptMask;
+    dpSet($sDpName + &quot;.portAInterruptMask.write&quot;, uPortAInterruptMask);
+    delay(0, 50);
+  }
+
+  // Port A Input Enable Mask
+  getValue(&quot;tglPortAInEnMask.txtOutputValue&quot;, &quot;text&quot;, sPortAInEnMask);
+  if (sPortAInEnMask != &quot;Invalid&quot;) {
+    uPortAInEnMask = sPortAInEnMask;
+    dpSet($sDpName + &quot;.portAInEnMask.write&quot;, uPortAInEnMask);
+    delay(0, 50);
+  }
+
+  // Port C Interrupt Mask
+  getValue(&quot;tglPortCInterruptMask.txtOutputValue&quot;, &quot;text&quot;, sPortCInterruptMask);
+  if (sPortCInterruptMask != &quot;Invalid&quot;) {
+    uPortCInterruptMask = sPortCInterruptMask;
+    dpSet($sDpName + &quot;.portCInterruptMask.write&quot;, uPortCInterruptMask);
+    delay(0, 50);
+  }
+
+  // Port C Input Enable Mask
+  getValue(&quot;tglPortCInEnMask.txtOutputValue&quot;, &quot;text&quot;, sPortCInEnMask);
+  if (sPortCInEnMask != &quot;Invalid&quot;) {
+    uPortCInEnMask = sPortCInEnMask;
+    dpSet($sDpName + &quot;.portCInEnMask.write&quot;, uPortCInEnMask);
+    delay(0, 50);
+  }
+
+  // Save values to EEPROM if requested
+  if (df[1] == 1.0) {
+    dpSet(sElmbDpName + &quot;.eeprom.save&quot;, ELMB_SAVE_EEPROM);
+    delay(0, 50);
+  }
+
+  // Set the ELMB back to it's original state, but only if it was stopped or operational.
+  // Otherwise, leave it as preoperational
+  if ((uState == 0x84) || (uState == 0x04))
+    dpSet(sElmbDpName + &quot;.requestedState&quot;, &quot;STOPPED&quot;);
+  else if ((uState  == 0x85) || (uState == 0x05))
+    dpSet(sElmbDpName + &quot;.requestedState&quot;, &quot;OPERATIONAL&quot;);
+
+  // Indicate success to user
+  txtMessage.text = &quot;Info: DI configuration set&quot;;
+
+  // Re-enable controls
+  this.enabled = true;
+  cmdRead.enabled = true;
+
+  // Return to calling routine
+  return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdRead" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">66</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">352 520</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">50</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">352 520</prop>
+    <prop name="Size">63 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Read</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[// Generalization for fetching the data from hardware: gets the data and puts into the widget
+void updateData (string dpeActive, string dpeData, string widget, dyn_string &amp; dsExceptionInfo)
+{
+  anytype aValue;
+  bool bActive;
+  dyn_string dsExceptionTemp;
+  dpGet($sDpName + dpeActive, bActive);
+  if (bActive) {
+    fwElmb_elementSQ($sDpName + dpeData, 2, aValue, dsExceptionTemp);
+    if (dynlen(dsExceptionTemp) == 0)
+    {
+      setValue(widget, &quot;text&quot;, aValue);
+    } else {
+      setValue(widget, &quot;text&quot;, &quot;Invalid&quot;);
+      dynAppend(dsExceptionInfo, dsExceptionTemp);
+    }
+  } else {
+    setValue(widget, &quot;text&quot;, &quot;Invalid&quot;);
+  }
+}
+
+
+main()
+{
+// Local Variables
+// ---------------
+  bool bDigIrqEnable;
+  bool bActive;
+
+  int i;
+  int iTemp;
+
+  unsigned uState;
+  unsigned uDebounceTimer;
+  unsigned uTransmissionType;
+  unsigned uEventTimer;
+  unsigned uPortFInterruptMask;
+  unsigned uPortAInterruptMask;
+  unsigned uPortAInEnMask;
+
+  string sElmbName;
+  string sTemp;
+  string sMessage;
+
+  anytype aValue;
+
+  dyn_string dsTemp;
+  dyn_string dsExceptionTemp;
+  dyn_string dsExceptionInfo;
+
+// Executable Code
+// ---------------
+  // Disable certain controls while the read takes place
+  this.enabled = false;
+  cmdWrite.enabled = false;
+
+  // Give some information to the user
+  txtMessage.text = &quot;Reading Digital Input Settings. Please wait...&quot;;
+  fwOpenProgressBar(&quot;Reading Digital Input Settings&quot;, &quot;In progress. Please wait...&quot;, 1);
+
+  // Get the parent (ELMB) that this config comes from
+  fwDevice_getParent($sDpName, sElmbName, dsExceptionInfo);
+
+  // Get current state of ELMB
+  dpGet(sElmbName + &quot;.state.value&quot;, uState);
+
+  // Set node to Pre-Operational:
+  dpSetWait(sElmbName + &quot;.requestedState&quot;, &quot;PREOPERATIONAL&quot;);
+
+  // Global digital interrupt enable
+  fwElmb_elementSQ($sDpName + &quot;.enable.read&quot;, 2, aValue, dsExceptionTemp);
+  if (dynlen(dsExceptionTemp) == 0) {
+    bDigIrqEnable = aValue;
+    glbIrqMode.enabled = true;
+    if (bDigIrqEnable)
+      glbIrqMode.number = 0;
+    else
+      glbIrqMode.number = 1;
+  } else {
+    glbIrqMode.enabled = false;
+    dynAppend(dsExceptionInfo, dsExceptionTemp);
+  }
+
+  // Debounce timer
+  fwElmb_elementSQ($sDpName + &quot;.debounceTimer.read&quot;, 2, aValue, dsExceptionTemp);
+  if (dynlen(dsExceptionTemp) == 0) {
+    uDebounceTimer = aValue;
+    txtDebounceTimer.enabled = true;
+    cmbDebounceTimer.enabled = true;
+    dsTemp = cmbDebounceTimer.items;
+    sprintf(sTemp, &quot;%d&quot;, uDebounceTimer);
+    iTemp = dynContains(dsTemp, sTemp);
+    if (iTemp &gt; 0)
+      cmbDebounceTimer.selectedPos = iTemp;
+  } else {
+    txtDebounceTimer.enabled = false;
+    cmbDebounceTimer.enabled = false;
+    dynAppend(dsExceptionInfo, dsExceptionTemp);
+  }
+
+  // Transmission type
+  fwElmb_elementSQ($sDpName + &quot;.transmissionType.read&quot;, 2, aValue, dsExceptionTemp);
+  if (dynlen(dsExceptionTemp) == 0) {
+    uTransmissionType = aValue;
+    radTransmissionType.enabled = true;
+    switch (uTransmissionType) {
+      case 1:	// Sync response only
+        radTransmissionType.number = 0;
+        txtEventTimer.enabled = false;
+        cmbEventTimer.enabled = false;
+        break;
+      case 255:	// Sync response and event timer
+        radTransmissionType.number = 1;
+        txtEventTimer.enabled = true;
+        cmbEventTimer.enabled = true;
+    }
+  } else {
+    radTransmissionType.enabled = false;
+    txtEventTimer.enabled = false;
+    cmbEventTimer.enabled = false;
+    dynAppend(dsExceptionInfo, dsExceptionTemp);
+  }
+
+  // Event timer
+  fwElmb_elementSQ($sDpName + &quot;.eventTimer.read&quot;, 2, aValue, dsExceptionTemp);
+  if (dynlen(dsExceptionTemp) == 0) {
+    uEventTimer = aValue;
+    txtEventTimer.enabled = true;
+    cmbEventTimer.enabled = true;
+    dsTemp = cmbEventTimer.items;
+    uEventTimer /= 1000;
+    sprintf(sTemp, &quot;%d&quot;, uEventTimer);
+    iTemp = dynContains(dsTemp, sTemp);
+    if (iTemp &gt; 0)
+      cmbEventTimer.selectedPos = iTemp;
+  } else {
+    txtEventTimer.enabled = false;
+    cmbEventTimer.enabled = false;
+    dynAppend(dsExceptionInfo, dsExceptionTemp);
+  }
+
+  // Port F interrupt mask. Check if address active first
+  dpGet($sDpName + &quot;.portFInterruptMask.read:_address.._active&quot;, bActive);
+  if (bActive) {
+    fwElmb_elementSQ($sDpName + &quot;.portFInterruptMask.read&quot;, 2, aValue, dsExceptionTemp);
+    if (dynlen(dsExceptionTemp) == 0) {
+      uPortFInterruptMask = aValue;
+      setValue(&quot;tglPortFInterruptMask.txtInputValue&quot;, &quot;text&quot;, uPortFInterruptMask);
+    } else {
+      setValue(&quot;tglPortFInterruptMask.txtInputValue&quot;, &quot;text&quot;, &quot;Invalid&quot;);
+      dynAppend(dsExceptionInfo, dsExceptionTemp);
+    }
+  } else {
+    setValue(&quot;tglPortFInterruptMask.txtInputValue&quot;, &quot;text&quot;, &quot;Invalid&quot;);
+  }
+
+  updateData( &quot;.portFInterruptMask.read:_address.._active&quot;, &quot;.portFInterruptMask.read&quot;, &quot;tglPortFInterruptMask.txtInputValue&quot;, dsExceptionTemp );
+  updateData( &quot;.portAInterruptMask.read:_address.._active&quot;, &quot;.portAInterruptMask.read&quot;, &quot;tglPortAInterruptMask.txtInputValue&quot;, dsExceptionTemp );
+  updateData( &quot;.portCInterruptMask.read:_address.._active&quot;, &quot;.portCInterruptMask.read&quot;, &quot;tglPortCInterruptMask.txtInputValue&quot;, dsExceptionTemp );
+  updateData( &quot;.portAInterruptMask.read:_address.._active&quot;, &quot;.portAInEnMask.read&quot;, &quot;tglPortAInEnMask.txtInputValue&quot;, dsExceptionTemp );
+  updateData( &quot;.portCInterruptMask.read:_address.._active&quot;, &quot;.portCInEnMask.read&quot;, &quot;tglPortCInEnMask.txtInputValue&quot;, dsExceptionTemp );
+
+  fwElmbUser_updateFirmwareInfo(sElmbName);
+
+  // Set the ELMB back to it's original state, but only if it was stopped or operational.
+  // Otherwise, leave it as preoperational
+  if ((uState == 0x84) || (uState == 0x04))
+    dpSet(sElmbName + &quot;.requestedState&quot;, &quot;STOPPED&quot;);
+  else if ((uState  == 0x85) || (uState == 0x05))
+    dpSet(sElmbName + &quot;.requestedState&quot;, &quot;OPERATIONAL&quot;);
+
+  // Check for errors
+  if (dynlen(dsExceptionInfo) &gt; 0) {
+    fwCloseProgressBar(&quot;Problems reading DI settings&quot;);
+    txtMessage.text = &quot;Problems reading DI settings&quot;;
+    fwExceptionHandling_display(dsExceptionInfo);
+  } else {
+    fwCloseProgressBar(&quot;DI settings successfully read&quot;);
+    txtMessage.text = &quot;DI settings successfully read&quot;;
+  }
+
+  // Re-enable controls
+  this.enabled = true;
+  cmdWrite.enabled = true;
+
+  // Return to calling routine
+  return;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">67</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">352 560</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">51</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">352 560</prop>
+    <prop name="Size">131 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff(myPanelName());
+}
+]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="tglPortFInterruptMask" referenceId="2">
+   <properties>
+    <prop name="FileName">fwElmb/objects/fwElmbToggleByteRef.pnl</prop>
+    <prop name="Location">252 232</prop>
+    <prop name="Geometry">1 0 0 1 68 8</prop>
+    <prop name="TabOrder">96</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$bShowOutput</prop>
+      <prop name="Value"></prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="frmPortFInterruptMask" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">442</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 280</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">98</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.855018587360595 0 0 1.01449275362319 241.449814126394 -3.04347826086953</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Port F Interrupt Mask</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 210</prop>
+    <prop name="Size">270 70</prop>
+   </properties>
+  </shape>
+  <shape Name="lblPortFInterruptMask" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">443</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">260 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">100</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">262 252</prop>
+    <prop name="Size">47 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Interrupt:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="tglPortAInterruptMask" referenceId="3">
+   <properties>
+    <prop name="FileName">fwElmb/objects/fwElmbToggleByteRef.pnl</prop>
+    <prop name="Location">312 292</prop>
+    <prop name="Geometry">1 0 0 1 8 68</prop>
+    <prop name="TabOrder">101</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$bShowOutput</prop>
+      <prop name="Value"></prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="lblPortAInterruptMask" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">462</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">260 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">103</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">262 372</prop>
+    <prop name="Size">47 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Interrupt:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="tglPortAInEnMask" referenceId="4">
+   <properties>
+    <prop name="FileName">fwElmb/objects/fwElmbToggleByteRef.pnl</prop>
+    <prop name="Location">252 232</prop>
+    <prop name="Geometry">1 0 0 1 68 88</prop>
+    <prop name="TabOrder">104</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$bShowOutput</prop>
+      <prop name="Value"></prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="frmPortAInterruptMask" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">481</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 280</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">106</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.855018587360595 0 0 1.59420289855072 241.4498141263939 -44.78260869565453</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Port A Interrupt/Output Line Mask</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 210</prop>
+    <prop name="Size">270 70</prop>
+   </properties>
+  </shape>
+  <shape Name="lblPortAInputEnableMask" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">482</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">258 318</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">108</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">260 320</prop>
+    <prop name="Size">56 32</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Input = 0
+Output = 1</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtMessage" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">483</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 1259.022014244566</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">109</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 0.9411764705882349 2 134</prop>
+    <prop name="Location">10 410</prop>
+    <prop name="Size">331 31</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">550</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 537.9999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">112</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 539.9999999999999</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Current readout method:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="READOUT_METHOD" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">551</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">182 540</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">113</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">182 540</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">rm</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="BUTTON_ON_SYNC" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">552</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 563</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">114</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">80 562</prop>
+    <prop name="Size">70 19</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">on-sync</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string errors;
+  fwElmbUser_setElmbDiReadoutMethod( sElmbDp, FWELMB_DI_READOUT_ONSYNC, errors);
+  if (dynlen(errors)&gt;0)
+  {
+    DebugN (&quot;Errors&quot;, errors);
+    fwExceptionHandling_display(errors);
+  }
+  refreshReadoutMethod();
+  
+  string desc;
+  if (fwElmbUser_isDiReadoutMethodWellConfigured( sElmbDp, desc ))
+    txtMessage.text(&quot;Your config is OK&quot;);
+  else
+    txtMessage.text(&quot;Config bad:&quot;+desc);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT4" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">553</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 562.9999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">115</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 564.9999999999999</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Change to:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="BUTTON_ON_CHANGE" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">554</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">80 563</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">116</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">150 562</prop>
+    <prop name="Size">77 19</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">on-change</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string errors;
+  fwElmbUser_setElmbDiReadoutMethod( sElmbDp, FWELMB_DI_READOUT_ONCHANGE, errors);
+  if (dynlen(errors)&gt;0)
+  {
+    DebugN (&quot;Errors&quot;, errors);
+    fwExceptionHandling_display(errors);
+  }
+  refreshReadoutMethod();
+  
+  string desc;
+  if (fwElmbUser_isDiReadoutMethodWellConfigured( sElmbDp, desc ))
+    txtMessage.text(&quot;Your config is OK&quot;);
+  else
+    txtMessage.text(&quot;Config bad:&quot;+desc);
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="tglPortCInterruptMask" referenceId="5">
+   <properties>
+    <prop name="FileName">fwElmb/objects/fwElmbToggleByteRef.pnl</prop>
+    <prop name="Location">312 292</prop>
+    <prop name="Geometry">1 0 0 1 8 177.9999999999987</prop>
+    <prop name="TabOrder">117</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$bShowOutput</prop>
+      <prop name="Value"></prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="PRIMITIVE_TEXT5" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">632</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">260 479.9999999999987</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">119</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">262 481.9999999999987</prop>
+    <prop name="Size">47 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Interrupt:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="tglPortCInEnMask" referenceId="6">
+   <properties>
+    <prop name="FileName">fwElmb/objects/fwElmbToggleByteRef.pnl</prop>
+    <prop name="Location">252 232</prop>
+    <prop name="Geometry">1 0 0 1 68 197.9999999999987</prop>
+    <prop name="TabOrder">118</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$bShowOutput</prop>
+      <prop name="Value"></prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="FRAME1" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">649</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 280</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">120</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.855018587360595 0 0 1.59420289855072 241.449814126394 65.21739130434649</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Port C Interrupt/Output Line Mask</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 210</prop>
+    <prop name="Size">270 70</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT6" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">651</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">258 427.9999999999987</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">121</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">260 429.9999999999987</prop>
+    <prop name="Size">56 32</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Input = 0
+Output = 1</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

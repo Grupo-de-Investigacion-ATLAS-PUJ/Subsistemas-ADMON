@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Summary</prop>
+  </prop>
+  <prop name="Size">125 85</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+
+accessControlGroupCB(string dp, string value)
+{
+  bool acGranted;
+  dyn_string accessRights, exceptionInfo;
+  acGranted = TRUE;  
+  if(isFunctionDefined(&quot;fwAccessControl_isGranted&quot;))
+  {
+    fwAlarmHandlingScreen_getAccessControlOptions(accessRights, exceptionInfo);  
+    if(accessRights[fwAlarmHandlingScreen_ACCESS_ACKNOWLEDGE] != &quot;&quot;)
+      fwAccessControl_isGranted(accessRights[fwAlarmHandlingScreen_ACCESS_ACKNOWLEDGE], acGranted, exceptionInfo);
+  }
+  SUB.enableItemId(1, acGranted);
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int x,y,x1,y1;
+  dyn_string exceptionInfo;
+
+  getValue(getShape(INFO.name()),&quot;size&quot;,x,y);
+  getValue(getShape(SUB.name()),&quot;size&quot;,x1,y1);
+  if(isDollarDefined(&quot;$xzoom&quot;)) 
+  {     
+    if((int)($xzoom)&lt;x)  { 
+      setValue(getShape(INFO.name()),&quot;size&quot;,(int)$xzoom,y);
+      setValue(getShape(SUB.name()),&quot;size&quot;,(int)$xzoom,y1);
+    }
+  }  
+  if(isFunctionDefined(&quot;fwAccessControl_setupPanel&quot;))
+    fwAccessControl_setupPanel(&quot;accessControlGroupCB&quot;, exceptionInfo);
+  else
+    accessControlGroupCB(&quot;&quot;, getUserName());  
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="INFO" shapeType="TEXT_EDIT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 10.8433734939759</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 30</prop>
+    <prop name="Size">123 53</prop>
+    <extended>
+     <prop type="ENUM" name="wordWrap">0</prop>
+     <prop type="ENUM" name="vScrollBarMode">1</prop>
+     <prop type="BOOL" name="readOnly">True</prop>
+     <script name="TextChanged" isEscaped="1"><![CDATA[TextChanged()
+{
+  this.toolTipText = this.text;
+}]]></script>
+    </extended>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.append(&quot;\n\n\nInitializing...\n&quot;);
+  this.enabled = false;
+}
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="SUB" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 1</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">FwStateOKPhysics</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,75,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 1</prop>
+    <prop name="Size">123 29</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Acknowledge</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">2</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Display Alerts</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+  dyn_string exInfo;
+  switch(id)
+  {
+    case 1:
+      if(dynlen(fwAlarmHandling_g_alertsPerSys)&gt;0)  
+         if(dynlen(fwAlarmHandling_g_alertsPerSys[$pos])&gt;0)
+         {
+            for(int i = 1;i&lt;=dynlen(fwAlarmHandling_g_alertsPerSys[$pos]);i++)
+            {
+               fwAlertConfig_acknowledge(fwAlarmHandling_g_alertsPerSys[$pos][i],exInfo);
+            }
+         }
+    break;
+    case 2:
+      if(dynlen(fwAlarmHandling_g_alertsPerSys)&gt;0)
+        if(dynlen(fwAlarmHandling_g_alertsPerSys[$pos])&gt;0)
+        {
+          int x,x1,y,y1;
+          dyn_int size;
+          getValue(fwAlarmHandling_g_centralTable,&quot;position&quot;,x,y);
+          getValue(fwAlarmHandling_g_centralTable,&quot;size&quot;,x1,y1);
+          string panel = &quot;fwAlarmHandling\\fwAlarmHandlingGroupsSubTable.pnl&quot;;
+          dyn_int size = getPanelSize(panel);
+          ChildPanelOnModal(panel,this.text()+&quot; SubSystem details panel&quot;,makeDynString(&quot;$pos:&quot;+$pos,&quot;$sub:&quot;+$name),x+(x1/2)-(size[1]/2),y+(y1/2)-(size[2]/2));
+         }
+    break;
+  }
+}
+
+
+
+
+
+
+
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = $name;
+  this.toolTipText = $description;
+}
+
+
+
+
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

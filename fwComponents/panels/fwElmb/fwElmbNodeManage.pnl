@@ -1,0 +1,1019 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">800 478</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 10</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+#uses &quot;fwGeneral/fwExceptionHandling.ctl&quot;
+
+#uses &quot;fwElmb/fwElmb.ctl&quot;
+
+#uses &quot;fwDevice/fwDevice.ctl&quot;
+
+#uses &quot;fwGeneral/fwProgressBar.ctl&quot;
+updateDeviceListTable()
+{
+// Local Variables
+// ---------------
+	bool bActive;
+
+	int i;
+
+	string sNodeId;
+	string sDeviceType, sDeviceName, sOpcuaType, sManagementOnServerStartup=&quot;-&quot;;
+
+	langString lsComment;
+
+	dyn_string dsChildren, dsExceptionInfo;
+
+// Executable Code
+// ---------------
+  Text_ForBus.text(&quot;For bus: &quot;+$sDpName);
+	// Delete all lines to start with
+	deviceListTable.deleteAllLines();
+
+	// Get all ELMBs on this bus
+	fwDevice_getChildren($sDpName, fwDevice_HARDWARE, dsChildren, dsExceptionInfo);
+
+	// Loop through all ELMBs on this bus
+	for (i = 1; i &lt;= dynlen(dsChildren); i++) {
+
+		// Get the node ID
+		dpGet(dsChildren[i] + &quot;.id&quot;, sNodeId,
+					dsChildren[i] + &quot;.monitoring.autoActions.active&quot;, bActive,
+          dsChildren[i] + &quot;.type&quot;,sOpcuaType);
+
+		// Get the framework device type
+		fwDevice_getType(dpTypeName(dsChildren[i]), sDeviceType, dsExceptionInfo);
+
+		// Get the framework device name
+		fwDevice_getName(dsChildren[i], sDeviceName, dsExceptionInfo);
+
+		// Get any comment
+		lsComment = dpGetDescription(dsChildren[i] + &quot;.&quot;);
+
+  // Get NMT Command on server startup
+  dpGet (dsChildren[i]+&quot;.managementOnServerStart&quot;, sManagementOnServerStartup);
+
+		// Append the line to the table
+		deviceListTable.appendLine(	&quot;deviceName&quot;, sDeviceName,
+																       &quot;comment&quot;, lsComment,
+																&quot;nodeId&quot;, sNodeId,
+																&quot;deviceType&quot;, sDeviceType,
+                         &quot;opcuaType&quot;,sOpcuaType,
+																&quot;monitoring&quot;, bActive ? &quot;Active&quot; : &quot;Inactive&quot;,
+																&quot;datapointName&quot;, dsChildren[i],
+                &quot;managementOnServerStart&quot;, sManagementOnServerStartup);
+	}
+
+	// Return to calling routine
+	return;
+}]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="Text1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">16 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">18 12</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Manage ELMB Nodes</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmShowColumns" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">390 77</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1 260 0</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Show Columns</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">390 10</prop>
+    <prop name="Size">140 70</prop>
+   </properties>
+  </shape>
+  <shape Name="btnModify" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">528 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">528 440</prop>
+    <prop name="Size">60 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Modify</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	string sDpName;
+	string sElmb;
+	string sElmbDp;
+	
+	dyn_int diSelectedLines;
+	
+	dyn_float df;
+	
+	dyn_string ds;
+	
+// Executable Code
+// ---------------
+	// Get any selected nodes from the table
+	diSelectedLines = deviceListTable.getSelectedLines();	
+	if (dynlen(diSelectedLines) &gt; 0) {
+		// Get information for the first node selected
+		getValue(&quot;deviceListTable&quot;, &quot;cellValueRC&quot;, diSelectedLines[1], &quot;deviceName&quot;, sElmb);
+		getValue(&quot;deviceListTable&quot;, &quot;cellValueRC&quot;, diSelectedLines[1], &quot;datapointName&quot;, sElmbDp);
+	 	ChildPanelOnCentralModalReturn(	&quot;fwElmb/fwElmbNodeCreate.pnl&quot;,
+	   																&quot;Modify ELMB Node&quot;,
+								   									makeDynString(&quot;$sDpName:&quot; + $sDpName,
+								   																&quot;$bModify:&quot; + true,
+								   																&quot;$sElmbName:&quot; + sElmb,
+								   																&quot;$sElmbDp:&quot; + sElmbDp),
+	   																df, ds);
+	
+		// Update the table information
+		updateDeviceListTable();
+	} else {
+		ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+												&quot;Nothing to Modify&quot;,
+												makeDynString(&quot;No nodes have been selected for modification&quot;));
+	}
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnDelete" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">596 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">596 440</prop>
+    <prop name="Size">60 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Delete</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int i;
+	
+	string sDpName;
+	
+	dyn_int diSelectedLines;
+	
+	dyn_float df;
+	
+	dyn_string dsExceptionInfo;
+	dyn_string ds;
+	
+// Executable Code
+// ---------------
+	// Get any selected nodes from the table
+	diSelectedLines = deviceListTable.getSelectedLines();	
+
+	if (dynlen(diSelectedLines) &gt; 0) {	
+	
+		// Give user the chance to cancel
+		if (dynlen(diSelectedLines) == 1)
+			ChildPanelOnCentralReturn(&quot;vision/MessageInfo&quot;,
+																&quot;Confirm&quot;,
+																makeDynString(&quot;Are you sure you want delete this node?&quot;, &quot;OK&quot;, &quot;Cancel&quot;),
+																df, ds);
+		else
+			ChildPanelOnCentralReturn(&quot;vision/MessageInfo&quot;,
+																&quot;Confirm&quot;,
+																makeDynString(&quot;Are you sure you want delete these &quot; + dynlen(diSelectedLines) + &quot; nodes?&quot;, &quot;OK&quot;, &quot;Cancel&quot;),
+																df, ds);
+																
+		if (df[1]==1) {
+	
+			// Indicate system is busy
+			fwOpenProgressBar(&quot;Deleting Nodes&quot;, &quot;In progress. Please wait...&quot;, 1);
+	
+			for (i = 1; i &lt;= dynlen(diSelectedLines); i++) {
+				getValue(&quot;deviceListTable&quot;, &quot;cellValueRC&quot;, diSelectedLines[i], &quot;datapointName&quot;, sDpName);
+				fwDevice_delete(sDpName, dsExceptionInfo);
+			}
+
+			// Check for errors																
+			if (dynlen(dsExceptionInfo) &gt; 0) {
+				fwCloseProgressBar(&quot;Node deletion encountered errors&quot;);
+				fwExceptionHandling_display(dsExceptionInfo);
+			} else {
+				fwCloseProgressBar(&quot;Node deletion completed successfully&quot;);
+			}	
+			
+			// Update the table information
+			updateDeviceListTable();
+		}
+	} else {
+		ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+												&quot;Nothing to Delete&quot;,
+												makeDynString(&quot;No nodes have been selected for deletion&quot;));
+	}
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">732 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">732 440</prop>
+    <prop name="Size">60 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deviceListTable" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">-18.10707456978968 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 90</prop>
+    <prop name="Size">781 341</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">26</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">deviceName</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Device Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">comment</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Comment</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">nodeId</prop>
+     <prop name="Width">60</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Node Id</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">deviceType</prop>
+     <prop name="Width">150</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Device Type</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">opcuaType</prop>
+     <prop name="Width">150</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">OPC UA type</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">monitoring</prop>
+     <prop name="Width">90</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Monitoring</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8">Right click to configure monitoring</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">datapointName</prop>
+     <prop name="Width">250</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Data Point Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">managementOnServerStart</prop>
+     <prop name="Width">120</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Management on server start</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8">(OPC UA Only) Defines which NMT command (Start,Stop,Reset) should be sent to given node upon The OPC UA Startup. You may use similar setting for whole Bus instead of individual nodes if preferred.</prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"/>
+     <prop name="Label">
+	<prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	// Put table in multiple selection mode
+	deviceListTable.tableMode(TABLE_SELECT_MULTIPLE); 
+	deviceListTable.selectByClick(TABLE_SELECT_LINE);
+	
+	// Call function to initialise data displayed
+	updateDeviceListTable();
+}]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  string sOut;
+  if (column == &quot;managementOnServerStart&quot;)
+  {
+    switch (this.cellValue)
+    {
+      case &quot;&quot;: 
+        sOut=&quot;START&quot;;
+        break;
+      case &quot;START&quot;:
+        sOut=&quot;RESET&quot;;
+        break;
+      case &quot;RESET&quot;:
+        sOut=&quot;STOP&quot;;
+        break;
+      case &quot;STOP&quot;:
+        sOut=&quot;&quot;;
+        break;
+      default:
+        sOut=&quot;&quot;;
+    }
+    
+    // find dp
+    string dp = this.cellValueRC(row, &quot;datapointName&quot;);
+    dpSet(dp+&quot;.managementOnServerStart&quot;, sOut);
+    this.cellValue(sOut);
+  }
+  
+}]]></script>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int iRow;
+	int iColumn;
+	int iReturn;
+	
+	string sColumnName;
+	string sName = this.name;
+	string sNodeDpName;
+	
+	dyn_float df;
+	
+	dyn_string dsMenu;
+	dyn_string ds;
+
+// Executable Code
+// ---------------
+	// Get the column name that has been clicked
+	getValue(sName, &quot;currentColumn&quot;, sColumnName);
+	
+	// Check if this column should have a menu
+	if (sColumnName == &quot;monitoring&quot;) {
+	
+		// Get the row
+		getValue(sName, &quot;currentCell&quot;, iRow, iColumn);
+		getValue(sName, &quot;cellValueRC&quot;, iRow, &quot;datapointName&quot;, sNodeDpName);
+		
+		// Check if we have the necessary information
+		if ((strlen(sNodeDpName) &gt; 0) &amp;&amp; dpExists(sNodeDpName)) {
+			// Setup the menu
+			dsMenu = makeDynString(&quot;PUSH_BUTTON, Configure, 1, 1&quot;);
+
+			// Display the popup menu
+			if (popupMenu(dsMenu, iReturn) == 0) {
+				if (iReturn == 1) {
+					// Display monitor configuration panel
+					ChildPanelOnCentralModalReturn(	&quot;fwElmb/fwElmbMonitorAutoActionConfiguration.pnl&quot;,
+											   									&quot;ELMB Node Monitor Configuration&quot;,
+																					makeDynString(&quot;$sDpName:&quot; + sNodeDpName),
+																					df, ds);
+																				
+					// Update the table to refect any changes
+					updateDeviceListTable();
+				}
+			}
+		}
+	}
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnRefresh" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">664 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">664 440</prop>
+    <prop name="Size">60 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Refresh</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	updateDeviceListTable();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="chkShowDescription" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">660 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">660 30</prop>
+    <prop name="Size">121 41</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Device Name</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Comment</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+	switch (button) {
+		case 0:	// ELMB name
+			if (state)
+				deviceListTable.namedColumnVisibility(&quot;deviceName&quot;, true);
+			else
+				deviceListTable.namedColumnVisibility(&quot;deviceName&quot;, false);
+			break;
+		case 1:	// Comment
+			if (state)
+				deviceListTable.namedColumnVisibility(&quot;comment&quot;, true);
+			else
+				deviceListTable.namedColumnVisibility(&quot;comment&quot;, false);
+			break;
+	}
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdCreate" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">460 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">460 440</prop>
+    <prop name="Size">60 26</prop>
+    <prop name="PopupItemId"/>
+    <prop name="Text">
+	<prop name="en_US.utf8"> Create</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">single</prop>
+      <prop name="Text">
+	<prop name="en_US.utf8">Single Node</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">many</prop>
+      <prop name="Text">
+	<prop name="en_US.utf8">Many Nodes</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+// Local Variables
+// ---------------
+	dyn_float df;
+	dyn_string ds;
+	
+// Executable Code
+// ---------------
+	// Check for create single or create many
+	if (id == &quot;many&quot;) {
+		ModuleOn(&quot;elmbCreateManyModule&quot;, 0, 0, 600, 800, 0, 0, &quot;&quot;);
+										  
+		RootPanelOnModule(&quot;fwElmb/objects/fwElmbCreateManyNodes.pnl&quot;,
+										  &quot;Mass creation of ELMBs in bus &quot; + $sDpName,
+										  &quot;elmbCreateManyModule&quot;,
+										   makeDynString(&quot;$sDpName:&quot; + $sDpName));
+	} else {
+	 	ChildPanelOnCentralModalReturn(	&quot;fwElmb/fwElmbNodeCreate.pnl&quot;,
+	   																&quot;Create ELMB Node&quot;,
+								   									makeDynString(&quot;$sDpName:&quot; + $sDpName),
+	   																df, ds);
+	 	updateDeviceListTable();
+	}
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8">wwwww</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 440</prop>
+    <prop name="Size">71 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Add alerts</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+ dyn_string argdsExceptionInfo;
+  
+  dyn_int diSelectedLines;
+  getValue(&quot;deviceListTable&quot;, &quot;getSelectedLines&quot;, diSelectedLines);
+	
+			for (int i = 1; i &lt;= dynlen(diSelectedLines); i++) {
+        string sElmbDp;
+				getValue(&quot;deviceListTable&quot;, &quot;cellValueRC&quot;, diSelectedLines[i], &quot;datapointName&quot;, sElmbDp);
+			  DebugN (&quot;dpName=&quot;+sElmbDp);
+     
+          fwElmb_createNodeAlertHandling(sElmbDp, argdsExceptionInfo);
+
+			}  
+  
+  if (dynlen( argdsExceptionInfo)&gt;0) DebugN(argdsExceptionInfo);
+
+
+  
+
+}]]></script>
+    <script name="MouseOver" isEscaped="1"><![CDATA[main(bool enter)
+{
+  this.toolTipText = &quot;For chosen bus and its ELMBs\nadd standard FwElmb alerts for certain DPEs\n(only if they don't yet exist.) &quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">90 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8">wwwww</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 440</prop>
+    <prop name="Size">91 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Add comments</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  
+  dyn_string argdsExceptionInfo;
+  
+  dyn_int diSelectedLines;
+  getValue(&quot;deviceListTable&quot;, &quot;getSelectedLines&quot;, diSelectedLines);
+	
+			for (int i = 1; i &lt;= dynlen(diSelectedLines); i++) {
+        string sElmbDp;
+				getValue(&quot;deviceListTable&quot;, &quot;cellValueRC&quot;, diSelectedLines[i], &quot;datapointName&quot;, sElmbDp);
+			  DebugN (&quot;dpName=&quot;+sElmbDp);
+     
+          fwElmb_addDpeComments (sElmbDp);
+
+			}  
+  
+  if (dynlen( argdsExceptionInfo)&gt;0) DebugN(argdsExceptionInfo);
+
+  
+}]]></script>
+    <script name="MouseOver" isEscaped="1"><![CDATA[main(bool enter)
+{
+  this.toolTipText = &quot;For chosen bus and its ELMBs\nadd standard FwElmb DP comments for certain DPEs\n(only if they don't yet exist.) &quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON4" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">190 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8">wwwww</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">190 440</prop>
+    <prop name="Size">71 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Del alerts</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  
+  dyn_string argdsExceptionInfo;
+  
+  dyn_int diSelectedLines;
+  getValue(&quot;deviceListTable&quot;, &quot;getSelectedLines&quot;, diSelectedLines);
+	
+			for (int i = 1; i &lt;= dynlen(diSelectedLines); i++) {
+        string sElmbDp;
+				getValue(&quot;deviceListTable&quot;, &quot;cellValueRC&quot;, diSelectedLines[i], &quot;datapointName&quot;, sElmbDp);
+			  DebugN (&quot;dpName=&quot;+sElmbDp);
+     
+         fwElmb_removeNodeAlertHandling (sElmbDp);
+
+			}  
+  
+  if (dynlen( argdsExceptionInfo)&gt;0) DebugN(argdsExceptionInfo);
+
+
+}]]></script>
+    <script name="MouseOver" isEscaped="1"><![CDATA[main(bool enter)
+{
+  this.toolTipText = &quot;For chosen bus and its ELMBs delete standard FwElmb alerts.&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON5" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">270 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8">wwwww</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">270 440</prop>
+    <prop name="Size">91 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Del comments</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+
+  
+  dyn_string argdsExceptionInfo;
+  
+  dyn_int diSelectedLines;
+  getValue(&quot;deviceListTable&quot;, &quot;getSelectedLines&quot;, diSelectedLines);
+	
+			for (int i = 1; i &lt;= dynlen(diSelectedLines); i++) {
+        string sElmbDp;
+				getValue(&quot;deviceListTable&quot;, &quot;cellValueRC&quot;, diSelectedLines[i], &quot;datapointName&quot;, sElmbDp);
+			  DebugN (&quot;dpName=&quot;+sElmbDp);
+     
+         fwElmb_deleteDpeComments (sElmbDp);
+
+			}  
+  
+
+}]]></script>
+    <script name="MouseOver" isEscaped="1"><![CDATA[main(bool enter)
+{
+  this.toolTipText = &quot;For given bus and its ELMBs delete standard FwElmb DPE comments&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Text_ForBus" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">20 50</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">For bus:  </prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

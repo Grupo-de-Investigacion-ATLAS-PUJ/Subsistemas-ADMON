@@ -1,0 +1,773 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">410 340</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+#uses &quot;fwGeneral/fwExceptionHandling.ctl&quot;
+
+#uses &quot;fwElmb/fwElmb.ctl&quot;
+
+#uses &quot;fwDevice/fwDevice.ctl&quot;
+
+#uses &quot;fwElmb/fwElmbUser.ctl&quot;
+
+#uses &quot;fwGeneral/fwProgressBar.ctl&quot;
+pnlUpdateDigitalOutput(int iNumElmb, int &amp;argiNextBit)
+{
+// Local Variables
+// ---------------
+	int i;
+	int iBit;
+	int iCount;
+	int iPort;
+	
+	string sElmb;
+	
+	dyn_string dsAvailableDoPorts;
+	dyn_string dsBitList;
+	dyn_string dsExceptionInfo;
+	dyn_string dsABits;
+	dyn_string dsCBits;
+	
+// Executable Code
+// ---------------
+	// Get the ELMB datapoint name to update for
+	pnlGetDpNameElmb(iNumElmb, sElmb);
+	
+	// Get any available digital lines on port F
+	fwElmb_getAvailableBitList(sElmb, ELMB_DO_TYPE_NAME, &quot;C&quot;, dsCBits, dsExceptionInfo);
+	if (dynlen(dsExceptionInfo) &gt; 0) {
+		fwExceptionHandling_display(dsExceptionInfo);
+		return;
+	}
+	
+	// Get any available digital lines on port A
+	fwElmb_getAvailableBitList(sElmb, ELMB_DO_TYPE_NAME, &quot;A&quot;, dsABits, dsExceptionInfo);
+	if (dynlen(dsExceptionInfo) &gt; 0) {
+		fwExceptionHandling_display(dsExceptionInfo);
+		return;
+	}
+	
+	// Set the list of available ports
+	if (dynlen(dsCBits) &gt; 0)
+		dynAppend(dsAvailableDoPorts, &quot;C&quot;);
+	if (dynlen(dsABits) &gt; 0)
+		dynAppend(dsAvailableDoPorts, &quot;A&quot;);
+	
+	// Check if any ports are available
+	if (dynlen(dsAvailableDoPorts) &gt; 0) {
+		
+		// Make certain the selected port is valid
+		iPort = cmbDigitalPort.selectedPos;
+		cmbDigitalPort.items = dsAvailableDoPorts;
+		if ((iPort &lt; 1) || (iPort &gt; dynlen(dsAvailableDoPorts)))
+			iPort = 1;
+		cmbDigitalPort.selectedPos = iPort;
+		
+		// Check which port should be checked for available bits
+		if (dsAvailableDoPorts[iPort] == &quot;C&quot;)
+			dsBitList = dsCBits;
+		else if (dsAvailableDoPorts[iPort] == &quot;A&quot;)
+			dsBitList = dsABits;
+
+		// Check selected position before updating items
+		iBit = cmbBitSelector.selectedPos;
+		cmbBitSelector.items = dsBitList;
+		if ((iBit == 0) || (iBit &gt; dynlen(dsBitList)))
+			cmbBitSelector.selectedPos = 1;
+		else
+			cmbBitSelector.selectedPos = iBit;
+	} else {
+		txtMessage.text = &quot;No available digital output ports in this ELMB&quot;;
+		cmbDigitalPort.items = makeDynString(&quot;&quot;);
+		cmbDigitalPort.text = &quot;&quot;;
+		cmbBitSelector.items = makeDynString(&quot;&quot;);
+  	cmbBitSelector.text = &quot;&quot;;
+  	cmdCreate.enabled = false;
+		spnHowMany.sbMaximum = 0;
+		spnHowMany.text = &quot;0&quot;;
+		return;
+	}
+
+	// The maximum number of channels (spnHowMany.sbMaximum) is set depending on the first bit selected 
+	// not avoiding to jump bits already created
+	iCount = 1;
+	for (i = cmbBitSelector.selectedPos; i &lt; dynlen(dsBitList); i++) {
+		if (((int)dsBitList[i] + 1) == dsBitList[i + 1])
+			iCount++;
+		else
+			break;
+	}
+
+	// Set the max value and the start value
+	spnHowMany.sbMaximum = iCount;
+	spnHowMany.text = &quot;1&quot;;
+	
+	// Set return value of next bit in array
+	argiNextBit = dsBitList[cmbBitSelector.selectedPos];
+		
+	// Return to calling routine
+	return;
+}
+
+pnlGetDpNameElmb(int argiNElmb, string &amp;argsElmbDpName)
+{
+// Local Variables
+// ---------------
+	string sDpName;
+	
+	dyn_string dsExceptionInfo;
+	dyn_string dsTemp = strsplit($sElmbLabels, &quot;|&quot;);
+
+// Executable Code
+// ---------------
+	// Check the datapoint type of the dollar parameter
+	if (dpTypeName($sDpName) == ELMB_DO_CONFIG_TYPE_NAME) {
+  	fwDevice_getParent($sDpName, sDpName, dsExceptionInfo);
+	} else if (dpTypeName($sDpName) == ELMB_TYPE_NAME) {
+		sDpName = $sDpName;
+	} else if (dpTypeName($sDpName) == ELMB_CAN_BUS_TYPE_NAME) {
+		sDpName = $sDpName + fwDevice_HIERARCHY_SEPARATOR + dsTemp[argiNElmb];
+	} else {
+		fwExceptionHandling_display(makeDynString(&quot;Unknown parent DP type. Action aborted!!&quot;));
+		return;
+	}
+	
+	// Return only the datapoint name
+	argsElmbDpName = dpSubStr(sDpName, DPSUB_DP);
+	
+	// Return to calling routine
+	return;
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int iTemp;
+	pnlUpdateDigitalOutput(1, iTemp);
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="lblBitSelector" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">12 149</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 85</prop>
+    <prop name="Size">100 24</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Bit in Byte:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblDigitalPort" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">11 92</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 45</prop>
+    <prop name="Size">70 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Digital Port:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtMessage" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 210</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 212</prop>
+    <prop name="Size">387 27</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblComment" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 162</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Comment</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmOpcAddressing" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 290</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 240</prop>
+    <prop name="Size">390 50</prop>
+   </properties>
+  </shape>
+  <shape Name="txtTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 87</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Size">317 25</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Create Digital Output Lines</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblHowMany" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 123</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 125</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">How Many?</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="cmbBitSelector" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">117 83</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">117 83</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+	int iTemp;
+	pnlUpdateDigitalOutput(1, iTemp);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmbDigitalPort" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">117 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">117 40</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+	int iTemp;
+	pnlUpdateDigitalOutput(1, iTemp);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtComment" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 180</prop>
+    <prop name="Size">391 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="chbOpcAddressing" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">26 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">26 250</prop>
+    <prop name="Size">194 31</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Default OPC addressing?</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+// Local Variables
+// ---------------
+	dyn_float df;
+	
+	dyn_string ds;
+	
+// Executable Code
+// ---------------
+	// Check the state of the check-box
+	if (!state) {
+		ChildPanelOnCentralReturn(&quot;vision/MessageInfo3&quot;,
+															&quot;Question&quot;,
+															makeDynString(&quot;Unselecting this option you'll have to address\nyour devices by hand.\nAre you sure you want to do it?&quot;, &quot;Yes&quot;, &quot;No&quot;, &quot;Cancel&quot;),
+															df, ds);
+		if (df[1] != 1)
+			this.state(button) = true;
+	}
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">310 300</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">310 300</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	// Close the panel
+	PanelOff();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="spnHowMany" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">117 123</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">117 123</prop>
+    <prop name="Size">51 24</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">8</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">1</prop>
+   </properties>
+  </shape>
+  <shape Name="cmdCreate" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">210 300</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">210 300</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Create</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	bool bIsRunning;
+	bool bDefaultOPCAddressing;
+
+	int iDriverNumber;
+	int i, j;
+	int iHowMany;
+	int iFirstBit;
+	int iBit;
+	int iNextBit;
+	
+	string sBus;
+	string sElmb;
+	string sComment;
+	string sPort;
+	
+	dyn_float df;
+
+	dyn_string dsExceptionInfo;
+	dyn_string dsElmbs = strsplit($sElmbLabels, &quot;|&quot;);
+	dyn_string ds;
+	
+// Executable Code
+// ---------------
+	// Check if the default driver is running
+	bIsRunning = fwElmbUser_checkDefaultDriver(iDriverNumber, dsExceptionInfo);
+	if (dynlen(dsExceptionInfo) &gt; 0) {
+		fwExceptionHandling_display(dsExceptionInfo);
+		return;
+	} else if (!bIsRunning) {
+		ChildPanelOnCentralReturn(&quot;fwElmb/fwElmbDriverMessage.pnl&quot;,
+															&quot;Warning&quot;,
+															makeDynString(&quot;$drvNum:&quot; + iDriverNumber),
+															df, ds);
+		return;
+	}
+	
+	// Get required information from the panel
+	iFirstBit = cmbBitSelector.text;
+	bDefaultOPCAddressing = chbOpcAddressing.state(0);
+	sComment = txtComment.text;
+	iHowMany = spnHowMany.text;
+	sPort = cmbDigitalPort.text;
+
+	// Start progress bar to indicate system is busy
+	fwOpenProgressBar(&quot;Create Digital Output&quot;, &quot;In progress. Please wait...&quot;, 1);
+	
+	// For each ELMB, create the required digital lines
+	for (i = 1; i &lt;= dynlen(dsElmbs); i++) {
+
+		// Get current ELMB datapoint name	
+		pnlGetDpNameElmb(i, sElmb);
+		
+		// Get the bus name, removing all framework path information (not strictly
+		// necessary in this loop, but would allow for mutliple ELMBs to have digital
+		// outputs created even if not on the same bus). Also get the ELMB name without
+		// framework path information at the same time.
+		ds = strsplit(sElmb, fwDevice_HIERARCHY_SEPARATOR);
+		if (dynlen(ds) &gt;= 3) {
+			sBus = ds[2];
+			sElmb = ds[3];
+			iBit = iFirstBit;
+	
+			// Create all digital outputs for this ELMB	
+			for (j = 1; j &lt;= iHowMany; j++) {
+				
+				// Create the digital output
+				fwElmbUser_createDigital(	sBus, sElmb,
+																	sComment,
+																	sPort, iBit,
+																	false,
+																	bDefaultOPCAddressing,
+																	dsExceptionInfo);
+																	
+				// Check for success or error
+				if (dynlen(dsExceptionInfo) &gt; 0) {
+					fwExceptionHandling_display(dsExceptionInfo);
+				} else {
+			
+					// Update panel
+					pnlUpdateDigitalOutput(i, iNextBit);
+					iBit = iNextBit;
+				}
+			} // End of loop j (outputs)
+		}
+	} // End of loop i (ELMBs)
+	
+	if (dynlen(dsExceptionInfo) &gt; 0) {
+		fwCloseProgressBar(&quot;Digital Output creation encountered errors&quot;);
+		fwExceptionHandling_display(dsExceptionInfo);
+	} else {
+		fwCloseProgressBar(&quot;Digital Output creation completed successfully&quot;);
+	}	
+	
+	// Return to calling routine
+	return;
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

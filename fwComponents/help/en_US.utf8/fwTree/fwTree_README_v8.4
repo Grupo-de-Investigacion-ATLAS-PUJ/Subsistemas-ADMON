@@ -1,0 +1,29 @@
+02/12/2022 Release Notes for fwTree v8r4p3
+    - Fixed and optimized the way the "TreeRedos" within one
+	 manager or across managers is implemented, in case nodes
+	 are added/removed, for example. 
+	 To fix problems, in particular, in the FSMOperate tree.
+
+11/11/2019 Release Notes for fwTree v8r4p0
+    - change the way backward-compatibility is assured:
+      all the functions uin fwTreeUtil.ctl were renamed to be fwTreeUtil_xxx, and 
+      a new library fwTree/fwFsmCompat.ctl were added, where the old fwFsm_xxx and fwUi_xxx
+      functions are declared and call the relevant fwTreeUtil_xxx functions.
+      Note that fwFsmCompat.ctl needs to be loaded explicitly.
+
+19/06/2019 Release Notes For FwTree v1r1:
+
+    - This is the initial version of FwTree as a separate (sub-)component.
+      It contains all panels and libraries to create & modify fwTrees and to visualise them.
+      It is used (at least) by fwFSM and fwTrending.
+    - Some info on packaging and usage:
+	- The component's panels are in folder panels/fwTreeDisplay (not panels/fwTree)
+          for backward compatibility reasons
+        - The component's libraries are in scripts/libs/fwTree
+          Users may need to do #uses "fwTree/fwTree.ctl"
+        - A little idiosyncrasy (again for backward compatibility):
+          The library fwTreeUtil.ctl contains functions that were part of the FSM (previously fwFsmUtil.ctl)
+          But that were used by both fwFSM and FwTrending
+          (so the functions are called fwFsm_xxx or fwUi_xxx, even though they are generic functions)
+        - For some reason the initialization of fwTrendingMain.pnl calls fwFsm_initialize()
+          but I think this line can just be removed...

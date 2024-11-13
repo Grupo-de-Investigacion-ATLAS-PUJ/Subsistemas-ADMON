@@ -1,0 +1,598 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   <prop name="en_US.iso88591"></prop>
+  </prop>
+  <prop name="Size">554 172</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">11 20</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[const int INTERNAL_BROWSER_ID = 0;
+const int EXTERNAL_BROWSER_ID = 1;
+
+public int applyChanges()
+{
+  dyn_string exInfo;
+  bool useInternalBrowser = isInternalBrowserSelected(rbBrowserSelector.number);
+  fwGeneral_setHelpUseInternalBrowser(useInternalBrowser, exInfo);
+  if(dynlen(exInfo) &gt; 0)
+  {
+    fwExceptionHandling_display(exInfo);
+    return -1;
+  }
+  if(!useInternalBrowser)
+  {
+    string browserCmdLin = tfBrowserCommandLin.text;
+    string browserCmdWin = tfBrowserCommandWin.text;
+    fwGeneral_setHelpExtBrowserCommand(browserCmdLin, browserCmdWin, exInfo);
+    if(dynlen(exInfo) &gt; 0)
+    {
+      fwExceptionHandling_display(exInfo);
+      return -1;
+    }
+  }
+  return 0;
+}
+
+public bool areUnappliedChanges()
+{
+  dyn_string exInfo;
+  bool useInternalBrowser;
+  string browserCmdLin, browserCmdWin;
+  fwGeneral_getHelpUseInternalBrowser(useInternalBrowser, exInfo);
+  fwGeneral_getHelpExtBrowserCommand(browserCmdLin, browserCmdWin, exInfo);
+  return ((dynlen(exInfo) == 0) &amp;&amp; // Report unsaved changes only when data was retrieved from dp successfully
+      (useInternalBrowser != isInternalBrowserSelected(rbBrowserSelector.number) ||
+       browserCmdLin != tfBrowserCommandLin.text ||
+       browserCmdWin != tfBrowserCommandWin.text));
+}
+
+bool isInternalBrowserSelected(int buttonId)
+{
+  return (buttonId == INTERNAL_BROWSER_ID);
+}
+
+public loadConfiguration()
+{
+  dyn_string exInfo;
+  loadSelectedBrowserConfiguration(exInfo);
+  loadExtBrowserCommandConfiguration(exInfo);
+  if(dynlen(exInfo) &gt; 0)
+  {
+    fwExceptionHandling_display(exInfo);
+  }
+}
+
+loadSelectedBrowserConfiguration(dyn_string &amp;exInfo)
+{
+  bool useInternalBrowser;
+  fwGeneral_getHelpUseInternalBrowser(useInternalBrowser, exInfo);
+  rbBrowserSelector.number = useInternalBrowser?INTERNAL_BROWSER_ID:EXTERNAL_BROWSER_ID;
+  enableExternalBrowserConfiguration(!useInternalBrowser);
+}
+
+loadExtBrowserCommandConfiguration(dyn_string &amp;exInfo)
+{
+  string browserCmdLin, browserCmdWin;
+  fwGeneral_getHelpExtBrowserCommand(browserCmdLin, browserCmdWin, exInfo);
+  tfBrowserCommandLin.text = browserCmdLin;
+  tfBrowserCommandWin.text = browserCmdWin;
+}
+
+enableExternalBrowserConfiguration(bool enable)
+{
+  lbBrowserCommand.enabled = enable;
+  lbBrowserCommandLin.enabled = enable;
+  lbBrowserCommandWin.enabled = enable;
+  lbBrowserCommandNote.enabled = enable;
+  tfBrowserCommandLin.enabled = enable;
+  tfBrowserCommandWin.enabled = enable;
+  btDefaultCmdLin.enabled = enable;
+  btDefaultCmdWin.enabled = enable;
+}
+
+public void simulateInternalBrowser() {
+  rbBrowserSelector.number = 0;
+  applyChanges();
+}
+
+public void simulateSavingExternalBrowser(string sBrowserLinux, string sBrowserWindows) {
+  rbBrowserSelector.number = 1;
+  tfBrowserCommandLin.text = sBrowserLinux;
+  tfBrowserCommandWin.text = sBrowserWindows;
+  applyChanges();
+}
+
+public bool simulateNotSavingExternalBrowser(string sBrowserLinux, string sBrowserWindows) {
+  rbBrowserSelector.number = 1;
+  tfBrowserCommandLin.text = sBrowserLinux;
+  tfBrowserCommandWin.text = sBrowserWindows;
+  return areUnappliedChanges();
+}
+
+public dyn_string simulateLoadConfig(bool useInternalBrowser, string sBrowserLinux, string sBrowserWindows) {
+  dpSetWait(FW_GENERAL_HELP_USE_INTERNAL_BROWSER_DPE, useInternalBrowser,
+            FW_GENERAL_HELP_BROWSER_CMD_LIN_DPE, sBrowserLinux,
+            FW_GENERAL_HELP_BROWSER_CMD_WIN_DPE, sBrowserWindows);
+  loadConfiguration();
+  return makeDynString(isInternalBrowserSelected(rbBrowserSelector.number), tfBrowserCommandLin.text, tfBrowserCommandWin.text);
+}
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  loadConfiguration();
+}
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="frHelpConf" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">11 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Allows to choose how to open the help of component/panel</prop>
+     <prop name="en_US.iso88591">Allows to choose how to open the help of component/panel</prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.8722397476340695 0 0 1.02453987730061 -9.594637223974765 -18.4907975460122</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Help configuration</prop>
+     <prop name="en_US.iso88591">Help configuration</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">11 20</prop>
+    <prop name="Size">635 164</prop>
+   </properties>
+  </shape>
+  <shape Name="lbBrowserCommandWin" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1314.5 342.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.9914529914529915 0 0 0.9655172413793425 -29.12820512820513 -25.05172413793471</prop>
+    <prop name="Location">43.5 114.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Windows:</prop>
+     <prop name="en_US.iso88591">Windows:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lbBrowserCommandLin" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1148.5 370.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.9863013698630138 0 0 0.9655172413793418 -9.178082191780824 -23.0862068965562</prop>
+    <prop name="Location">23.5 142.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Linux:</prop>
+     <prop name="en_US.iso88591">Linux:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lbBrowserCommandNote" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">2985.5 397.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignLeft|AlignLeading</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.9988998899890086 0 0 0.9655172413793427 -19.38723872387338 -22.65517241379861</prop>
+    <prop name="Location">102.5 169.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Note: $1 will be replaced by the name of the file to be displayed in the browser.</prop>
+     <prop name="en_US.iso88591">Note: $1 will be replaced by the name of the file to be displayed in the browser.</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="tfBrowserCommandWin" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">701.8188585607941 111.3885175466975</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Type command to open external browser on Windows operating system here. Remember to include '$1' in the command, otherwise help file path will be added at the end by default.
+Note that leaving this field empty with 'External browser' option selected will disable opening of help files (warning will be displayed instead) on Windows.
+You can restore the default command using button on the right.</prop>
+     <prop name="en_US.iso88591">Type command to open external browser on Windows operating system here. Remember to include '$1' in the command, otherwise help file path will be added at the end by default.
+Note that leaving this field empty with 'External browser' option selected will disable opening of help files (warning will be displayed instead) on Windows.
+You can restore the default command using button on the right.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">81 81.5</prop>
+    <prop name="Size">395 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="tfBrowserCommandLin" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">701.8188585607941 140.3885175466975</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Type command to open external browser on Linux operating system here. Remember to include '$1' in the command, otherwise help file path will be added at the end by default.
+Note that leaving this field empty with 'External browser' option selected will disable opening of help files (warning will be displayed instead) on Linux.
+You can restore the default command using button on the right.</prop>
+     <prop name="en_US.iso88591">Type command to open external browser on Linux operating system here. Remember to include '$1' in the command, otherwise help file path will be added at the end by default.
+Note that leaving this field empty with 'External browser' option selected will disable opening of help files (warning will be displayed instead) on Linux.
+You can restore the default command using button on the right.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">81 110.5</prop>
+    <prop name="Size">395 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="rbBrowserSelector" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">280 29</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select if help files should be opened in either the built-in framework web browser or in the external browser (ie. Internet Explorer, Mozilla, Chrome) run from command line.</prop>
+     <prop name="en_US.iso88591">Select if help files should be opened in either the built-in framework web browser or in the external browser (ie. Internet Explorer, Mozilla, Chrome) run from command line.</prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">280 29</prop>
+    <prop name="Size">262 21</prop>
+    <prop name="Vertical">False</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Built-in browser</prop>
+       <prop name="en_US.iso88591">Built-in browser</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">External browser</prop>
+       <prop name="en_US.iso88591">External browser</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  enableExternalBrowserConfiguration(!isInternalBrowserSelected(button));
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="lbBrowserSelector" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">13.99999999999999 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignLeft|AlignLeading</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.142857142857178 1.06581410364015e-14 -3.285714285715345</prop>
+    <prop name="Location">13.99999999999999 30</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select where to open the help files:</prop>
+     <prop name="en_US.iso88591">Select where to open the help files:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lbBrowserCommand" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">24 66</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.65615141955836 0 0 1 -25.74763406940064 -8</prop>
+    <prop name="Location">24 66</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Provide system commands to run the external browser</prop>
+     <prop name="en_US.iso88591">Provide system commands to run the external browser</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btDefaultCmdWin" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">484.2987012987013 88.9974572422141</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Restore default command to open an external browser on Windows.</prop>
+     <prop name="en_US.iso88591">Restore default command to open an external browser on Windows.</prop>
+    </prop>
+    <prop name="maximumSize">60 -1</prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">482 81.5</prop>
+    <prop name="Size">60 23</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Default</prop>
+     <prop name="en_US.iso88591">Default</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  tfBrowserCommandWin.text = FW_GENERAL_DEFAULT_HELP_EXT_BROWSER_COMMAND_WIN;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btDefaultCmdLin" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">484.2987012987013 91.7563568944647</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Restore default command to open an external browser on Linux.</prop>
+     <prop name="en_US.iso88591">Restore default command to open an external browser on Linux.</prop>
+    </prop>
+    <prop name="maximumSize">60 -1</prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">482 110.5</prop>
+    <prop name="Size">60 23</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Default</prop>
+     <prop name="en_US.iso88591">Default</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  tfBrowserCommandLin.text = FW_GENERAL_DEFAULT_HELP_EXT_BROWSER_COMMAND_LIN;
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="5" Name="LAYOUT_GROUP0" serial="0">
+   <properties>
+    <prop idx="0" name="shapeSerial">7</prop>
+    <prop idx="1" name="shapeSerial">6</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="5" Name="LAYOUT_GROUP4" serial="4">
+   <properties>
+    <prop name="shapeSerial" rowSpan="1" column="0" row="0" colSpan="2">1</prop>
+    <prop name="shapeSerial" rowSpan="1" column="0" row="1" colSpan="1">2</prop>
+    <prop name="shapeSerial" rowSpan="1" column="2" row="2" colSpan="2">3</prop>
+    <prop name="shapeSerial" rowSpan="1" column="2" row="1" colSpan="1">5</prop>
+    <prop name="shapeSerial" rowSpan="1" column="2" row="0" colSpan="1">4</prop>
+    <prop name="shapeSerial" rowSpan="1" column="3" row="0" colSpan="1">9</prop>
+    <prop name="shapeSerial" rowSpan="1" column="3" row="1" colSpan="1">10</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">Grid</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP5" serial="5">
+   <properties>
+    <prop name="shapeSerial">0</prop>
+    <prop idx="1" name="shapeSerial">8</prop>
+    <prop idx="0" name="groupSerial">0</prop>
+    <prop idx="2" name="groupSerial">4</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">VBox</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

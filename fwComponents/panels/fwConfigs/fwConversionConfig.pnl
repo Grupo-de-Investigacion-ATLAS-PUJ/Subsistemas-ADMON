@@ -1,0 +1,2496 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">641 391</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">337 220</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[dyn_string DPE_LIST;
+int DPE_TYPE;
+bool DPES_OK;
+
+// mode in which the panel is used
+int panelMode;
+const int OBJECT	= 1;
+const int SINGLE_DPE		= 2;
+const int MULTIPLE_DPES	= 3;
+
+dyn_dyn_anytype dpeConfigObject;
+
+int configType;
+string fwConfigType;
+
+fwSetPolynomialFieldsFormat(dyn_string &amp;exceptionInfo)
+{
+	string formatString;
+
+	fwConfigs_getBestFormatForDpeType(DPEL_FLOAT, formatString, exceptionInfo);
+	fwConfigs_setTextFieldsFormat(makeDynString(&quot;coeff1&quot;, &quot;coeff2&quot;, &quot;coeff3&quot;, &quot;coeff4&quot;, &quot;coeff5&quot;), formatString,
+									makeDynBool(FALSE), exceptionInfo);
+}
+
+fwSetBaseCurveFieldsFormat(dyn_string &amp;exceptionInfo)
+{
+	string formatString;
+
+	if(panelMode != OBJECT)
+	{
+		fwConfigs_getBestFormatForDpeList(DPE_LIST, formatString, exceptionInfo);
+		fwConfigs_setTextFieldsFormat(makeDynString(&quot;x1&quot;, &quot;x2&quot;, &quot;x3&quot;, &quot;x4&quot;, &quot;x5&quot;, &quot;y1&quot;, &quot;y2&quot;, &quot;y3&quot;, &quot;y4&quot;, &quot;y5&quot;), formatString,
+										makeDynBool(FALSE), exceptionInfo);
+	}
+}
+
+_fwHideConversionItems()
+{
+	_fwTogglePolynomialItems(FALSE);
+	_fwToggleBaseCurveItems(FALSE);
+        _fwToggleInvertItems(FALSE);
+}
+
+_fwShowConversionItems(int conversionType)
+{
+	driverProblem.visible = FALSE;
+	switch(conversionType)
+	{
+		case 0:
+			_fwToggleBaseCurveItems(FALSE);	
+			_fwToggleInvertItems(FALSE);	
+			_fwTogglePolynomialItems(TRUE);			
+			break;
+		case 1:
+			_fwTogglePolynomialItems(FALSE);			
+			_fwToggleInvertItems(FALSE);	
+			_fwToggleBaseCurveItems(TRUE);	
+			break;
+		case 2:
+			_fwToggleBaseCurveItems(FALSE);	
+			_fwTogglePolynomialItems(FALSE);			
+			_fwToggleInvertItems(TRUE);	
+			break;
+		default:
+			_fwToggleBaseCurveItems(FALSE);	
+			_fwTogglePolynomialItems(FALSE);			
+			_fwToggleInvertItems(FALSE);	
+			break;
+	}
+}
+
+_fwToggleInvertItems(bool shouldShow)
+{
+  invertSelector.visible = shouldShow;
+  invertTitle.visible = shouldShow;
+}
+    
+_fwTogglePolynomialItems(bool shouldShow)
+{
+	int i, order;
+	shape valueField, titleField;
+
+	convSelector.visible = shouldShow;
+	oText.visible = shouldShow;
+	o.visible = shouldShow;
+	p3.visible = shouldShow;
+	p2.visible = shouldShow;
+	p4.visible = shouldShow;
+	polyText.visible = shouldShow;	
+	
+	if(shouldShow)
+	{
+		order = o.text;
+		for(i=1; i &lt;= order+1; i++)
+		{
+			valueField = getShape(&quot;coeff&quot; + i);
+			titleField = getShape(&quot;coeffTitle&quot; + i);
+			
+			valueField.visible = TRUE;
+			titleField.visible = TRUE;			
+		}
+	}
+	else
+	{
+		coeff1.visible = shouldShow;
+		coeff2.visible = shouldShow;
+		coeff3.visible = shouldShow;
+		coeff4.visible = shouldShow;
+		coeff5.visible = shouldShow;
+		coeffTitle1.visible = shouldShow;
+		coeffTitle2.visible = shouldShow;
+		coeffTitle3.visible = shouldShow;
+		coeffTitle4.visible = shouldShow;
+		coeffTitle5.visible = shouldShow;
+	}
+}
+
+_fwToggleBaseCurveItems(bool shouldShow)
+{
+	int i, points;
+	shape valueXField, valueYField, titleXField, titleYField;
+
+	convSelector.visible = shouldShow;
+	nrText.visible = shouldShow;
+	nrOfPoints.visible = shouldShow;
+	
+	if(shouldShow)
+	{
+		points = nrOfPoints.text;
+		for(i=1; i &lt;= points; i++)
+		{
+			valueXField = getShape(&quot;x&quot; + i);
+			valueYField = getShape(&quot;y&quot; + i);
+			titleXField = getShape(&quot;t&quot; + i);
+			titleYField = getShape(&quot;t&quot; + (i+5));
+			
+			valueXField.visible = TRUE;
+			titleXField.visible = TRUE;			
+			valueYField.visible = TRUE;
+			titleYField.visible = TRUE;			
+		}
+	}
+	else
+	{
+		x1.visible = shouldShow;
+		y1.visible = shouldShow;
+		x2.visible = shouldShow;
+		y2.visible = shouldShow;
+		x3.visible = shouldShow;
+		y3.visible = shouldShow;
+		x4.visible = shouldShow;
+		y4.visible = shouldShow;
+		x5.visible = shouldShow;
+		y5.visible = shouldShow;
+		t1.visible = shouldShow;
+		t2.visible = shouldShow;
+		t3.visible = shouldShow;
+		t4.visible = shouldShow;
+		t5.visible = shouldShow;
+		t6.visible = shouldShow;
+		t7.visible = shouldShow;
+		t8.visible = shouldShow;
+		t9.visible = shouldShow;
+		t10.visible = shouldShow;	
+	}
+}
+
+saveSettings(dyn_string &amp;exceptionInfo)
+{
+	bool isGood;
+	int i, order, conversionType, elementType;
+	string temp;
+	shape valueShape;
+	dyn_float arguments;
+	
+ 	if(!DPES_OK)
+	{
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_MIXEDORBADDPETYPES&quot;), &quot;&quot;);
+		return;		
+	}
+		
+	okButton.enabled = FALSE;
+	applyButton.enabled = FALSE;
+	closeButton.enabled = FALSE;
+	if(panelMode == MULTIPLE_DPES)
+		fwOpenProgressBar(&quot;Configuration panel&quot;, &quot;Saving configuration...&quot;, 1);
+
+	if(conversionOnOff.state(0))
+	{
+                if(configType == DPCONFIG_CONVERSION_ENG_TO_RAW_MAIN)
+		  _fwConfigs_getConfigOptionsForDpeType(DPE_TYPE, fwConfigs_PVSS_CMD_CONV, elementType, exceptionInfo);		
+                else
+		  _fwConfigs_getConfigOptionsForDpeType(DPE_TYPE, fwConfigs_PVSS_MSG_CONV, elementType, exceptionInfo);		
+          
+		if(elementType == fwConfigs_ANALOG_OPTIONS)
+                {
+		  switch(convSelector.number())
+		  {
+      			// polinomial conversion
+      			case 0:
+      	 	 		order = o.text;
+	 	 		
+      	 	 		for(i=1; i&lt;=(order+1); i++)
+      	 	 		{
+      	 	 			valueShape = getShape(&quot;coeff&quot; + i);
+      	 	 			temp = valueShape.text;
+      					fwConfigs_checkStringFormat(temp, DPEL_FLOAT, isGood, exceptionInfo);
+      					if(isGood)
+      		 	 			arguments[i] = temp;
+      					else
+      						fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Polynomial coefficient &quot; + i + &quot; is not valid&quot;, &quot;&quot;);
+      	 	 		}
+						
+      				conversionType = DPDETAIL_CONV_POLY;
+      				break;	
+      			// base curve conversion	
+      			case 1:
+      				order = nrOfPoints.text;
+      	 	 		for(i=1; i&lt;=(order); i++)
+      	 	 		{
+      	 	 			valueShape = getShape(&quot;x&quot; + i);
+      	 	 			temp = valueShape.text;
+      					fwConfigs_checkStringFormat(temp, DPE_TYPE, isGood, exceptionInfo);
+      					if(isGood)
+      		 	 			arguments[(i*2)-1] = temp;
+      					else
+      						fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Base Curve point x&quot; + i + &quot; is not valid&quot;, &quot;&quot;);
+
+      	 	 			valueShape = getShape(&quot;y&quot; + i);
+      	 	 			temp = valueShape.text;
+      					fwConfigs_checkStringFormat(temp, DPE_TYPE, isGood, exceptionInfo);
+      					if(isGood)
+      		 	 			arguments[i*2] = temp;
+      					else
+      						fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Base Curve point y&quot; + i + &quot; is not valid&quot;, &quot;&quot;);
+      	 	 		}
+	
+      				conversionType = DPDETAIL_CONV_LIN_INT;
+      				break;	
+      		  }                  
+                }
+                else if(elementType == fwConfigs_BINARY_OPTIONS)
+                {
+      			conversionType = DPDETAIL_CONV_INVERT;
+                }
+
+		if(dynlen(exceptionInfo)&gt;0)
+		{
+			okButton.enabled = TRUE;
+			applyButton.enabled = TRUE;
+			closeButton.enabled = TRUE;
+			if(panelMode == MULTIPLE_DPES)
+				fwCloseProgressBar(&quot;Configuration failed&quot;);
+			return;	
+		}
+
+		if(panelMode != OBJECT)
+		{
+			fwConfigConversion_setMultiple(DPE_LIST, configType, conversionType, order, arguments, exceptionInfo, TRUE);
+		}
+		else
+		{
+			dpeConfigObject[fwConfigs_DPE_OBJECT_ACTIVE][1] = TRUE;
+					
+			dpeConfigObject[fwConversion_DPE_OBJECT_TYPE][1] 		= fwConfigType;
+			dpeConfigObject[fwConversion_DPE_OBJECT_CONV_TYPE][1]	= conversionType;
+			dpeConfigObject[fwConversion_DPE_OBJECT_ORDER][1]		= order ;
+			dpeConfigObject[fwConversion_DPE_OBJECT_ARGUMENTS]		= arguments;
+			
+			fwGeneral_setGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+//			DebugN(&quot;Modified &quot;, dpeConfigObject);	
+		}
+	}
+	else
+	{
+		if(panelMode != OBJECT)
+		{
+			fwConfigConversion_deleteMultiple(DPE_LIST, configType, exceptionInfo);	
+		}
+		else
+		{
+			dpeConfigObject[fwConfigs_DPE_OBJECT_ACTIVE][1] = FALSE;
+					
+			dpeConfigObject[fwConversion_DPE_OBJECT_TYPE][1] 		= fwConfigType;
+			dpeConfigObject[fwConversion_DPE_OBJECT_CONV_TYPE][1]	= DPCONFIG_NONE;
+			dpeConfigObject[fwConversion_DPE_OBJECT_ORDER][1]		= 0;
+			dpeConfigObject[fwConversion_DPE_OBJECT_ARGUMENTS]		= makeDynFloat();
+			
+			fwGeneral_setGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+//			DebugN(&quot;Modified &quot;, dpeConfigObject);
+		}
+	}
+	
+	okButton.enabled = TRUE;
+	applyButton.enabled = TRUE;
+	closeButton.enabled = TRUE;
+	if(panelMode == MULTIPLE_DPES)
+		fwCloseProgressBar(&quot;Configuration complete&quot;);
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	bool singleDpe, firstCheck = TRUE;
+	int length, i;
+	string dpe, errorString;
+	dyn_string systems, exceptionInfo;
+	
+	bool convExists;
+	int conversionType, order;
+	dyn_float arguments;
+		
+	if(isDollarDefined(&quot;$sDpe&quot;))
+	{
+		dpe = $sDpe;
+		strreplace(dpe, &quot; &quot;, &quot;&quot;);
+	    DPE_LIST = strsplit(dpe, &quot;|&quot;);
+	}
+    
+	elementNameField.editable(FALSE);
+
+	length = dynlen(DPE_LIST);
+	switch(length)
+	{
+			case 0:
+				if(isDollarDefined(&quot;$sDpeConfigObjectVarName&quot;))	// object passed to the panel
+				{
+					if(getGlobalType($sDpeConfigObjectVarName) != DYN_DYN_ANYTYPE_VAR)
+					{
+						elementNameField.text(&quot;Wrong config object name&quot;);
+						conversionOnOff.enabled = FALSE;
+						applyButton.enabled = FALSE;
+						okButton.enabled = FALSE;
+						fwException_raise(exceptionInfo, 
+															&quot;WARNING&quot;, &quot;The config object &quot; + $sDpeConfigObjectVarName + 
+															&quot; doesn't exists or hasn't got the proper format.&quot;, 
+															&quot;&quot;);
+						fwExceptionHandling_display(exceptionInfo);					
+						return;
+					}					
+					
+					panelMode = OBJECT;					
+					fwGeneral_getGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+//					DebugN(&quot; Config Panel: &quot;, dpeConfigObject);
+					
+					DPE_LIST[1] = dpeConfigObject[fwConfigs_DPE_OBJECT_DPE_NAME][1];						
+					DPE_TYPE	= dpeConfigObject[fwConfigs_DPE_OBJECT_DPE_TYPE][1];					
+					// config type in this case is special, not the standard PVSS one
+//					configType	= dpeConfigObject[fwConfigs_DPE_OBJECT_TYPE][1];
+					convExists	= (bool)dpeConfigObject[fwConversion_DPE_OBJECT_CONV_TYPE][1];
+					
+					fwConfigType	= dpeConfigObject[fwConversion_DPE_OBJECT_TYPE][1];
+					conversionType	= dpeConfigObject[fwConversion_DPE_OBJECT_CONV_TYPE][1];
+					order		= dpeConfigObject[fwConversion_DPE_OBJECT_ORDER][1];
+					fwGeneral_stringToDynString(dpeConfigObject[fwConversion_DPE_OBJECT_ARGUMENTS], arguments);
+					if(dynlen(arguments) &lt; 10) //set arguments dyn_string to maximum required length (10)
+                                          arguments[10] = &quot;&quot;;
+					DPES_OK			= TRUE;
+					elementNameField.text(DPE_LIST[1]);
+				}
+				else // neither dpes nor object passed, nothing to do in the panel
+				{
+					elementNameField.text(&quot;No Data Point Elements&quot;);
+					conversionOnOff.enabled = FALSE;
+					applyButton.enabled = FALSE;
+					okButton.enabled = FALSE;
+					fwException_raise(exceptionInfo, &quot;WARNING&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_NODATAPOINTSTOCONFIG&quot;), &quot;&quot;);
+					fwExceptionHandling_display(exceptionInfo);					
+					return;
+				}
+				break;				
+				
+			case 1:		// single dpe passed to the panel
+				panelMode = SINGLE_DPE;
+				elementNameField.text(DPE_LIST[1]);
+				break;
+			default:	// multiple dpes passed to the panel
+				panelMode = MULTIPLE_DPES;
+
+				_fwConfigs_getSystemsInDpeList(DPE_LIST, systems, exceptionInfo);
+
+				if(dynlen(systems) == 1)
+					elementNameField.text(&quot;Multiple Data Point Elements (from &quot; + systems[1] + &quot;)&quot;);
+				else
+					elementNameField.text(&quot;Multiple Data Point Elements (from multiple systems)&quot;);
+
+				dpeDetails.visible = TRUE;
+				convExists = FALSE;
+				break;
+	}
+
+	if(isDollarDefined(&quot;$configType&quot;))
+		fwConfigType = strtolower($configType);
+	
+	switch(fwConfigType) 
+    {    	
+    	case (&quot;msg&quot;):  //  message conversion
+	   	case (&quot;msg_conv&quot;):
+    	 	configType = DPCONFIG_CONVERSION_RAW_TO_ENG_MAIN;
+    	 	title.text = &quot;Message Conversion Configuration&quot;;
+    		break;
+	   	case (&quot;cmd&quot;):  // command conversion
+    	case (&quot;cmd_conv&quot;):
+    		configType = DPCONFIG_CONVERSION_ING_TO_RAW_MAIN;
+			title.text = &quot;Command Conversion Configuration&quot;;
+    		break;
+	   	default:
+	    	fwException_raise(exceptionInfo, 
+    						  &quot;ERROR&quot;, 
+    						  &quot;Did not select a proper conversion config type.&quot;, 
+    						  &quot;&quot;);
+	   		return;
+    }    
+
+	if(panelMode != OBJECT)
+	{
+		if(configType == DPCONFIG_CONVERSION_RAW_TO_ENG_MAIN)
+			DPES_OK = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_MSG_CONV, DPE_TYPE, exceptionInfo, errorString);
+		else
+			DPES_OK = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_CMD_CONV, DPE_TYPE, exceptionInfo, errorString);
+	
+		if(!DPES_OK)
+			fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+	}
+	
+	fwSetPolynomialFieldsFormat(exceptionInfo);
+	fwSetBaseCurveFieldsFormat(exceptionInfo);
+
+	okButton.enabled = DPES_OK;
+	applyButton.enabled = DPES_OK;
+
+	if(dynlen(exceptionInfo)&gt;0)
+	{
+		fwExceptionHandling_display(exceptionInfo);
+		return;
+	}
+
+	if(panelMode == SINGLE_DPE)
+	{	
+		fwConfigConversion_get(DPE_LIST[1], convExists, configType, conversionType, order, arguments, exceptionInfo);
+		if(dynlen(exceptionInfo)&gt;0)
+		{
+			if(exceptionInfo[dynlen(exceptionInfo)] != &quot;&quot;)
+			{
+				driverProblem.text = &quot;The current state of this config is unknown.\nThe config can not be modified.\nThe config can not be accessed because\ndriver number &quot;
+									+ exceptionInfo[dynlen(exceptionInfo)] + &quot; is not running.&quot;;
+				driverProblem.visible = TRUE;
+				conversionOnOff.enabled = FALSE;
+				okButton.enabled = FALSE;
+				applyButton.enabled = FALSE;
+				exceptionInfo = makeDynString();
+			}
+		}
+	}
+		
+	if(convExists)
+	{
+		fromRawToTreated(DPDETAIL_CONV_LIN_INT, 5, makeDynFloat(0,0,0,0,0,0,0,0,0,0), exceptionInfo);
+		fromRawToTreated(DPDETAIL_CONV_POLY, 5, makeDynFloat(0,0,0,0,0), exceptionInfo);
+		fromRawToTreated(conversionType, order, arguments, exceptionInfo);
+		if(conversionType == DPDETAIL_CONV_POLY)
+			_fwShowConversionItems(0);
+		else if(conversionType == DPDETAIL_CONV_LIN_INT)
+			_fwShowConversionItems(1);
+                else if(conversionType == DPDETAIL_CONV_INVERT)
+                        _fwShowConversionItems(2);
+		
+		conversionOnOff.state(0) = TRUE;	
+	}
+	else
+	{
+		conversionOnOff.state(0) = FALSE;
+		fromRawToTreated(DPDETAIL_CONV_LIN_INT, 5, makeDynFloat(0,0,0,0,0,0,0,0,0,0), exceptionInfo);
+		fromRawToTreated(DPDETAIL_CONV_POLY, 5, makeDynFloat(0,0,0,0,0), exceptionInfo);
+		_fwHideConversionItems();
+		convSelector.visible = FALSE;	
+	}
+	
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+}
+
+
+fromRawToTreated(int convType, int order, dyn_float arguments, dyn_string exceptionInfo)
+{	
+	if(convType == DPDETAIL_CONV_POLY )
+	{
+		convSelector.number = 0;
+		coeff1.text = arguments[1];
+		coeff2.text = arguments[2];
+		coeff3.text = arguments[3];
+		coeff4.text = arguments[4];
+		coeff5.text = arguments[5];
+		o.selectedPos(order);	
+	}
+	else if(convType == DPDETAIL_CONV_LIN_INT)
+	{
+		convSelector.number = 1;
+		x1.text = arguments[1];
+		y1.text = arguments[2];
+		x2.text = arguments[3];
+		y2.text = arguments[4];
+		x3.text = arguments[5];
+		y3.text = arguments[6];
+		x4.text = arguments[7];
+		y4.text = arguments[8];
+		x5.text = arguments[9];
+		y5.text = arguments[10];
+		nrOfPoints.selectedPos(order-1);
+	}
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="t3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">311 384</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">295 223</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">x3:</prop>
+     <prop name="en_US.iso88591">x3:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="t8" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">532 384</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">424 223</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">y3:</prop>
+     <prop name="en_US.iso88591">y3:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="t1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">311 270</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">36</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">295 163</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">x1:</prop>
+     <prop name="en_US.iso88591">x1:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="t6" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">532 270</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">424 163</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">y1:</prop>
+     <prop name="en_US.iso88591">y1:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="t4" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">311 441</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">38</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">295 253</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">x4:</prop>
+     <prop name="en_US.iso88591">x4:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="t9" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">532 441</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">39</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">424 253</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">y4:</prop>
+     <prop name="en_US.iso88591">y4:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="t2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">311 327</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">40</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">295 193</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">x2:</prop>
+     <prop name="en_US.iso88591">x2:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="t7" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">532 327</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">41</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">424 193</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">y2:</prop>
+     <prop name="en_US.iso88591">y2:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="t5" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">311 499</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">42</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">295 283</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">x5:</prop>
+     <prop name="en_US.iso88591">x5:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="t10" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">532 499</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">43</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">424 283</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">y5:</prop>
+     <prop name="en_US.iso88591">y5:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="nrText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">316 191</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">44</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">293 121</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Number of Points:</prop>
+     <prop name="en_US.iso88591">Number of Points:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="coeffTitle1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">350 282</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">312 163</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">a:</prop>
+     <prop name="en_US.iso88591">a:</prop>
+     <prop name="de_AT.iso88591">a:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="coeffTitle2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">350 347</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">312 193</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">b:</prop>
+     <prop name="en_US.iso88591">b:</prop>
+     <prop name="de_AT.iso88591">b:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="coeffTitle3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">354 413</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">312 223</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">c:</prop>
+     <prop name="en_US.iso88591">c:</prop>
+     <prop name="de_AT.iso88591">c:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="coeffTitle4" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">350 478</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">312 253</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">d:</prop>
+     <prop name="en_US.iso88591">d:</prop>
+     <prop name="de_AT.iso88591">d:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="coeffTitle5" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">350 544</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">312 283</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">e:</prop>
+     <prop name="en_US.iso88591">e:</prop>
+     <prop name="de_AT.iso88591">e:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="polyText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">355 152</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">302 95</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> (y=a+bx+cx +dx +ex ) </prop>
+     <prop name="en_US.iso88591"> (y=a+bx+cx +dx +ex ) </prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="p4" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">560 146</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">427 90</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-11-*-100-100-*-*-iso8859-1|-11,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">4</prop>
+     <prop name="en_US.iso88591">4</prop>
+     <prop name="de_AT.iso88591">4</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="p3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">519 146</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">402 90</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-11-*-100-100-*-*-iso8859-1|-11,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">3</prop>
+     <prop name="en_US.iso88591">3</prop>
+     <prop name="de_AT.iso88591">3</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="p2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">476 146</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">377 90</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-11-*-100-100-*-*-iso8859-1|-11,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">2</prop>
+     <prop name="en_US.iso88591">2</prop>
+     <prop name="de_AT.iso88591">2</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="oText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">332 201</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">292 122</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Polynomial Order:</prop>
+     <prop name="en_US.iso88591">Polynomial Order:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">49</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">45</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-19-*-100-100-*-*-iso8859-1|-19,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Conversion Configuration</prop>
+     <prop name="en_US.iso88591">Conversion Configuration</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">52</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">161 74</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">46</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 55</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">DP Element:</prop>
+     <prop name="en_US.iso88591">DP Element:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="driverProblem" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">59</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">140 130</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">47</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">146 136</prop>
+    <prop name="Size">279 69</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Driver problem</prop>
+     <prop name="en_US.iso88591">Driver problem</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">6</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="elementNameField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">54</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">348 103</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">90 50</prop>
+    <prop name="Size">541 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="dpeDetails" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">57</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">460 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">460 10</prop>
+    <prop name="Size">121 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select Elements</prop>
+     <prop name="en_US.iso88591">Select Elements</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string returnedDpeList, systems, exceptionInfo;
+	dyn_float cancelOrOk;
+	int configType;
+	string configName, errorString;
+
+	switch(strtolower($configType)) 
+    {    	
+    	case (&quot;msg&quot;):  //  message conversion
+    	case (&quot;msg_conv&quot;):
+    	 	configType = DPCONFIG_CONVERSION_RAW_TO_ENG_MAIN;
+    	 	configName = fwConfigs_PVSS_MSG_CONV;
+    		break;
+    	case (&quot;cmd&quot;):  // command conversion
+    	case (&quot;cmd_conv&quot;):
+    		configType = DPCONFIG_CONVERSION_ING_TO_RAW_MAIN;
+    	 	configName = fwConfigs_PVSS_CMD_CONV;
+    		break;
+    	default:
+	    	fwException_raise(exceptionInfo, 
+       						  &quot;ERROR&quot;, 
+       						  &quot;Did not select a proper conversion config type.&quot;, 
+       						  &quot;&quot;);
+       	fwExceptionHandling_display(exceptionInfo);
+    		return;
+    }    
+
+	ChildPanelOnCentralModalReturn(&quot;fwConfigs/fwDpeSelector.pnl&quot;, &quot;Choose Data Point Elements&quot;,
+									makeDynString(&quot;$dsAllDpes:&quot;+$sDpe, &quot;$dsIncludedDpes:&quot;+DPE_LIST, &quot;$sConfigType:&quot;+configName),
+									cancelOrOk, returnedDpeList);
+
+	if(cancelOrOk[1] &gt; 0.5)
+	{
+		if(DPE_LIST != returnedDpeList)
+		{
+			DPE_LIST = returnedDpeList;
+		
+			DPES_OK = _fwConfigs_checkDpeList(DPE_LIST, configName, DPE_TYPE, exceptionInfo, errorString);
+			if(!DPES_OK)
+				fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+				
+			fwSetBaseCurveFieldsFormat(exceptionInfo);
+
+			_fwConfigs_getSystemsInDpeList(DPE_LIST, systems, exceptionInfo);
+			if(dynlen(DPE_LIST)== 1)
+				elementNameField.text(DPE_LIST[1]);
+			else
+			{
+				if(dynlen(systems) == 1)
+					elementNameField.text(&quot;Multiple Data Point Elements (from &quot; + systems[1] + &quot;)&quot;);
+				else
+					elementNameField.text(&quot;Multiple Data Point Elements (from multiple systems)&quot;);
+			}
+
+			okButton.enabled = DPES_OK;
+			applyButton.enabled = DPES_OK;
+
+			conversionOnOff.state(0) = FALSE;
+			_fwHideConversionItems();
+			convSelector.visible = FALSE;
+		}
+	}	
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="conversionOnOff" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">56</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">10 90</prop>
+    <prop name="Size">156 26</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Conversion ON/OFF</prop>
+       <prop name="en_US.iso88591">Conversion ON/OFF</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+
+{
+	int conversionType, elementType;
+	bool status;
+	dyn_string exceptionInfo;
+	
+    status = this.state(0);
+	
+	if(!DPES_OK)
+	{
+		this.state(0) = FALSE;
+		
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_MIXEDORBADDPETYPES&quot;), &quot;&quot;);
+		if(dynlen(exceptionInfo)&gt;0)
+			fwExceptionHandling_display(exceptionInfo);
+		return;
+	}
+
+	if(status==TRUE)
+	{
+                if(configType == DPCONFIG_CONVERSION_ENG_TO_RAW_MAIN)
+		  _fwConfigs_getConfigOptionsForDpeType(DPE_TYPE, fwConfigs_PVSS_CMD_CONV, elementType, exceptionInfo);		
+                else
+		  _fwConfigs_getConfigOptionsForDpeType(DPE_TYPE, fwConfigs_PVSS_MSG_CONV, elementType, exceptionInfo);		
+                  
+		conversionType = convSelector.number;
+                
+                if(elementType == fwConfigs_ANALOG_OPTIONS)
+		  _fwShowConversionItems(conversionType);
+                else if(elementType == fwConfigs_BINARY_OPTIONS)
+                  _fwShowConversionItems(2);
+	}
+	else
+	{	
+		_fwHideConversionItems();
+	}
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="convSelector" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">374 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">170 90</prop>
+    <prop name="Size">91 61</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Polynomial</prop>
+       <prop name="en_US.iso88591">Polynomial</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Base Curve</prop>
+       <prop name="en_US.iso88591">Base Curve</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	int conversionType;
+	
+	conversionType = this.number;
+	_fwShowConversionItems(conversionType);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="nrOfPoints" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">44</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">511 181</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">421 117</prop>
+    <prop name="Size">47 24</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">2</prop>
+       <prop name="en_US.iso88591">2</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">3</prop>
+       <prop name="en_US.iso88591">3</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">4</prop>
+       <prop name="en_US.iso88591">4</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">5</prop>
+       <prop name="en_US.iso88591">5</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+	_fwToggleBaseCurveItems(FALSE);
+	_fwToggleBaseCurveItems(TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="o" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">47</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">421 117</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">421 117</prop>
+    <prop name="Size">51 24</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">1</prop>
+       <prop name="en_US.iso88591">1</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">2</prop>
+       <prop name="en_US.iso88591">2</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">3</prop>
+       <prop name="en_US.iso88591">3</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">4</prop>
+       <prop name="en_US.iso88591">4</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+	_fwTogglePolynomialItems(FALSE);
+	_fwTogglePolynomialItems(TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="coeff1" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">395 269</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">329 155</prop>
+    <prop name="Size">113 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[15.5f,False,False,AlignRight,False]</prop>
+   </properties>
+  </shape>
+  <shape Name="coeff2" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">395 335</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">329 185</prop>
+    <prop name="Size">113 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[15.5f,False,False,AlignRight,False]</prop>
+   </properties>
+  </shape>
+  <shape Name="coeff3" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">395 402</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">329 215</prop>
+    <prop name="Size">113 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[15.5f,False,False,AlignRight,False]</prop>
+   </properties>
+  </shape>
+  <shape Name="coeff4" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">395 469</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">329 245</prop>
+    <prop name="Size">113 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[15.5f,False,False,AlignRight,False]</prop>
+   </properties>
+  </shape>
+  <shape Name="coeff5" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">395 536</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">329 275</prop>
+    <prop name="Size">113 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[15.5f,False,False,AlignRight,False]</prop>
+   </properties>
+  </shape>
+  <shape Name="x1" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">362 256</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">322 155</prop>
+    <prop name="Size">90 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="y1" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">591 256</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">451 155</prop>
+    <prop name="Size">91 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="x2" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">362 313</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">322 185</prop>
+    <prop name="Size">90 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="y2" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">591 313</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">451 185</prop>
+    <prop name="Size">91 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="x3" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">362 371</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">322 215</prop>
+    <prop name="Size">90 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="y3" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">39</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">591 371</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">451 215</prop>
+    <prop name="Size">91 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="x4" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">362 429</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">322 245</prop>
+    <prop name="Size">90 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="y4" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">41</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">591 429</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">451 245</prop>
+    <prop name="Size">91 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="x5" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">42</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">362 486</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">322 275</prop>
+    <prop name="Size">90 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="y5" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">43</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">591 486</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">451 275</prop>
+    <prop name="Size">91 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="applyButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">51</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">460 350</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+     <prop name="en_US.iso88591">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+
+	saveSettings(exceptionInfo);
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int x, y;
+
+	if(isDollarDefined(&quot;$bHierarchyBrowser&quot;))
+	{
+		if(!$bHierarchyBrowser)
+			closeButton.visible = TRUE;
+		else
+		{
+			getValue(&quot;&quot;, &quot;position&quot;, x, y);
+			this.position(x + 90,y);	
+		}
+	}
+	else
+		closeButton.visible = TRUE;
+		
+	this.visible = TRUE;	
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">58</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1492 929</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">550 350</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="okButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">60</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">47</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,404,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">370 350</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+
+	saveSettings(exceptionInfo);
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+	else
+		PanelOff();
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	if(isDollarDefined(&quot;$bHierarchyBrowser&quot;))
+	{
+		if(!$bHierarchyBrowser)
+			this.visible = TRUE;
+	}
+	else
+		this.visible = TRUE;	
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="Group4" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">604 10</prop>
+    <prop name="TabOrder">47</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwConfigs/fwConversionConfig</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="invertTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">65</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">190 97</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">190 97</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,505,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Invert Binary Value</prop>
+     <prop name="en_US.iso88591">Invert Binary Value</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="invertSelector" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">66</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">170 95</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">53</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-*-Arial-*-r-normal-*-13-*-100-100-*-*-iso8859-1|-13,0,0,0,505,0,0,0,0,0,0,0,0,Arial</prop>
+    </prop>
+    <prop name="Location">170 95</prop>
+    <prop name="Size">14 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">???</prop>
+       <prop name="en_US.iso88591">???</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">???</prop>
+       <prop name="en_US.iso88591">???</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

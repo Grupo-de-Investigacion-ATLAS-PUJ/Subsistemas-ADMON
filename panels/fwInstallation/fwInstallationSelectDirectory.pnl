@@ -1,0 +1,498 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Select Directory ...</prop>
+  </prop>
+  <prop name="Size">500 135</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">28 56</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwInstallation/fwInstallation.ctl&quot;
+
+void showErrorInfo(string message)
+{
+  txtWarning.text = message;
+  txtWarning.visible = true;
+  warningArrow.visible = true;
+}
+
+void clearErrorInfo()
+{
+  txtWarning.visible = false;
+  warningArrow.visible = false;
+}
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[/**
+
+fwInstallationSelectDirectory.pnl
+
+This panel is run from the main panel if the installation directory is not set.
+It is used for choosing the installation directory. The user can either write the name of the directory
+( if it does not exist it will be created ) or he can choose the existing directory.
+If the chosen directory is not defined in proj_path in the config file - the file is then modified.
+The new installation directory is also stored in the data point element -
+&quot;fwInstallationDirectory.installationDirectoryPath:_original.._value&quot; of type &quot;_FwInstallationInformation&quot; .
+
+Required $-parameters:
+
+none
+
+Panels called from this panel:
+
+- fwInstallation/fwInstallation_messageInfo.pnl - when asking user if wants to register non-empty directory in config file and use it as installation directory
+
+*/
+
+main()
+{
+  string dp = fwInstallation_getInstallationDp();
+
+  // create internal fwInstallation dp if it is not created yet
+  if(!dpExists(dp) &amp;&amp; dpCreate(dp, FW_INSTALLATION_DPT_INFORMATION) != 0)
+  {
+    fwInstallation_throw(&quot;Internal fwInstallation dp does not exist and an attempt to create it failed, cannot continue&quot;);
+    PanelOff();
+    return;
+  }
+
+  // prepare a list of proposed paths that will be displayed in the drop-down list
+  dyn_string pathsToDisplay = _fwInstallation_proposeInstallationDirs();
+
+  // retrieve current installation directory path
+  string sPath = &quot;&quot;;
+  dpGet(dp + &quot;.installationDirectoryPath&quot;, sPath);
+  if(sPath != &quot;&quot;)
+  {
+    fwInstallation_normalizePath(sPath);
+    int currInstDirPos = dynContains(pathsToDisplay, sPath);
+    if(currInstDirPos &gt; 1)
+      dynRemove(pathsToDisplay, currInstDirPos);
+    if(currInstDirPos != 1)
+      dynInsertAt(pathsToDisplay, sPath, 1); // make sure that the current installation directory appears first
+  }
+
+  // show directory proposals in the drop-down list
+  cbDestinationDir.items = pathsToDisplay;
+  cbDestinationDir.selectedPos(1);
+
+  if(isDollarDefined(&quot;$msg&quot;) &amp;&amp; getDollarValue(&quot;$msg&quot;) != &quot;&quot;)
+    showErrorInfo(getDollarValue(&quot;$msg&quot;));
+}
+
+
+
+
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="infoLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 34</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select directory to install components in:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtWarning" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 127</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,51}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 104</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Warning message</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btnSelectSourceDir" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">464 28</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select the directory</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Shift+O</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">464 28</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Open_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  clearErrorInfo();
+
+  string sPath = cbDestinationDir.selectedText;   // Selected path in combo box
+  int pos = cbDestinationDir.selectedPos();
+  while(!isdir(sPath) &amp;&amp; sPath != &quot;&quot;)
+    sPath = _fwInstallation_baseDir(sPath);
+  if(folderSelector(sPath) == 1 &amp;&amp; strlen(sPath) &gt; 0)
+  {
+    fwInstallation_normalizePath(sPath);
+    int pathPosition = dynContains(cbDestinationDir.items(), sPath);
+    if(pathPosition &lt;= 0)
+    {
+      cbDestinationDir.appendItem(sPath);
+      pathPosition = cbDestinationDir.itemCount();
+    }
+    cbDestinationDir.selectedPos(pathPosition);
+  }
+}
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnOK" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">333 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">333 100</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+    <prop name="IsDefault">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  clearErrorInfo();
+
+  string sPath = cbDestinationDir.selectedText;
+  if(sPath == &quot;&quot;)
+  {
+    showErrorInfo(&quot;Directory cannot be empty.&quot;);
+    return;
+  }
+  fwInstallation_normalizePath(sPath);
+
+  // ensure that it is an absolute path
+  bool isAbsolute;
+  if(_WIN32)
+    isAbsolute = (patternMatch(&quot;//*&quot;, sPath) || patternMatch(&quot;?:/*&quot;, sPath));
+  else
+    isAbsolute = patternMatch(&quot;/*&quot;, sPath);
+
+  if(!isAbsolute)
+  {
+    showErrorInfo(&quot;Please provide absolute path.&quot;);
+    return;
+  }
+
+  if(access(sPath, F_OK) == -1) // directory not accessible (doesn't exist)
+  {
+    if(!checkCreateDirectory.state(0)) // 'Create directory' option is not checked
+    {
+      showErrorInfo(&quot;Directory does not exist.&quot;);
+      return;
+    }
+
+    if(!mkdir(sPath) || !isdir(sPath)) // create directory
+    {
+      showErrorInfo(&quot;Failed to create provided directory.&quot;);
+      return;
+    }
+  }
+
+  // check if path is in config file, if not add it
+  bool isPathInConfig;
+  fwInstallation_isPathInConfigFile(sPath, isPathInConfig);
+  if(!isPathInConfig)
+  {
+    dyn_string fileNames = getFileNames(sPath, &quot;*&quot;, FILTER_FILES | FILTER_DIRS);
+    int currDirPos = dynContains(fileNames, &quot;.&quot;);
+    if(currDirPos &gt; 0) dynRemove(fileNames, currDirPos);
+    int prevDirPos = dynContains(fileNames, &quot;..&quot;);
+    if(prevDirPos &gt; 0) dynRemove(fileNames, prevDirPos);
+    if(dynlen(fileNames) &gt; 0) // check if directory to be registered in config is empty
+    {
+      showErrorInfo(&quot;Given directory is not empty.&quot;);
+      dyn_string ds;
+      dyn_float df;
+      ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallation_messageInfo.pnl&quot;, &quot;Confirm adding directory to config&quot;,
+                                     makeDynString(&quot;$text:Given directory is not empty, are you sure\nthat you want to add it to project config file\n&quot; +
+                                                   &quot;and use it as installation directory?&quot;), df, ds);
+      if(dynlen(df) &lt; 1 || df[1] &lt; 1) // user choose not to use non-empty directory as installation path
+        return;
+
+    }
+    if(fwInstallation_addProjPath(sPath, 999) != 0)
+    {//failed to register provided directory as a project path
+      showErrorInfo(&quot;Choose directory defined in config file.&quot;);
+      return;
+    }
+  }
+
+  dpSet(fwInstallation_getInstallationDp() + &quot;.installationDirectoryPath&quot;, sPath);
+  PanelOff();
+}
+
+
+
+
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">414 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">414 100</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOff();
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  showErrorInfo(&quot;First project directory will be chosen by default.&quot;);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="checkCreateDirectory" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 60</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 60</prop>
+    <prop name="Size">161 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Create directory</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="warningArrow" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.7259259259259259 0 0 0.6825000000000002 2.740740740740741 -420.5250000000002</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+     <prop name="Location">20 780</prop>
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="cbDestinationDir" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 34</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 30</prop>
+    <prop name="Size">451 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">True</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

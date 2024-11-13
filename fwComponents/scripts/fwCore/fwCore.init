@@ -1,0 +1,86 @@
+main()
+{
+    // change from the pre-8.4.0 version where
+    // DE&N and FSM were subcomponents of fwCore.
+    // We promote them to be components and show an info message
+
+    bool needUninstall=false; // signals if uninstallation of DE&N or FSM is needed
+    bool subComp;
+
+    if (dpExists("fwInstallation_fwFSM.isItSubComponent")) {
+	dpGet("fwInstallation_fwFSM.isItSubComponent",subComp);
+	if (subComp) {
+	    needUninstall=true;
+	    dpSet("fwInstallation_fwFSM.isItSubComponent",false);
+	}
+    }
+
+    if (dpExists("fwInstallation_fwDeviceEditorNavigator.isItSubComponent")) {
+	dpGet("fwInstallation_fwDeviceEditorNavigator.isItSubComponent",subComp);
+	if (subComp) {
+	    needUninstall=true;
+	    dpSet("fwInstallation_fwDeviceEditorNavigator.isItSubComponent",false);
+	}
+    }
+
+    if (needUninstall) {
+	fwInstallation_popup( "Change: fwDE&N and fwFSM are not a part of fwCore anymore.\n" +
+                              "Uninstall their old version if not used, \n"+
+                              "or upgrade to latest versions.");
+    }
+
+	SetGediLibParsingPlusConfig();
+	SetupConfigFile();
+    
+    // cleanup
+    fwInstallation_cleanupObsoleteFiles("fwCore", 
+    	makeDynString("help/en_US.iso88591/fwCore",
+    				  "fwCoreReleaseNotes.txt",
+    				  "help/en_US.utf8/fwCore/fwCore.htm"
+    	),true);
+
+    fwInstallation_cleanupObsoleteFiles("fwCore", 
+    	makeDynString("scripts/libs/fwCore/AAA_FwLibStartup.ctl", "scripts/libs/fwCore/AAA_FwLibStartup_UI.ctl"),
+    	true);
+}
+
+void SetGediLibParsingPlusConfig()
+{
+	string newOptions="+config config.gedi";	
+	dyn_mixed properties;
+	int rc=fwInstallationManager_getProperties("WCCOAui", "-m gedi", properties);
+	
+	if(dynlen(properties) < FW_INSTALLATION_MANAGER_OPTIONS)  return; // manager not found
+				
+	if (strpos(properties[FW_INSTALLATION_MANAGER_OPTIONS],newOptions)>=0) return; // already has the option
+					
+	properties[FW_INSTALLATION_MANAGER_OPTIONS] += " " + newOptions;
+	fwInstallation_throw("fwCore.init: Adding +config to GEDI" ,"INFO");
+	fwInstallationManager_setProperties("WCCOAui","-m gedi", properties);
+
+}
+
+// things to be appended to the project config file, but
+// without overwriting if user changed their values...
+void SetupConfigFile()
+{
+	string cfgFilePath=getPath(CONFIG_REL_PATH,"config");
+	if (cfgFilePath=="") {
+		fwInstallation_throw("fwCore.init: SetupConfigFile() could not access project config file" ,"ERROR");
+		return;
+	}
+
+	// FWCORE-3426: switch default panel format to XML (same method as above)
+	string section="ui";
+	string key="defaultPanelFormat";
+	string reqValue="XML";
+	bool isDflt;
+
+	// check if it was already there
+	string val=paCfgReadValueDflt(cfgFilePath,section,key,"_NOT_SET_",isDflt);
+	if (isDflt && (val!=reqValue)) {
+		fwInstallation_throw("fwCore.init: Config file: adding to [general]: "+key+"=\""+reqValue+"\"" ,"INFO");
+		paCfgInsertValue(cfgFilePath,section,key,reqValue);
+	}
+
+}

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">366 50</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 20</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName">objects_parampanels/fwGeneral/fwLabelText_param.pnl</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  string sText=&quot;$sText&quot;;	
+	
+  // use $sText for the label as default
+  if (isDollarDefined(&quot;$sText&quot;)) sText=$sText;
+
+  // if $sEscapedText is defined and valid, use it for the label instead
+  if ( isDollarDefined(&quot;$sEscapedText&quot;) &amp;&amp; ($sEscapedText != &quot;&quot; ) &amp;&amp; ($sEscapedText != &quot;$sEscapedText&quot;) )
+  {
+    sText=$sEscapedText;
+  }
+
+  // FWCORE-3402: check if we need to recode from UTF to ISO
+  // UTF-encoded strings usually have \xc3 as the first byte
+  // for French accented characters
+  bool needRecode=true; // we assume that panels created in the past used ISO
+  if (strpos(sText,&quot;\xc3&quot;)&gt;=0) needRecode=false;
+  if (needRecode) sText=recode(sText,&quot;latin1&quot;,&quot;UTF-8&quot;);
+
+  Text.text=sText;
+
+  if (isDollarDefined(&quot;$sFont&quot;)) {
+    if ($sFont!=&quot;&quot;) {
+      Text.font=$sFont;
+    }
+  }
+  
+  if (isDollarDefined(&quot;$sColor&quot;)) {
+    if ($sColor!=&quot;&quot;) {
+      Text.color=$sColor;
+    }
+  }
+  
+  if (isDollarDefined(&quot;$sBgColor&quot;)) {
+    if ($sBgColor!=&quot;&quot;) {
+      Text.fill(&quot;[solid]&quot;);
+      Text.backCol=$sBgColor;
+    } else {
+      Text.fill(&quot;[outline]&quot;);
+    }
+  }
+
+  string tooltip=&quot;$sTooltip&quot;;
+  
+  if (isDollarDefined(&quot;$sTooltip&quot;)) {
+	tooltip=$sTooltip;
+	tooltip=strrtrim(strltrim(tooltip,&quot;\&quot;&quot;),&quot;\&quot;&quot;);
+  }
+
+  // FWCORE-3402
+  needRecode=true;
+  if (strpos(tooltip,&quot;\xc3&quot;)&gt;=0) needRecode=false;
+  if (needRecode) tooltip=recode(tooltip,&quot;latin1&quot;,&quot;UTF-8&quot;);
+  Text.toolTipText=tooltip;
+ 
+}
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="Text" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">10 20</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">$sText</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

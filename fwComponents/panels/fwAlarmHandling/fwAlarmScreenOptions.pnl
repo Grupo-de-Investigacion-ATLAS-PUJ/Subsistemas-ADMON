@@ -1,0 +1,1762 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">JCOP Alarm Screen Options</prop>
+  </prop>
+  <prop name="Size">500 535</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="StartZoomPoint">0 0</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+
+unsigned g_descriptionOption;
+bool g_rowColourOption;
+int g_scrollLockTimeout;
+bool g_showOnlineValue;
+bool g_colourWholeRow;
+bool g_bGroupsEnabled;
+bool g_bAlarmFilterEnabled;
+
+bool g_bInitialized = false;
+
+
+showRestartWarning()
+{
+  if
+    (
+      (colourWholeRow.state(0) == g_rowColourOption) &amp;&amp; 
+      ((showDpeInDescription.number == g_descriptionOption) || !showDpeInDescription.enabled) &amp;&amp; 
+      ((int) (scrollLock.state(0)?scrollLockValue.text:0) == g_scrollLockTimeout) &amp;&amp;
+      (columnValueOptions.state(1) == g_showOnlineValue) &amp;&amp;
+      (checkBoxShowGroups.state(0) == g_bGroupsEnabled) &amp;&amp; (checkBoxShowAlarmFilter.state(0) == g_bAlarmFilterEnabled)
+    )
+  {
+    restartNote.visible = FALSE;
+    infoArrow.visible = FALSE;
+  }
+  else
+  {
+    restartNote.visible = TRUE;
+    infoArrow.visible = TRUE;
+  }
+}
+
+
+/*
+  Check if enable groups and enable alarm filter are not
+  both disabled
+  */
+checkIfOneOptionEnabled( string sOptionWidgets)
+{
+    bool bEnableGroups = checkBoxShowGroups.state(0);
+    bool bEnableAlarmFilter = checkBoxShowAlarmFilter.state(0);
+    
+    if ( !bEnableGroups &amp;&amp; !bEnableAlarmFilter)
+    {
+      int x, y;
+      getValue( &quot;checkBoxShowAlarmFilter&quot;, &quot;position&quot;, x, y);
+      enableOptionsText.position(x+100, y-15);
+      enableOptionsText.visible(true);
+      setValue( sOptionWidgets, &quot;state&quot;, 0, true);
+      fwAlarmScreen_saveConfig();
+    } else
+    {
+      enableOptionsText.visible(false);
+    }
+}]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	return;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  dyn_string dsExceptions;
+  string sDefaultFilter;
+  dyn_string dsConfigDpNames;
+
+  fwAlarmScreen_getDescriptionColumnBehaviour(g_descriptionOption, dsExceptions);
+  showDpeInDescription.number = g_descriptionOption;
+
+  fwAlarmScreen_getRowColourBehaviour(g_rowColourOption, dsExceptions);
+  colourWholeRow.state(0) = g_rowColourOption;
+  
+  
+  fwAlarmScreen_getScrollLockTimeout(g_scrollLockTimeout, dsExceptions);
+  scrollLock.state(0) = (g_scrollLockTimeout != 0);
+  scrollLockValue.enabled = (g_scrollLockTimeout != 0);
+  scrollLockValue.text = g_scrollLockTimeout == 0 ? 10 : g_scrollLockTimeout;        
+	
+  bool bColumnVisible;
+  fwAlarmScreen_getShowHideColumn(fwAlarmScreen_PROPERTIES_DP, fwAlarmScreen_COLUMN_DP_NAME, bColumnVisible, dsExceptions);  
+  columnVisibleOptions.state(0) = bColumnVisible;  
+  
+  fwAlarmScreen_getShowHideColumn(fwAlarmScreen_PROPERTIES_DP, fwAlarmScreen_COLUMN_LOGICAL_NAME, bColumnVisible, dsExceptions);  
+  columnVisibleOptions.state(1) = bColumnVisible;  
+  
+  fwAlarmScreen_getShowHideColumn(fwAlarmScreen_PROPERTIES_DP, fwAlarmScreen_COLUMN_DESCRIPTION, bColumnVisible, dsExceptions);  
+  columnVisibleOptions.state(2) = bColumnVisible;
+		
+  fwAlarmScreen_getShowHideColumn(fwAlarmScreen_PROPERTIES_DP, fwAlarmScreen_COLUMN_ALERT_VALUE, bColumnVisible, dsExceptions);  
+  columnValueOptions.state(0) = bColumnVisible;
+  
+  fwAlarmScreen_getShowHideColumn(fwAlarmScreen_PROPERTIES_DP, fwAlarmScreen_COLUMN_ONLINE_VALUE, bColumnVisible, dsExceptions);  
+  columnValueOptions.state(1) = bColumnVisible;
+  g_showOnlineValue = bColumnVisible;
+
+  fwAlarmScreen_getShowHideColumn(fwAlarmScreen_PROPERTIES_DP, fwAlarmScreen_COLUMN_TIME_CAME, bColumnVisible, dsExceptions);  
+  cameWentTimeSelection.selectedPos = bColumnVisible? 2 : 1;
+  
+  int iIdleTimeout;
+  fwAlarmScreen_getIdleTimeout(iIdleTimeout, dsExceptions);
+  idleTimeoutValue.text = iIdleTimeout;
+  idleTimeout.state(0) = iIdleTimeout;
+  idleTimeoutValue.enabled = iIdleTimeout;
+                           
+  showDpeInDescription.enabled = columnVisibleOptions.state(2);
+        
+  int iOnlineValueUpdateRate;
+  fwAlarmScreen_getOnlineValueUpdateRate(iOnlineValueUpdateRate, dsExceptions);
+  onlineValueUpdateRate.text = iOnlineValueUpdateRate;
+  onlineValueUpdateRate.enabled = columnValueOptions.state(1);
+        
+  bool bShowDistDetails;
+  fwAlarmScreen_getDistSystemDisplayOption(bShowDistDetails, dsExceptions);
+  showDistSystemDetails.state(0) = bShowDistDetails;
+
+  int iSummaryMode;
+  fwAlarmScreen_getReductionMode(fwAlarmScreen_PROPERTIES_DP, iSummaryMode, dsExceptions);
+  switch(iSummaryMode)
+  {
+    case AES_SUMALERTS_BOTH:
+      summariesMode.number = 0;
+      break;
+    case AES_SUMALERTS_FILTERED:
+      summariesMode.number = 1;
+      break;
+    case AES_SUMALERTS_NO:
+      summariesMode.number = 2;
+      break;
+  }
+  
+  fwAlarmScreen_getDefaultFilterName(sDefaultFilter, dsExceptions);
+  strreplace(sDefaultFilter, fwAlarmScreen_FILTER_DP_PREFIX, &quot;&quot;);
+	dsConfigDpNames = dpNames(fwAlarmScreen_FILTER_DP_PREFIX + &quot;*&quot;, fwAlarmScreen_FILTER_DP_TYPE);
+	
+	for(int i = 1; i &lt;= dynlen(dsConfigDpNames) ; i++)
+	{
+		dsConfigDpNames[i] = dpSubStr(dsConfigDpNames[i], DPSUB_DP);
+		strreplace(dsConfigDpNames[i], fwAlarmScreen_FILTER_DP_PREFIX, &quot;&quot;);
+	}
+  
+  dynInsertAt(dsConfigDpNames, &quot;Show All (*)&quot;, 1);
+  savedFilterList.items(dsConfigDpNames);
+  
+  if(dynContains(dsConfigDpNames, sDefaultFilter) &gt; 0)
+  {
+    savedFilterList.text = sDefaultFilter;
+  }
+  else
+  {
+    savedFilterList.selectedPos = 1;
+  }
+  
+  int iMaxLines;
+  fwAlarmScreen_getHistoricalMaxLines(iMaxLines,dsExceptions);
+  historicalMaxLineslValue.text = iMaxLines;
+  
+  g_bGroupsEnabled = fwAlarmScreen_getEnableGroups();
+  checkBoxShowGroups.state(0, g_bGroupsEnabled);
+  
+  g_bAlarmFilterEnabled = fwAlarmScreen_getEnableAlarmFilter();
+  checkBoxShowAlarmFilter.state(0, g_bAlarmFilterEnabled);
+  
+  checkboxInvertPriorities.state(0, fwAlarmScreen_getInvertPriorities());
+  
+  g_bInitialized = true;
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="TAB2" shapeType="TAB" layerId="0">
+   <properties>
+    <prop name="serialId">57</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">11 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">72</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">11 20</prop>
+    <prop name="Size">478 469</prop>
+    <prop name="TabBarAutoHide">False</prop>
+    <prop name="Page">
+     <prop name="Name">Alarm options</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Alarm table options</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">Screen options</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Screen options</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="SelectionChanged" isEscaped="1"><![CDATA[main()
+{
+  int iHideLayer;
+  int iShowLayer;
+  
+  if (this.namedActiveRegister() == &quot;Alarm options&quot;)
+  {
+    iHideLayer = 3;
+    iShowLayer = 2;
+  }
+  else
+  {
+    iHideLayer = 2;
+    iShowLayer = 3;
+  }
+  
+  LayerOn(iShowLayer);
+  LayerOff(iHideLayer);
+}
+
+
+
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{  
+  LayerOn(2);
+  LayerOff(3);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="contentFrameDummy" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">55</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 35</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">70</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.8316666666666668 0 0 1.782142857142857 -8.316666666666668 -62.37499999999999</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">General</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 35</prop>
+    <prop name="Size">601 281</prop>
+   </properties>
+  </shape>
+  <shape Name="restartNote" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">59</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">25 513</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">74</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">25 513</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Restart alarm screen for options to take effect.  </prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.position(25, 554);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="infoArrow" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">154</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">_3DText</prop>
+    <prop name="TabOrder">146</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.725925925925926 0 0 0.6825000000000001 2.740740740740741 -11.52500000000009</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+     <prop name="Location">20 780</prop>
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.position(10, 555);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Button3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">355 -36</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Revert to the default JCOP settings</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">400 14</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Set default</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  columnVisibleOptions.state(0) = TRUE;
+  columnVisibleOptions.state(1) = TRUE;
+  columnVisibleOptions.state(2) = FALSE;
+	
+  columnValueOptions.state(0) = TRUE;
+  columnValueOptions.state(1) = FALSE;
+  onlineValueUpdateRate.enabled = columnValueOptions.state(1);
+  onlineValueUpdateRate.text = 5;
+
+  showDpeInDescription.number = 0;
+  
+  colourWholeRow.state(0) = FALSE;      
+  showDistSystemDetails.state(0) = FALSE;
+  summariesMode.number = 1;
+        
+  idleTimeout.state(0) = FALSE;
+  idleTimeoutValue.enabled = idleTimeout.state(0);
+  idleTimeoutValue.text = 10;
+  
+  scrollLock.state(0) = FALSE;
+  scrollLockValue.enabled = scrollLock.state(0);
+  scrollLockValue.text = 10;
+  
+  cameWentTimeSelection.selectedPos = 1;
+  
+  checkBoxShowGroups.state(0, false);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="columnVisibleOptions" shapeType="CHECK_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">107</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">41 47</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">100</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 47</prop>
+    <prop name="Size">150 90</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show device name</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show logical name</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show description</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  showDpeInDescription.enabled = columnVisibleOptions.state(2);
+  showRestartWarning();
+  fwAlarmScreen_saveConfig();
+}]]></script>
+    <script name="MouseOver" isEscaped="1"><![CDATA[main(bool enter)
+{
+  if(enter)
+  {
+    infoText.visible(TRUE);
+  }
+  else
+  {
+    infoText.visible(FALSE);
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="showDpeInDescription" shapeType="RADIO_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">109</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">101 186</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">102</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">31 162</prop>
+    <prop name="Size">231 90</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show nothing</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show device name</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show alias (or name)</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  showRestartWarning();
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cameWentTimeSelection" shapeType="COMBO_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">111</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">244 171</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">104</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">246 404</prop>
+    <prop name="Size">140 23</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">WENT timestamp</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">CAME timestamp</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="colourWholeRow" shapeType="CHECK_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">112</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 276</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">105</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 320</prop>
+    <prop name="Size">271 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Use alarm colour to highlight complete row</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  showRestartWarning();
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="columnValueOptions" shapeType="CHECK_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">114</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">41 182</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">107</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 248</prop>
+    <prop name="Size">241 61</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show first alarm value</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show online value with update rate:</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  onlineValueUpdateRate.enabled = columnValueOptions.state(1);
+  showRestartWarning();
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="onlineValueUpdateRate" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">115</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">246 280</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">108</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">246 280</prop>
+    <prop name="Size">60 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0d,False,False,AlignRight,False]</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="historicalMaxLineslValue" shapeType="SPIN_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">118</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">246.0000000000001 361</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">111</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">246 361</prop>
+    <prop name="Size">60 23</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">100000</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="oneRowPerAlarm" shapeType="CHECK_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">119</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">272 320</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">112</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">243 168</prop>
+    <prop name="Size">271 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show one row for CAME and WENT</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  showRestartWarning();
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="descriptionAvailableLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">131</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 448</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">123</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 143</prop>
+    <prop name="Size">220 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;If no description available:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="infoText" shapeType="TEXT_EDIT" layerId="1">
+   <properties>
+    <prop name="serialId">133</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">210 19</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">125</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">210 54</prop>
+    <prop name="Size">267 75</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;It is recommended to show only 2 of the 3 selectable columns. All columns visible at the same time make the table too wide to see.&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="secondsLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">135</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">16 410</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">127</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">306 280</prop>
+    <prop name="Size">121 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;s&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="maxLinesLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">136</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 434</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">128</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 361</prop>
+    <prop name="Size">220 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Maximum lines of historical alarms:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="wentAlarmRowsLabel" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">134</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">38 604</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">126</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 404</prop>
+    <prop name="Size">220 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;For WENT alarm rows show:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="separator1" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">139</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 136</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">131</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 136</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="separator2" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">140</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">490 311</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">132</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 251</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="separator3" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">141</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">490 372</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">133</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 312</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="separator4" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">142</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">490 407</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">134</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 347</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="separator5" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">143</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">490 455</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">135</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 395</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="separator6" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">158</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">489 497</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">150</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 437</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="checkboxInvertPriorities" shapeType="CHECK_BOX" layerId="1">
+   <properties>
+    <prop name="serialId">157</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 404</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">149</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 448</prop>
+    <prop name="Size">271 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Invert local and global alarm priorities</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="showDistSystemDetails" shapeType="CHECK_BOX" layerId="2">
+   <properties>
+    <prop name="serialId">121</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 54</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">114</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 54</prop>
+    <prop name="Size">341 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show status of displayed remote systems</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  showRestartWarning();
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="idleTimeout" shapeType="CHECK_BOX" layerId="2">
+   <properties>
+    <prop name="serialId">122</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">60 154</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">115</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 154</prop>
+    <prop name="Size">240 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show default filter when idle for</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  idleTimeoutValue.enabled = idleTimeout.state(0);
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="idleTimeoutValue" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">124</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">270 182</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">117</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">240 151</prop>
+    <prop name="Size">60 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0d,False,False,AlignRight,False]</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="summariesMode" shapeType="RADIO_BOX" layerId="2">
+   <properties>
+    <prop name="serialId">126</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">500 255</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">119</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 355</prop>
+    <prop name="Size">200 90</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show all alarms</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Use alarm reduction</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Hide all summary alarms</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="scrollLockValue" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">127</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">270 126</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">120</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">240 101</prop>
+    <prop name="Size">60 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0d,False,False,AlignRight,False]</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  showRestartWarning();
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="scrollLock" shapeType="CHECK_BOX" layerId="2">
+   <properties>
+    <prop name="serialId">128</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">60 131</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">121</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 104</prop>
+    <prop name="Size">240 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Keep scroll position for minimum</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  scrollLockValue.enabled = scrollLock.state(0);
+  showRestartWarning();
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="savedFilterList" shapeType="COMBO_BOX" layerId="2">
+   <properties>
+    <prop name="serialId">129</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">245 305</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">122</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">195 285</prop>
+    <prop name="Size">117 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreen_saveConfig();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="secondsLabel2" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">144</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 231</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">136</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">300 101</prop>
+    <prop name="Size">121 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;s&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="minutesLabel" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">145</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 281</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">137</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">300 151</prop>
+    <prop name="Size">121 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;min&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="defaultFilterLabel" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">146</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-273 415</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">138</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">17 285</prop>
+    <prop name="Size">180 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Default filter on startup/idle:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="alarmVisibilityLabel" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">147</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-273 466</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">139</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">17 336</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Alarm representation:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="TEXT_FIELD3" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">149</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">490 147</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">141</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 87</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="TEXT_FIELD4" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">150</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">490 199</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">142</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 139</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="TEXT_FIELD5" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">151</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">489 329</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">143</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 269</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="TEXT_FIELD6" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">152</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">489 381</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">144</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 321</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="checkBoxShowGroups" shapeType="CHECK_BOX" layerId="2">
+   <properties>
+    <prop name="serialId">155</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">59 206</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">147</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 206</prop>
+    <prop name="Size">240 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Enable groups</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  showRestartWarning();
+  fwAlarmScreen_saveConfig();
+  checkIfOneOptionEnabled( this.name);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="TEXT_FIELD7" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">156</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">489 250</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">grey</prop>
+    <prop name="TabOrder">148</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 190</prop>
+    <prop name="Size">457 1</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="checkBoxShowAlarmFilter" shapeType="CHECK_BOX" layerId="2">
+   <properties>
+    <prop name="serialId">160</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">60 235</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">152</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 235</prop>
+    <prop name="Size">240 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Enable alarm filter</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  showRestartWarning();
+  fwAlarmScreen_saveConfig();
+  checkIfOneOptionEnabled( this.name);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="enableOptionsText" shapeType="PRIMITIVE_TEXT" layerId="2">
+   <properties>
+    <prop name="serialId">162</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">200 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">black</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">154</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">200 220</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">One of the two options has to be selected.</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.position(25, 554);
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

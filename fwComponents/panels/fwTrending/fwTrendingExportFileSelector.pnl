@@ -1,0 +1,532 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">591 208</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 10</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  // Avoid closing panel in X window
+  int iCloseWindow;
+}
+]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+  // Avoid closing panel in X window
+  int iCloseWindow;
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  string sFolder, sTextField;
+  dyn_string exceptionInfo;
+
+
+  // Initialize CHECK_BOX_EMPTY_CELLS
+  if( _fwTrending_isUnicosEnvironment(exceptionInfo) )
+  {
+    CHECK_BOX_EMPTY_CELLS.state(0) = TRUE;
+  }
+
+
+  // Initialize CHECK_BOX_OPEN_EXCEL
+  if(_WIN32)
+  {
+    setMultiValue(&quot;CHECK_BOX_OPEN_EXCEL&quot;, &quot;state&quot;,   0, TRUE,
+                  &quot;CHECK_BOX_OPEN_EXCEL&quot;, &quot;enabled&quot;, TRUE);
+  }
+  else
+  {
+    setMultiValue(&quot;CHECK_BOX_OPEN_EXCEL&quot;, &quot;state&quot;,   0, FALSE,
+                  &quot;CHECK_BOX_OPEN_EXCEL&quot;, &quot;enabled&quot;, FALSE);
+  }
+
+  // Initialize TEXT_FIELD_FILE_NAME
+
+  // By default write in projet/data folder
+  sTextField = selectDefaultFolder(); 
+
+  // If save to User Folder configuration flag is enable propose AFS/DFS/tmp folder as default.
+  if( $sSaveToUserFolder == &quot;TRUE&quot; )
+  {
+    sFolder = _fwScreenShot_getUserWritableFolder(exceptionInfo);
+    if( dynlen(exceptionInfo) &gt; 0 )
+    {
+      DebugTN(&quot;Error in &quot; + myPanelName() + &quot; -&gt; Initialize TEXT_FIELD_FILE_NAME : &quot; + exceptionInfo);
+      return;
+    }
+    else
+    {
+      if( sFolder != &quot;&quot; )
+      {
+        sTextField = sFolder;
+      }
+      
+    }
+    
+  }
+
+  TEXT_FIELD_FILE_NAME.text = sTextField;
+
+}
+
+
+
+
+
+string selectDefaultFolder()
+{
+  if( !isdir(fwTrending_EXPORT_DATA_PATH) )
+  {
+    mkdir(fwTrending_EXPORT_DATA_PATH);
+  }
+  
+  return fwTrending_EXPORT_DATA_PATH;
+
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="PRIMITIVE_TEXT_TITLE" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,69,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,69,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Export to CSV File</prop>
+     <prop name="en_US.iso88591">Export to CSV File</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT_FILE" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 53</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 55</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">File:</prop>
+     <prop name="en_US.iso88591">File:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PUSH_BUTTON_FILE_SELECTOR" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">542 46</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">544 48</prop>
+    <prop name="Size">37 27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop SharedPixmap="1" name="Image">
+     <prop name="BackgroundPixmap">fileselektor.xpm</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sPath;
+  string sFileName;
+
+  sPath = TEXT_FIELD_FILE_NAME.text();
+  
+  while( !isdir(sPath) )
+  {
+    sPath = stripEnding(sPath);
+  }
+
+  fileSelector(sFileName, sPath, FALSE, &quot;*.csv&quot;, FALSE);
+  if( sFileName != &quot;&quot; )
+  {
+    if( strpos(sFileName, &quot;.csv&quot;) != (strlen(sFileName) -4) )
+    {
+      sFileName = sFileName + &quot;.csv&quot;;
+    }
+
+    TEXT_FIELD_FILE_NAME.text = sFileName;
+  }
+
+}
+
+string stripEnding(string sPath)
+{
+  int iLoop;
+  string sNewPath;
+  dyn_string dsPathParts;
+
+  strreplace(sPath, &quot;\\&quot;, &quot;/&quot;);
+  sPathParts = strsplit(sPath, &quot;/&quot;);
+
+  for( iLoop = 1 ; iLoop &lt; dynlen(dsPathParts) ; iLoop++ )
+  {
+    sNewPath = sNewPath + dsPathParts[iLoop] + &quot;/&quot;;
+  }
+
+  return sNewPath;
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="CHECK_BOX_EMPTY_CELLS" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 130</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 130</prop>
+    <prop name="Size">261 31</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Fill empty cells with previous value</prop>
+       <prop name="en_US.iso88591">Fill empty cells with previous value</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="TEXT_FIELD_FILE_NAME" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">48 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">48 50</prop>
+    <prop name="Size">493 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PUSH_BUTTON_OK" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">390 170</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">390 170</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sFillGaps, sOpenExcel, sFileName, sOnlyVisibleCurves;
+  
+  sFileName = TEXT_FIELD_FILE_NAME.text;
+  
+  if( (strpos(sFileName, &quot;/&quot;) &lt; 0) &amp;&amp; (strpos(sFileName, &quot;\\&quot;) &lt; 0) )
+  {
+    sFileName = fwTrending_EXPORT_DATA_PATH + sFileName;
+  }
+
+  if( CHECK_BOX_EMPTY_CELLS.state(0) )
+    sFillGaps = &quot;TRUE&quot;;
+  else
+    sFillGaps = &quot;FALSE&quot;;
+  
+  if( CHECK_BOX_OPEN_EXCEL.state(0) )
+    sOpenExcel = &quot;TRUE&quot;;
+  else
+    sOpenExcel = &quot;FALSE&quot;;
+  
+  if( CHECK_BOX_OPEN_EXCEL.state(0) )
+    sOnlyVisibleCurves = &quot;TRUE&quot;;
+  else
+    sOnlyVisibleCurves = &quot;FALSE&quot;;
+  
+  PanelOffReturn( makeDynFloat(1), 
+                  makeDynString(&quot;ok&quot;, sFileName, sFillGaps, sOpenExcel, sOnlyVisibleCurves) );
+
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="PUSH_BUTTON_CANCEL" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">490 170</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">490 170</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOffReturn(makeDynFloat(0), 
+                 makeDynString(&quot;cancel&quot;) );
+
+}
+
+]]></script>
+   </events>
+  </shape>
+  <reference referenceId="0" Name="HELP" parentSerial="-1">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">364 10</prop>
+    <prop name="Geometry">1 0 0 1 190 0</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwTrending/fwTrendingExportFileSelector</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape layerId="0" Name="CHECK_BOX_OPEN_EXCEL" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 160</prop>
+    <prop name="Size">261 31</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Open exported file in Excel</prop>
+       <prop name="en_US.iso88591">Open exported file in Excel</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="CHECK_BOX_EXPORT" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 100</prop>
+    <prop name="Size">261 31</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Export only visible curves</prop>
+       <prop name="en_US.iso88591">Export only visible curves</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

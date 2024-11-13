@@ -1,0 +1,1132 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">590 403</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 320</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="StartZoomPoint">0 0</prop>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+#uses &quot;fwGeneral/fwGeneral.ctl&quot;
+
+#uses &quot;fwElmb/fwElmb.ctl&quot;
+// Modular (Panel) Variables
+// -------------------------
+	string m_sType;
+	string m_sFunction;
+	
+	dyn_string m_dsChannels;
+
+// ************************************************************************************
+// Function:		pnlUpdateForSensorsOnChange
+//
+// Description:	Updates all fields in the panel. This is mainly used on initialisation
+//							and when a different sensor type is selected from the combo box
+//
+// Returns:			None
+// ************************************************************************************
+void pnlUpdateForSensorsOnChange( string argsChannel = &quot;&quot;,
+																	string argsElmb = &quot;&quot;)
+{
+// Local Variables
+// ---------------
+	bool bIsStandard;
+	bool bIsRaw;
+	bool bMuxAll;
+	bool bMuxed;
+	
+	int i;
+	int iPos;
+	int iCount = 0;
+	
+	string sDpName;
+  string sSensorType;
+  string sSensorName;
+  string sParameter;
+  string sFctTemplate;
+  string sPrefix;
+	string sParamDescription;
+	string sTruncatedFormula;
+	string sPDOdp;
+	string sProfile;
+	string sItem;
+	string sFunction;
+	string sFunctionTemplate;
+	string sTemp;
+	
+	dyn_bool dbIsStandard;
+	dyn_bool dbIsRaw;
+	
+	dyn_string dsAvailableChannels;
+	dyn_string dsSensorTypes;
+	dyn_string dsFctTemplate;
+	dyn_string dsParameters;
+	dyn_string dsParamDescriptions;
+	dyn_string dsPrefixes;
+	dyn_string dsPDOdps;
+	dyn_string dsTemp;
+	dyn_string dsExceptionInfo;
+
+// Executable Code
+// ---------------
+	// Get the selected sensor
+	iPos = cmbSensorType.selectedPos();
+	
+	// Get information about all sensors
+	dpGet(ELMB_SENSOR_INFO_NAME + &quot;.types&quot;, dsSensorTypes,
+        ELMB_SENSOR_INFO_NAME + &quot;.functions&quot;, dsFctTemplate,
+        ELMB_SENSOR_INFO_NAME + &quot;.parameters&quot;, dsParameters,
+        ELMB_SENSOR_INFO_NAME + &quot;.parameterDescriptions&quot;, dsParamDescriptions,
+        ELMB_SENSOR_INFO_NAME + &quot;.prefix&quot;, dsPrefixes,
+        ELMB_SENSOR_INFO_NAME + &quot;.isStandard&quot;, dbIsStandard,
+        ELMB_SENSOR_INFO_NAME + &quot;.isRaw&quot;, dbIsRaw,
+        ELMB_SENSOR_INFO_NAME + &quot;.pdoDp&quot;, dsPDOdps);
+        
+  // Get information specific to the selected sensor
+  sSensorType = dsSensorTypes[iPos];
+  sFctTemplate = dsFctTemplate[iPos];
+  sParameter = dsParameters[iPos];
+	sParamDescription = dsParamDescriptions[iPos];
+  sPrefix = dsPrefixes[iPos];
+  bIsStandard = dbIsStandard[iPos];
+  bIsRaw = dbIsRaw[iPos];
+  sPDOdp = dsPDOdps[iPos];
+		
+	// Get information about the PDO used
+	if (sPDOdp == ELMB_NO_INFO) {
+		// Default analog input used
+		bMuxed = true;
+		bMuxAll = true;
+	} else {
+		dpGet(sPDOdp + &quot;.profile&quot;, sProfile,
+					sPDOdp + &quot;.mux.all&quot;, bMuxAll);
+					
+		if ((sProfile == &quot;404&quot;) || (sProfile == &quot;LMB&quot;)) {
+			bMuxed = true;
+		} else {
+			bMuxed = false;
+			bMuxAll = false;
+		}
+	}
+		
+	// If sensor is a standard type, do not allow edits or deletions
+	if (bIsStandard) {
+		setValue(&quot;cmdSensorType&quot;, &quot;enableItem&quot;, &quot;1&quot;, false);
+		setValue(&quot;cmdSensorType&quot;, &quot;enableItem&quot;, &quot;2&quot;, false);
+	} else {
+		setValue(&quot;cmdSensorType&quot;, &quot;enableItem&quot;, &quot;1&quot;, true);
+		setValue(&quot;cmdSensorType&quot;, &quot;enableItem&quot;, &quot;2&quot;, true);
+	}
+
+	// How many channels does our sensor use? (only applicable to non-raw sensors)
+	if (!bIsRaw) {
+		for (i = 1; i &lt;= ELMB_MAX_CHANNEL; i++) {
+			if (patternMatch(&quot;*%c&quot; + i + &quot;*&quot;, sFctTemplate))
+				iCount++;
+		}
+	} else {
+		iCount = 1;
+	}
+	
+	// Enter the number of channels used into the correct field
+	lblChannelCounter.text = iCount; 
+  fwElmb_getUserDefinedFct(sFctTemplate, m_dsChannels, makeDynFloat(), sTemp, dsExceptionInfo, true);
+  DebugN(sFctTemplate);
+  DebugN(sTemp);
+  dsTemp = strsplit(m_sFunction, &quot;=&quot;);
+  sItem = strrtrim(dsTemp[1], &quot; &quot;);
+  sFunction = strltrim(dsTemp[2], &quot; &quot;);
+  for (i = 1; i &lt;= 10; i++) {
+  	sTemp = &quot;%x&quot; + i;
+  	strreplace(sFunctionTemplate, sTemp, &quot;%s&quot;);
+  }
+
+	// Display the function (if sensor is raw, just indicate the channel value is used)
+	if (bIsRaw) {
+		lblEquationNote.text = &quot;&quot;;
+		lblEquation.text = &quot;%c1&quot;;
+	} else if (strlen(sFctTemplate) &gt; 95) {
+		sTruncatedFormula = substr(sFctTemplate, 0, 95) + &quot;...&quot;;
+	  lblEquation.text = sTruncatedFormula;
+		lblEquationNote.text = &quot;Formula is too long to show all of it. It has been truncated (indicated by '...')&quot;;
+	} else {
+		lblEquationNote.text = &quot;&quot;;
+	  lblEquation.text = sFctTemplate;
+	}
+	
+	// Update the table showing the parameters
+	modUpdateParameterTable(sParameter, sParamDescription);
+	
+	// Return to calling routine
+	return;
+}
+
+// ************************************************************************************
+// Function:		modUpdateParameterTable
+//
+// Description:	Updates table showing values to be applied to the parameter values for
+//							the sensor
+//
+// Returns:			None
+// ************************************************************************************
+void modUpdateParameterTable(	string argsParameter,
+															string argsParamDescription)
+{
+// Local Variables
+// ---------------
+	int i;
+	
+	string sDescription;
+	
+	dyn_string dsDefaultParameters;
+	dyn_string dsDefaultParameterDescriptions;
+	dyn_string dsTemp;
+
+// Executable Code
+// ---------------
+  // Clear table contents and then fill with the right parameters:
+  tblParameters.deleteAllLines();
+  
+	// Check if parameters exist
+	if (argsParameter != ELMB_NO_INFO) {
+		// Get information from the parameters given
+		fwGeneral_stringToDynString(argsParameter, dsDefaultParameters);
+		fwGeneral_stringToDynString(argsParamDescription, dsDefaultParameterDescriptions, &quot;|&quot;, false);
+  
+		for (i = 1; i &lt;= dynlen(dsDefaultParameters); i++) {
+			if (dynlen(dsDefaultParameterDescriptions) &lt; i || dsDefaultParameterDescriptions[i] == &quot;&quot;)
+				sDescription = &quot;%x&quot; + i;
+			else
+				sDescription = dsDefaultParameterDescriptions[i];
+
+			tblParameters.appendLine(&quot;parameter&quot;, &quot;%x&quot; + i, 
+			                         &quot;description&quot;, sDescription,
+			                         &quot;value&quot;, dsDefaultParameters[i]);
+		}
+	}
+
+	// Return to calling routine
+	return;
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="lblComment" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 320</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 322</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Comment</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblChannelsUsed" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 162</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 164</prop>
+    <prop name="Size">332 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Number of ELMB channels used by this sensor type:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblApplyChanges" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 273</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 275</prop>
+    <prop name="Size">252 34</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">For changes in the table to be permanent
+you must press the Apply Changes button</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblSensorFormula" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 122</prop>
+    <prop name="Size">97 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Sensor Formula:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblEquation" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">25 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">27 142</prop>
+    <prop name="Size">537 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblChannelCounter" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">360 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">362 162</prop>
+    <prop name="Size">27 20</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblEquationNote" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">120 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">122 122</prop>
+    <prop name="Size">447 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmSensorType" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Sensor Type</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">300 50</prop>
+   </properties>
+  </shape>
+  <shape Name="lblTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 87</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Size">272 25</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Modify Analog Input Sensor</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmConfiguration" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 310</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Configuration</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 100</prop>
+    <prop name="Size">570 210</prop>
+   </properties>
+  </shape>
+  <shape Name="cmdOK" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">350 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">350 370</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	modCreateAiChannels();
+	PanelOff();
+	PanelOffPanel(&quot;Create Device&quot;);
+	ModuleOff(&quot;assignIdsModule&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdApply" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">430 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">430 370</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	modCreateAiChannels();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">510 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">510 370</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+	PanelOffPanel(&quot;Create Device&quot;);
+	ModuleOff(&quot;assignIdsModule&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtComment" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 337</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 337</prop>
+    <prop name="Size">571 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="tblParameters" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">-1296 -209</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 192</prop>
+    <prop name="Size">551 83</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">26</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">parameter</prop>
+     <prop name="Width">100</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Parameter</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">description</prop>
+     <prop name="Width">331</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Description</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8">Click on the corresponding cell to change the parameter description</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">value</prop>
+     <prop name="Width">91</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Value</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8">Click on the cell to enter the default value</prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"/>
+     <prop name="Label">
+	<prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="cmdApplyChanges" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">460 280</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">460 280</prop>
+    <prop name="Size">110 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Apply Changes</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int iLines;
+	int i, j;
+	int iSelectedSensorType = cmbSensorType.selectedPos;
+	
+	string sParameters;
+	string sDescriptions;
+	string sTemp;
+	
+	dyn_string dsParameters;
+	dyn_string dsDescriptions;
+	dyn_string dsAllParameters;
+	dyn_string dsAllDescriptions;
+
+	dyn_anytype daLine;
+
+// Executable Code
+// ---------------
+	// Get information from 'SensorInfo' DP
+	dpGet(ELMB_SENSOR_INFO_NAME + &quot;.parameters&quot;, dsAllParameters,
+	      ELMB_SENSOR_INFO_NAME + &quot;.parameterDescriptions&quot;, dsAllDescriptions);
+
+	// Get information from the table
+	for (i = 0; i &lt; tblParameters.lineCount; i++) {
+		
+		// Get the data from the current line
+		daLine = tblParameters.getLineN(i);
+		
+		// Get the '%x' parameter number
+		sTemp = daLine[1];
+		sTemp = strltrim(sTemp, &quot;%x&quot;);
+		sscanf(sTemp, &quot;%d&quot;, j);
+		
+		// Set information into local variable
+		dsDescriptions[j] = daLine[2];
+		dsParameters[j] = daLine[3];
+		
+		// Trim each value of any spaces
+		dsDescriptions[j] = strltrim(dsDescriptions[j], &quot; &quot;);
+		dsDescriptions[j] = strrtrim(dsDescriptions[j], &quot; &quot;);
+		dsParameters[j] = strltrim(dsParameters[j], &quot; &quot;);
+		dsParameters[j] = strrtrim(dsParameters[j], &quot; &quot;);
+	}
+	
+	// Create strings of the parameters and descriptions
+	fwGeneral_dynStringToString(dsDescriptions, sDescriptions);
+	fwGeneral_dynStringToString(dsParameters, sParameters);
+	
+	// Set new information into the datapoint
+	dsAllParameters[iSelectedSensorType] = sParameters;
+	dsAllDescriptions[iSelectedSensorType] = sDescriptions;
+	dpSet(ELMB_SENSOR_INFO_NAME + &quot;.parameters&quot;, dsAllParameters,
+	      ELMB_SENSOR_INFO_NAME + &quot;.parameterDescriptions&quot;, dsAllDescriptions);
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmbSensorType" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">21 55</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 55</prop>
+    <prop name="Size">151 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+	// Call function to update all fields for new selected sensor
+	pnlUpdateForSensorsOnChange();
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	int iPos;
+	
+	langString lsComment;
+	
+	dyn_string dsSensorTypes;
+	
+// Executable Code
+// ---------------
+	// Get all sensor types defined in this system
+	dpGet(ELMB_SENSOR_INFO_NAME + &quot;.types&quot;, dsSensorTypes,
+				$sChannelDp + &quot;.type&quot;, m_sType,
+				$sChannelDp + &quot;.function&quot;, m_sFunction,
+				$sChannelDp + &quot;.channel&quot;, m_dsChannels);
+	lsComment = dpGetDescription($sChannelDp + &quot;.value&quot;);
+	txtComment.text = lsComment;
+	
+	// Display the information in the combo box
+	this.items = dsSensorTypes;
+	
+	iPos = dynContains(dsSensorTypes, m_sType);
+	if (iPos &gt; 0)	
+		this.selectedPos = iPos;
+	
+	// Update all fields in the panel for this sensor
+	pnlUpdateForSensorsOnChange();
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdSensorType" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">191 55</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">191 55</prop>
+    <prop name="Size">96 25</prop>
+    <prop name="PopupItemId"/>
+    <prop name="Text">
+	<prop name="en_US.utf8">Sensor Type</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">cmdCreateNewSensorType</prop>
+      <prop name="Text">
+	<prop name="en_US.utf8">Create New...</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">cmdEditSensorType</prop>
+      <prop name="Text">
+	<prop name="en_US.utf8">Edit...</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">cmdDeleteSensorType</prop>
+      <prop name="Text">
+	<prop name="en_US.utf8">Delete...</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+// Local Variables
+// ---------------
+	int iPos;
+	
+	string sSensorName;
+	string sSensorPrefix;
+	string sSensorFormula;
+	
+	dyn_bool dbIsRaw;
+	dyn_bool dbIsStandard;
+	
+	dyn_float df;
+	
+	dyn_string ds;
+	dyn_string dsExistingSensorTypes;
+	dyn_string dsSensorPrefixes;
+	dyn_string dsSensorFormulas;
+	dyn_string dsParameters;
+	dyn_string dsParamDescriptions;
+	dyn_string dsPDOdps;
+
+// Executable Code
+// ---------------
+	// Action whichever command has been selected
+	if (id == &quot;cmdCreateNewSensorType&quot;) {
+	
+		// Display panel allowing for a new sensor type to be created
+		ChildPanelOnCentralModalReturn(	&quot;fwElmb/objects/fwElmbCreateNewSensorType.pnl&quot;,
+		                          			&quot;Create New Sensor Type&quot;,
+					                          makeDynString(&quot;&quot;),
+					                          df, ds);
+
+		// Refresh combo box of sensors existing (which will add any new one if created)                          
+		dpGet(ELMB_SENSOR_INFO_NAME + &quot;.types&quot;, dsExistingSensorTypes);
+		cmbSensorType.items = dsExistingSensorTypes;
+		
+	} else if (id == &quot;cmdEditSensorType&quot;) {
+	
+		// Get which sensor is currently selected
+		iPos = cmbSensorType.selectedPos;
+	
+		// Get all sensor information
+		dpGet(ELMB_SENSOR_INFO_NAME + &quot;.types&quot;, dsExistingSensorTypes,
+					ELMB_SENSOR_INFO_NAME + &quot;.functions&quot;, dsSensorFormulas,
+					ELMB_SENSOR_INFO_NAME + &quot;.prefix&quot;, dsSensorPrefixes);
+					
+		// Get values to give to panel
+		sSensorName = dsExistingSensorTypes[iPos];
+		sSensorPrefix = dsSensorPrefixes[iPos];
+		sSensorFormula = dsSensorFormulas[iPos];
+					
+		// Display panel allowing for a new sensor type to be created
+		ChildPanelOnCentralModalReturn(	&quot;fwElmb/objects/fwElmbCreateNewSensorType.pnl&quot;,
+		                          			&quot;Edit Sensor Type&quot;,
+					                          makeDynString(&quot;$sSensorName:&quot; + sSensorName,
+					                          							&quot;$sSensorPrefix:&quot; + sSensorPrefix,
+					                          							&quot;$sSensorFormula:&quot; + sSensorFormula,
+					                          							&quot;$bEdit:&quot; + true),
+					                          df, ds);
+	      
+		// If sensor type has been edited, give message to check the variable descriptions
+	  if (df[1] == 1.0) {
+			ChildPanelOnCentralModal(	&quot;vision/MessageInfo1&quot;,
+																&quot;Information&quot;,
+																makeDynString(&quot;Please verify the parameter descriptions and modify\nif necessary as they may now be incorrect.\nNote: Existing sensors of this type are NOT updated&quot;));
+		}
+		                          
+		// Update panel to reflect any changes made
+		pnlUpdateForSensorsOnChange();
+		                          
+	} else if (id == &quot;cmdDeleteSensorType&quot;) {
+		// Get which sensor is currently selected
+		iPos = cmbSensorType.selectedPos;
+	
+		// Get all sensor information
+		dpGet(ELMB_SENSOR_INFO_NAME + &quot;.types&quot;, dsExistingSensorTypes,
+					ELMB_SENSOR_INFO_NAME + &quot;.functions&quot;, dsSensorFormulas,
+		      ELMB_SENSOR_INFO_NAME + &quot;.parameters&quot;, dsParameters,
+		      ELMB_SENSOR_INFO_NAME + &quot;.parameterDescriptions&quot;, dsParamDescriptions,
+		      ELMB_SENSOR_INFO_NAME + &quot;.prefix&quot;, dsSensorPrefixes,
+		      ELMB_SENSOR_INFO_NAME + &quot;.isStandard&quot;, dbIsStandard,
+		      ELMB_SENSOR_INFO_NAME + &quot;.isRaw&quot;, dbIsRaw,
+		      ELMB_SENSOR_INFO_NAME + &quot;.pdoDp&quot;, dsPDOdps);
+					
+		// Get values to give to panel
+		sSensorName = dsExistingSensorTypes[iPos];
+		
+		// Display panel for confirmation
+		ChildPanelOnCentralModalReturn(	&quot;vision/MessageInfo&quot;,
+																		&quot;Confirm Deletion&quot;,
+																		makeDynString(&quot;Are you sure you wish to delete the\nsensor type '&quot; + sSensorName + &quot;'?\nExisting sensors will remain in the system&quot;, &quot;OK&quot;, &quot;Cancel&quot;),
+																		df, ds);
+		if (df[1] == 1.0) {
+		  // Delete the sensor information
+		  dynRemove(dsExistingSensorTypes, iPos);
+		  dynRemove(dsSensorFormulas, iPos);
+		  dynRemove(dsParameters, iPos);
+		  dynRemove(dsParamDescriptions, iPos);
+		  dynRemove(dsSensorPrefixes, iPos);
+		  dynRemove(dbIsStandard, iPos);
+		  dynRemove(dbIsRaw, iPos);
+		  dynRemove(dsPDOdps, iPos);
+		  
+			// Set new information back into datapoint
+			dpSet(ELMB_SENSOR_INFO_NAME + &quot;.types&quot;, dsExistingSensorTypes,
+						ELMB_SENSOR_INFO_NAME + &quot;.functions&quot;, dsSensorFormulas,
+		        ELMB_SENSOR_INFO_NAME + &quot;.parameters&quot;, dsParameters,
+		        ELMB_SENSOR_INFO_NAME + &quot;.parameterDescriptions&quot;, dsParamDescriptions,
+		        ELMB_SENSOR_INFO_NAME + &quot;.prefix&quot;, dsSensorPrefixes,
+		        ELMB_SENSOR_INFO_NAME + &quot;.isStandard&quot;, dbIsStandard,
+		        ELMB_SENSOR_INFO_NAME + &quot;.isRaw&quot;, dbIsRaw,
+		        ELMB_SENSOR_INFO_NAME + &quot;.pdoDp&quot;, dsPDOdps);
+		}
+
+		// Refresh combo box of sensors existing (which will remove any that have been deleted)
+		dpGet(ELMB_SENSOR_INFO_NAME + &quot;.types&quot;, dsExistingSensorTypes);
+		cmbSensorType.items = dsExistingSensorTypes;
+		cmbSensorType.selectedPos = 1;
+		pnlUpdateForSensorsOnChange();
+	}
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

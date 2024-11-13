@@ -1,0 +1,762 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Device Editor Navigator</prop>
+  </prop>
+  <prop name="Size">371 584</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">50 160</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">0</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwDeviceEditorNavigator/fwDeviceEditorNavigator.ctl&quot;
+
+const int OPERATION_MODE_ID = 0;
+const int CONFIGURATION_MODE_ID = 1;
+
+dyn_int tabMapEditorToNavigator;
+dyn_int tabMapNavigatorToEditor;
+
+initialize()
+{
+    setStyleSheet();
+  // when embedded as GEDI dockModule we should not close
+  // the panel, or we loose it completely from the list of
+  // available toolbars/modules of GEDI)
+  if (isDollarDefined(&quot;$hideCloseButton&quot;)) {
+	bool bHide=getDollarValue(&quot;$hideCloseButton&quot;);
+	if (bHide) {
+	  CloseButton.visible=false;
+	  ResizeIndicator.visible=false;
+	}
+  }
+
+  string dp = fwDEN_COMMAND_DP + myManNum();
+
+  //When the DEN is open the HARDWARE tab is selected
+  g_fwDEN_currentHierarchyType = fwDevice_HARDWARE;
+
+  // check if internal dp exist, if not create it
+  if(!dpExists(dp))
+    dpCreate(dp, &quot;_FwDeviceEditorNavigator&quot;);
+
+  //DebugN(&quot;dp &quot; + dp + &quot; &quot; + dpExists(dp));
+  // connect the callback function
+  dpConnect(&quot;fwDeviceEditorNavigator_executeCommand&quot;, FALSE,
+            dp + &quot;.command&quot;, dp + &quot;.selectedNode&quot;);
+
+  string compVersion;
+  if (fwInstallation_isComponentInstalled(&quot;fwFSM&quot;,compVersion)) {
+    treeTab.registerPanel(2,&quot;fwFSM/ui/fwFsmDomains.pnl&quot;,makeDynString());
+    treeTab.registerPanel(3,&quot;fwFSM/ui/fwFsmOperation.pnl&quot;,makeDynString());
+  } else {
+
+  }
+
+  tabMapEditorToNavigator = makeDynString(1, 2, 4, 0);
+  tabMapNavigatorToEditor = makeDynString(1, 2, 0, 3);
+}
+
+setMode(string newMode, bool changePossible, dyn_string &amp;exceptionInfo)
+{
+  int newActiveTab, activeTab;
+
+  activeTab = treeTab.activeRegister();
+
+  switch(newMode)
+  {
+    case fwDEN_MODE_EDITOR:
+      g_fwDEN_mode = fwDEN_MODE_EDITOR;
+      modeRadiobox.number(CONFIGURATION_MODE_ID);
+      treeTab.namedRegisterVisible(&quot;fsmEditor&quot;) = TRUE;
+      treeTab.namedRegisterVisible(&quot;fsmNavigator&quot;) = FALSE;
+      treeTab.activeRegister(tabMapNavigatorToEditor[activeTab + 1] - 1);
+      newActiveTab = tabMapNavigatorToEditor[activeTab + 1] - 1;
+      //DebugN(&quot;Setting active tab to &quot; + &quot; &quot; + newActiveTab + &quot; &quot; + activeTab + &quot; &quot; + selectedTabIndex);
+      break;
+   case fwDEN_MODE_NAVIGATOR:
+      g_fwDEN_mode = fwDEN_MODE_NAVIGATOR;
+      modeRadiobox.number(OPERATION_MODE_ID);
+      treeTab.namedRegisterVisible(&quot;fsmEditor&quot;) = FALSE;
+      treeTab.namedRegisterVisible(&quot;fsmNavigator&quot;) = TRUE;
+      treeTab.activeRegister(tabMapEditorToNavigator[activeTab + 1] - 1);
+      newActiveTab = tabMapEditorToNavigator[activeTab + 1] - 1;
+      //DebugN(&quot;Setting active tab to &quot; + &quot; &quot; + newActiveTab + &quot; &quot; + activeTab + &quot; &quot; + selectedTabIndex);
+      break;
+   case fwDEN_MODE_SWITCH:
+      if (g_fwDEN_mode == fwDEN_MODE_NAVIGATOR)
+      {
+         setMode(fwDEN_MODE_EDITOR, changePossible, exceptionInfo);
+      }
+      else
+      {
+         if(g_fwDEN_mode == fwDEN_MODE_EDITOR)
+         {
+            setMode(fwDEN_MODE_NAVIGATOR, changePossible, exceptionInfo);
+         }
+      }
+      return;
+      break;
+   case fwDEN_MODE_SAME:
+      break;
+   default:
+      break;
+   }
+
+  // set accesibility of button to change mode
+  if(changePossible)
+    modeRadiobox.enabled(TRUE);
+  else
+    modeRadiobox.enabled(FALSE);
+
+  //DebugN(&quot;g_fwDEN_selectedDevice &quot; + g_fwDEN_selectedDevice + &quot; dpSubStr(g_fwDEN_selectedDevice, DPSUB_SYS) &quot; + dpSubStr(g_fwDEN_selectedDevice, DPSUB_SYS));
+  if(g_fwDEN_selectedDevice != &quot;&quot; &amp;&amp; dpSubStr(g_fwDEN_selectedDevice, DPSUB_SYS) != g_fwDEN_selectedDevice)
+  {
+        _fwDeviceEditorNavigator_displayAssociatedDevicePanel(g_fwDEN_selectedDevice, g_fwDEN_currentHierarchyType, g_fwDEN_mode, exceptionInfo);
+        //DebugN(&quot;g_fwDEN_selectedDevice &quot; + g_fwDEN_selectedDevice + &quot; g_fwDEN_currentHierarchyType &quot; + g_fwDEN_currentHierarchyType);
+  }
+}
+
+void setStyleSheet()
+{
+
+    treeTab.styleSheet=&quot;QTabBar::tab{background: oa-color(_WindowAlternate); border: 1px inset oa-color(_ButtonShadow); padding: 5px; padding-left:15px; padding-right:15px;}&quot;+
+                       &quot;QTabBar::tab:selected{background: oa-color(_Window); border: 1px outset oa-color(_ButtonShadow);margin-bottom: -1px;}&quot;;
+
+}
+
+void colorSchemeChangedCB()
+{
+    setStyleSheet();
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    dyn_string exceptionInfo;
+    initialize();
+    setMode(fwDEN_MODE_NAVIGATOR, TRUE, exceptionInfo);
+    modeRadiobox.enabled(TRUE);
+
+    uiConnect(&quot;colorSchemeChangedCB&quot;, &quot;colorSchemeChanged&quot;);
+}
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">13.40875912408759 339.8591549295774</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">FwCorporateColor</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="MinimumExpanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1.229235880398666 0 0 1.133333333333305 -24.58471760797332 -599.6666666666517</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 530</prop>
+    <prop name="Size">302 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="CloseButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">283 659.9414712049365</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignTrailing|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">283 546.5</prop>
+    <prop name="Size">80 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	ModuleOff(fwDEN_DEVICE_MODULE);
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="infoLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">49.55228758169935 -10.72222222222249</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.9966555183946252 0 0 0.9655172413793478 -24.3812709030092 300.9137931034386</prop>
+    <prop name="Location">35.5 258.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Right click opens options.</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="TextField2" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">98.38601823708179 159</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,37,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">91 68</prop>
+    <prop name="Size">271 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	string systemName;
+	
+	systemName = getSystemName();
+	systemName = substr(systemName, 0, strpos(systemName, &quot;:&quot;));
+	this.text = systemName;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Text3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">164.1066666666667 134.4545454545454</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.9930069930070027 0 0 1.285714285714299 -62.9790209790217 -9.714285714286346</prop>
+    <prop name="Location">74.5 62</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,37,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Running on:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">28.05208333333334 464.9117647058823</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">2.233215547703261 0 0 1.024390243902486 -87.37809187279511 -493.4390243902669</prop>
+    <prop name="Location">44.5 489.5</prop>
+    <prop name="Size">142 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Device Manager</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="7" Name="refHelpButton" referenceId="6">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">266 3</prop>
+    <prop name="Geometry">1.208333333333333 0 0 1.083333333333368 9.583333333333428 1.749999999999897</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwDeviceEditorNavigator/fwDeviceEditorNavigator</prop>
+     </prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="MinimumExpanding" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+   </properties>
+  </reference>
+  <shape Name="redundancyInfoBg" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 650</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="MinimumExpanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[none,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1.23745819397993 0 0 0.9629629629629842 0 7.074074074073461</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">0 29</prop>
+    <prop name="Size">300 28</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="modeLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">48.5 107</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.9870129870129549 0 0 1.000000000000014 -35.87012987012832 -65.50000000000145</prop>
+    <prop name="Location">48.5 107</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Mode:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string exceptionInfo;
+	setMode(fwDEN_MODE_SWITCH, TRUE, exceptionInfo);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="modeRadiobox" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-19.64397905759159 429.1994830712164</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">53 38.5</prop>
+    <prop name="Size">186 21</prop>
+    <prop name="Vertical">False</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Operation</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Configuration</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  dyn_string exceptionInfo;
+	setMode(fwDEN_MODE_SWITCH, TRUE, exceptionInfo);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="treeTab" shapeType="TAB" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type">Fw</prop>
+    <prop name="RefPoint">-18.04659498207684 22.85437521242517</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">5 97</prop>
+    <prop name="Size">361 443</prop>
+    <prop name="TabBarAutoHide">False</prop>
+    <prop name="Page">
+     <prop name="Name">Hardware</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Hardware</prop>
+     </prop>
+     <prop name="Panel">fwDeviceEditorNavigator/fwDeviceEditorNavigatorTree.pnl</prop>
+     <prop name="DollarParameters">
+      <prop name="dollarParameter">
+       <prop name="Dollar">$sTreeType</prop>
+       <prop name="Value">HARDWARE</prop>
+      </prop>
+     </prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">Logical</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Logical</prop>
+     </prop>
+     <prop name="Panel">fwDeviceEditorNavigator/fwDeviceEditorNavigatorTree.pnl</prop>
+     <prop name="DollarParameters">
+      <prop name="dollarParameter">
+       <prop name="Dollar">$sTreeType</prop>
+       <prop name="Value">LOGICAL</prop>
+      </prop>
+     </prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">fsmEditor</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">FSM</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">fsmNavigator</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">FSM</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="SelectionChanged" isEscaped="1"><![CDATA[main()
+{
+	switch(treeTab.activeRegister)	
+  	{
+		case 0:
+    		g_fwDEN_currentHierarchyType = fwDevice_HARDWARE;
+  			break;
+  		case 1:  
+     		g_fwDEN_currentHierarchyType = fwDevice_LOGICAL;
+  			break; 
+    case 2:
+       g_fwDEN_currentHierarchyType = fwDevice_FSM_EDITOR;
+	if(isModuleOpen(fwDEN_DEVICE_MODULE)) ModuleOff(fwDEN_DEVICE_MODULE);
+     break;
+    case 3: 
+      g_fwDEN_currentHierarchyType = fwDevice_FSM_NAVIGATOR;
+	if(isModuleOpen(fwDEN_DEVICE_MODULE)) ModuleOff(fwDEN_DEVICE_MODULE);
+     break;     
+      default:
+        	break;
+  	}
+  
+  string compVersion;
+  if (!fwInstallation_isComponentInstalled(&quot;fwFSM&quot;,compVersion)) {
+    if (treeTab.activeRegister==2 || treeTab.activeRegister==3) {
+      dyn_string exceptionInfo;
+      fwException_raise(exceptionInfo,&quot;WARNING&quot;,&quot;fwFSM Component is not installed. FSM tree not available&quot;,&quot;&quot;);
+      fwExceptionHandling_display(exceptionInfo);
+    }
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">239 38</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">239 38</prop>
+    <prop name="Size">122 21</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="17" Name="ResizeIndicator" referenceId="13">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwResizableIcon.pnl</prop>
+    <prop name="Location">145.5 356.75</prop>
+    <prop name="Geometry">0.9876717233118326 0 0 1.024433776137745 35.5128540619985 20.13517065806553</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="minimumSize">15 15</prop>
+    <prop name="maximumSize">15 15</prop>
+    <prop name="layoutAlignment">AlignTrailing|AlignBottom</prop>
+   </properties>
+  </reference>
+  <shape Name="SPACER3" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">171.4908616187987 546</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">169 546</prop>
+    <prop name="Size">107 23</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="18" Name="LAYOUT_GROUP4" serial="4">
+   <properties>
+    <prop idx="0" name="shapeSerial">10</prop>
+    <prop idx="1" name="shapeSerial">9</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">6</prop>
+    <prop name="layoutBottomMargin">6</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="18" Name="LAYOUT_GROUP7" serial="7">
+   <properties>
+    <prop name="shapeSerial">11</prop>
+    <prop idx="0" name="shapeSerial">12</prop>
+    <prop idx="1" name="groupSerial">6</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">3</prop>
+    <prop name="layoutBottomMargin">3</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="18" Name="LAYOUT_GROUP8" serial="8">
+   <properties>
+    <prop name="shapeSerial">15</prop>
+    <prop idx="0" name="shapeSerial">16</prop>
+    <prop idx="1" name="shapeSerial">17</prop>
+    <prop idx="2" name="shapeSerial">22</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">2</prop>
+    <prop name="layoutBottomMargin">2</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="18" Name="LAYOUT_GROUP9" serial="9">
+   <properties>
+    <prop idx="0" name="shapeSerial">20</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutLeftMargin">5</prop>
+    <prop name="layoutRightMargin">5</prop>
+    <prop name="layoutTopMargin">0</prop>
+    <prop name="layoutBottomMargin">0</prop>
+    <prop name="layoutSpacing">6</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="17" Name="LAYOUT_GROUP16" serial="16">
+   <properties>
+    <prop idx="0" name="shapeSerial">8</prop>
+    <prop idx="1" name="shapeSerial">35</prop>
+    <prop idx="2" name="shapeSerial">7</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">6</prop>
+    <prop name="layoutBottomMargin">0</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="18" Name="LAYOUT_GROUP17" serial="17">
+   <properties>
+    <prop idx="0" name="groupSerial">16</prop>
+    <prop idx="1" name="groupSerial">13</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP18" serial="18">
+   <properties>
+    <prop idx="3" name="groupSerial">9</prop>
+    <prop idx="1" name="groupSerial">8</prop>
+    <prop idx="0" name="groupSerial">7</prop>
+    <prop idx="2" name="groupSerial">4</prop>
+    <prop idx="4" name="groupSerial">17</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

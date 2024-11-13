@@ -1,0 +1,722 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">fwElmbNodeCreateRef</prop>
+  </prop>
+  <prop name="Size">441 253</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+#uses &quot;fwGeneral/fwExceptionHandling.ctl&quot;
+
+#uses &quot;fwElmb/fwElmb.ctl&quot;
+
+#uses &quot;fwElmb/fwElmbUser.ctl&quot;
+
+#uses &quot;fwGeneral/fwProgressBar.ctl&quot;
+// ************************************************************************************
+// Function:		pnlNodeIDSelectorUpdate
+//
+// Description:	Updates the node IDs available from the combo box
+//
+// Returns:			None
+// ************************************************************************************
+void pnlNodeIDSelectorUpdate()
+{
+// Local Variables
+// ---------------
+	bool bStandardElmb;
+	bool bModify;
+
+	int i;
+	int iNodeId;
+	int iTemp;
+	int iPos = 0;
+
+	string sNodeId;
+
+	dyn_string dsNodeIDs;
+
+// Executable Code
+// ---------------
+	// Get whether to limit node IDs to 63
+	bStandardElmb = chkStandardElmb.state(0);
+
+	// Call function to get all available node IDs
+	fwElmb_getAvailableNodeIdList($sDpName, dsNodeIDs, bStandardElmb);
+
+	if (isDollarDefined(&quot;$bModify&quot;)) {
+		bModify = $bModify;
+		if (bModify) {
+			dpGet($sElmbDp + &quot;.id&quot;, sNodeId);
+			iNodeId = sNodeId;
+			for (i = 1; i &lt;= dynlen(dsNodeIDs); i++) {
+				iTemp = dsNodeIDs[i];
+				if (iNodeId &lt; iTemp) {
+					iPos = i;
+					dynInsertAt(dsNodeIDs, sNodeId, iPos);
+					break;
+				}
+			}
+			if (iPos == 0) {
+				dynAppend(dsNodeIDs, sNodeId);
+				iPos = dynlen(dsNodeIDs);
+			}
+		}
+	}
+
+	// Populate the list
+	cmbNodeIDSelector.items = dsNodeIDs;
+	if (dynlen(dsNodeIDs) &gt; 0) {
+		if (iPos &gt; 0)
+			cmbNodeIDSelector.selectedPos = iPos;
+		else
+			cmbNodeIDSelector.selectedPos = 1;
+	}
+
+	// Return to calling routine
+	return;
+}
+
+// ************************************************************************************
+// Function:		pnlCreateNode
+//
+// Description:	Creates an ELMB node using the information from the panel
+//
+// Returns:			None
+// ************************************************************************************
+void pnlCreateNode()
+{
+// Local Variables
+// ---------------
+	bool bModify;
+	bool bIsRunning;
+	bool bUseDefaultAddressing;
+
+	int iDriverNumber;
+
+	string sNodeID;
+	string sUserName;
+	string sComment;
+
+	dyn_float df;
+
+	dyn_string dsExceptionInfo;
+	dyn_string ds;
+
+// Executable Code
+// ---------------
+	// Check for modify only
+	if (isDollarDefined(&quot;$bModify&quot;)) {
+		bModify = $bModify;
+		if (bModify) {
+			sNodeID = cmbNodeIDSelector.text;
+			sComment = txtComment.text;
+			fwElmb_setValuesToElmb($sElmbDp, sComment, sNodeID, dsExceptionInfo);
+			if (dynlen(dsExceptionInfo) &gt; 0)
+				fwExceptionHandling_display(dsExceptionInfo);
+		  pnlNodeIDSelectorUpdate();
+			return;
+		}
+	}
+
+	// Check correct driver is running
+	bIsRunning = fwElmbUser_checkDefaultDriver(iDriverNumber, dsExceptionInfo);
+	if (dynlen(dsExceptionInfo) &gt; 0) {
+		fwExceptionHandling_display(dsExceptionInfo);
+		return;
+	} else if (!bIsRunning) {
+		// Display panel indicating what the problem is and how to fix it
+		ChildPanelOnCentralReturn(&quot;fwElmb/fwElmbDriverMessage.pnl&quot;,
+															&quot;Warning&quot;,
+															makeDynString(&quot;$drvNum:&quot; + iDriverNumber),
+															df, ds);
+		return;
+	}
+
+	// Get information from panel
+ 	sUserName = txtUserName.text;
+	sNodeID = cmbNodeIDSelector.text;
+	sComment = txtComment.text;
+	bUseDefaultAddressing = chbOpcAddressing.state(0);
+
+	// Start progress bar to indicate system is busy
+	fwOpenProgressBar(&quot;ELMB Node creation&quot;, &quot;In progress. Please wait...&quot;, 1);
+
+	fwElmbUser_createElmb(sUserName,
+	                      sComment,
+	                      $sDpName,
+	                      sNodeID,
+	                      bUseDefaultAddressing,
+	                      dsExceptionInfo);
+
+	if (dynlen(dsExceptionInfo) &gt; 0) {
+		fwCloseProgressBar(sUserName + &quot; creation encountered errors&quot;);
+		fwExceptionHandling_display(dsExceptionInfo);
+	} else {
+		fwCloseProgressBar(sUserName + &quot; creation completed successfully&quot;);
+		lblLastSuccessfulCreate.text = sUserName;
+	}
+
+  pnlNodeIDSelectorUpdate();
+
+	// Return to calling routine
+	return;
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="txtTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 87</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Size">267 25</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Create Elmb Node</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	bool bModify;
+	
+	langString lsComment;
+
+// Executable Code
+// ---------------
+	// Check for 'modify' flag
+	if (isDollarDefined(&quot;$bModify&quot;)) {
+		bModify = $bModify;
+		if (bModify) {
+			txtTitle.text = &quot;Modify Elmb Node&quot;;
+			txtUserName.text = $sElmbName;
+			txtUserName.enabled = false;
+			lsComment = dpGetDescription($sElmbDp + &quot;.&quot;);
+			txtComment.text = lsComment;
+			chbOpcAddressing.enabled = false;
+		}
+	}
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="lblUserName" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">14 53</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">16 55</prop>
+    <prop name="Size">100 19</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Elmb Name:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblNodeID" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">290 125</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">292 127</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Node ID:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblComment" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">14 87</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">16 89</prop>
+    <prop name="Size">100 19</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Comment</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmOPCAddressing" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">14 210</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">14 150</prop>
+    <prop name="Size">417 60</prop>
+   </properties>
+  </shape>
+  <shape Name="lblLastSuccessfulCreate" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 222</prop>
+    <prop name="Size">187 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="cmbNodeIDSelector" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">350 124</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">350 124</prop>
+    <prop name="Size">81 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	// Call function to populate the list
+	pnlNodeIDSelectorUpdate();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtComment" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">130 84</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 84</prop>
+    <prop name="Size">300 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="chbOpcAddressing" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">25 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">25 160</prop>
+    <prop name="Size">194 41</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Default OPC addressing?</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+	dyn_string df;
+	dyn_string ds;
+	
+	if (!state) {
+		ChildPanelOnCentralReturn(&quot;vision/MessageInfo3&quot;,
+															&quot;Question&quot;,
+															makeDynString(&quot;Unselecting this option you'll have to address\nyour devices by hand.\nAre you sure you want to do it?&quot;, &quot;Yes&quot;, &quot;No&quot;, &quot;Cancel&quot;), df, ds);
+		if(df[1]!= 1)
+			this.state(button) = true;
+	}
+	
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtUserName" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">130 51</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 51</prop>
+    <prop name="Size">300 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="chkStandardElmb" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 125</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 125</prop>
+    <prop name="Size">251 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Limit Node IDs to 63 (Standard ELMB)</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+	// Call function to update node IDs
+	pnlNodeIDSelectorUpdate();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdOK" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">210 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">210 220</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string sText;
+	pnlCreateNode();
+	sText = lblLastSuccessfulCreate.text;
+	if (strlen(sText) &gt; 0)
+		PanelOffReturn(makeDynFloat(1.0), makeDynString(lblLastSuccessfulCreate.text));
+	else
+		PanelOffReturn(makeDynFloat(0.0), makeDynString());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdApply" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">285 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">285 220</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	pnlCreateNode();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">360 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">360 220</prop>
+    <prop name="Size">71 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string sText;
+	sText = lblLastSuccessfulCreate.text;
+	if (strlen(sText) &gt; 0)
+		PanelOffReturn(makeDynFloat(1.0), makeDynString(lblLastSuccessfulCreate.text));
+	else
+		PanelOffReturn(makeDynFloat(0.0), makeDynString());
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

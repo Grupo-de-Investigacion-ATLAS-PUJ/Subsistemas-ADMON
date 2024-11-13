@@ -1,0 +1,1623 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">614 1371</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">-276 48</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">9</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[class ObjectGroup{
+  setVisibility(bool visible){}
+
+  public hide(){setVisibility(false);}
+  public show(){setVisibility(true);}
+
+  public static showOnlyGiven(shared_ptr&lt;ObjectGroup&gt; objectGroup, const dyn_anytype &amp;objectGroupsList){
+    int objectGroupsListLen = dynlen(objectGroupsList);
+    for(int i=1;i&lt;=objectGroupsListLen;i++){
+      if(!equalPtr(objectGroup, objectGroupsList[i])){
+        objectGroupsList[i].hide();
+      }
+    }
+    objectGroup.show();
+  }
+
+  public static restoreAll(const dyn_anytype &amp;objectGroupsList){
+    int objectGroupsListLen = dynlen(objectGroupsList);
+    for(int i=1;i&lt;=objectGroupsListLen;i++){
+      objectGroupsList[i].show();
+    }
+  }
+};
+
+//-------------------------------
+
+class TableObj : ObjectGroup{
+  shape tableShape;
+
+  public TableObj(string tableId){
+    tableShape = getShape(tableId);
+    init();
+  }
+
+  init(){
+    int colsNum = tableShape.columnCount();
+    tableShape.columnStretchable(colsNum - 1, true);
+    fwInstallation_ui_setTableAlternatingRowColors(tableShape);
+  }
+
+  setVisibility(bool visible){
+    tableShape.visible = visible;
+  }
+};
+
+fillTables(){
+  dyn_string sectionCol, entryCol;
+  int rows = obsoleteConfigLibsStringToCols(getDollarValue(&quot;$obsoleteCfgLibs&quot;), sectionCol, entryCol);
+  tblCfgRemove.appendLines(rows, &quot;section&quot;, sectionCol, &quot;entry&quot;, entryCol);
+  rows = getConfigEntriesToAddAsCols(sectionCol, entryCol);
+  tblCfgAdd.appendLines(rows, &quot;section&quot;, sectionCol, &quot;entry&quot;, entryCol);
+
+  dyn_string filesToRemove = strsplit(getDollarValue(&quot;$filesToRemove&quot;), &quot;|&quot;);
+  tblCleanupFile.appendLines(dynlen(filesToRemove), &quot;path&quot;, filesToRemove);
+
+  dyn_string dirsToRemove = strsplit(getDollarValue(&quot;$dirsToRemove&quot;), &quot;|&quot;);
+  tblCleanupDirEmpt.appendLines(dynlen(dirsToRemove), &quot;path&quot;, dirsToRemove);
+
+  dyn_string dirsToRmvRec = strsplit(getDollarValue(&quot;$dirsToRmvRec&quot;), &quot;|&quot;);
+  tblCleanupDirRec.appendLines(dynlen(dirsToRmvRec), &quot;path&quot;, dirsToRmvRec);
+}
+
+int getConfigEntriesToAddAsCols(dyn_string &amp;sectionCol, dyn_string &amp;entryCol){
+  sectionCol = makeDynString(&quot;ui&quot;, &quot;ctrl&quot;);
+  entryCol = makeDynStringOfSize(2, &quot;LoadCtrlLibs = \&quot;fwInstallation/fwInstallation.ctl\&quot;&quot;);
+  return 2;
+}
+
+int obsoleteConfigLibsStringToCols(const string &amp;cfgModifMapString, dyn_string &amp;sectionCol, dyn_string &amp;entryCol){
+  dyn_string elements = strsplit(cfgModifMapString, &quot;#&quot;);
+  int elementsLen = dynlen(elements, &quot;#&quot;);
+  if(elementsLen % 2 != 0){
+    DebugTN(&quot;Invalid mapping string: &quot; + cfgModifMapString, &quot;Cannot decode it&quot;);
+    return 0;
+  }
+
+  for(int i=1;i&lt;=elementsLen;i+=2){
+    dyn_string entries = strsplit(elements[i + 1], &quot;|&quot;);
+    string section = elements[i];
+    dyn_string sectionList = makeDynStringOfSize(dynlen(entries), section);
+    dynAppend(sectionCol, sectionList);
+    dynAppend(entryCol, entries);
+  }
+  int entryColLen = dynlen(entryCol);
+  for(int i=1;i&lt;=entryColLen;i++){
+    entryCol[i] = &quot;LoadCtrlLibs = \&quot;&quot; + entryCol[i] + &quot;\&quot;&quot;;
+  }
+  return entryColLen;
+}
+
+dyn_string makeDynStringOfSize(int size, string s = &quot;&quot;){
+  dyn_string ds;
+  ds[size] = s;
+  for(int i=1;i&lt;=size-1;i++){
+    ds[i] = s;
+  }
+  return ds;
+}
+
+//-------------------------------
+
+class InfoElement : ObjectGroup{
+  shared_ptr&lt;TableObj&gt; tableObj;
+  string labelId;
+  string buttonMaxId;
+  string spacerId;
+
+  public InfoElement(string tableId, string _labelId, string _buttonMaxId, string _spacerId = &quot;&quot;){
+    tableObj = new TableObj(tableId);
+    labelId = _labelId;
+    buttonMaxId = _buttonMaxId;
+    spacerId = _spacerId;
+  }
+
+  public string getButtonMaxId(){return buttonMaxId;}
+
+  void setVisibility(bool visible){
+    visible?(tableObj.show()):(tableObj.hide());
+    setValue(labelId, &quot;visible&quot;, visible);
+    setValue(buttonMaxId, &quot;visible&quot;, visible);
+    setValue(spacerId, &quot;visible&quot;, visible);
+  }
+};
+
+const shared_ptr&lt;InfoElement&gt; IE_CFG_REMOVE = new InfoElement(&quot;tblCfgRemove&quot;, &quot;txtCfgRemoveLabel&quot;, &quot;btCfgRemoveMax&quot;, &quot;spcrCfgRemove&quot;);
+const shared_ptr&lt;InfoElement&gt; IE_CFG_ADD = new InfoElement(&quot;tblCfgAdd&quot;, &quot;txtCfgAddLabel&quot;, &quot;btCfgAddMax&quot;, &quot;spcrCfgAdd&quot;);
+const shared_ptr&lt;InfoElement&gt; IE_CLEANUP_FILES = new InfoElement(&quot;tblCleanupFile&quot;, &quot;txtCleanupFileLabel&quot;, &quot;btCleanupFileMax&quot;, &quot;spcrCleanupFile&quot;);
+const shared_ptr&lt;InfoElement&gt; IE_CLEANUP_DIRS_EMPT = new InfoElement(&quot;tblCleanupDirEmpt&quot;, &quot;txtCleanupDirEmptLabel&quot;, &quot;btCleanupDirEmptMax&quot;, &quot;spcrCleanupDirEmpt&quot;);
+const shared_ptr&lt;InfoElement&gt; IE_CLEANUP_DIRS_REC = new InfoElement(&quot;tblCleanupDirRec&quot;, &quot;txtCleanupDirRecLabel&quot;, &quot;btCleanupDirRecMax&quot;, &quot;spcrCleanupDirRec&quot;);
+
+const dyn_anytype INFO_ELEMENTS = makeDynAnytype(
+    IE_CFG_REMOVE, IE_CFG_ADD, IE_CLEANUP_FILES, IE_CLEANUP_DIRS_EMPT, IE_CLEANUP_DIRS_REC);
+const int INFO_ELEMENTS_LEN = dynlen(INFO_ELEMENTS);
+
+shared_ptr&lt;InfoElement&gt; getInfoElementFromButtonMaxId(string buttonMaxId){
+  string thisButtonMaxId = this.name();
+  for(int i=1;i&lt;=INFO_ELEMENTS_LEN;i++){
+    if(INFO_ELEMENTS[i].getButtonMaxId() == thisButtonMaxId){
+      return INFO_ELEMENTS[i];
+    }
+  }
+  return nullptr;
+}
+
+//-------------------------------
+
+class InfoFrame : ObjectGroup{
+  string frameId;
+  dyn_anytype infoElements;
+
+  public InfoFrame(string _frameId, const dyn_anytype &amp;_infoElements){
+    frameId = _frameId;
+    infoElements = _infoElements;
+  }
+
+  public bool hasInfoElement(shared_ptr&lt;InfoElement&gt; infElem){
+    return (dynContains(infoElements, infElem) &gt; 0);
+  }
+
+  void setVisibility(bool visible){
+    setValue(frameId, &quot;visible&quot;, visible);
+  }
+};
+
+const shared_ptr&lt;InfoFrame&gt; IF_CFG_MODIF = new InfoFrame(&quot;frmCfgModif&quot;, makeDynAnytype(IE_CFG_REMOVE, IE_CFG_ADD));
+const shared_ptr&lt;InfoFrame&gt; IF_CLEANUP = new InfoFrame(&quot;frmCleanup&quot;, makeDynAnytype(IE_CLEANUP_FILES, IE_CLEANUP_DIRS_EMPT, IE_CLEANUP_DIRS_REC));
+
+const dyn_anytype INFO_FRAMES = makeDynAnytype(IF_CFG_MODIF, IF_CLEANUP);
+const int INFO_FRAMES_LEN = dynlen(INFO_FRAMES);
+
+shared_ptr&lt;InfoFrame&gt; getInfoElementFrame(shared_ptr&lt;InfoElement&gt; infElem){
+  for(int i=1;i&lt;=INFO_FRAMES_LEN;i++){
+    if(INFO_FRAMES[i].hasInfoElement(infElem)){
+      return INFO_FRAMES[i];
+    }
+  }
+  return nullptr;
+}
+
+//-------------------------------
+
+const string BT_MAXIMIZE_LABEL_MAXIMIZE = &quot;Maximize&quot;;
+const string BT_MAXIMIZE_LABEL_RESTORE = &quot;Restore All&quot;;
+
+maximizeBtnClicked(){
+  string thisButtonId = this.name();
+  string currentButtonLabel = this.text();
+  string newButtonLabel;
+  if(currentButtonLabel == BT_MAXIMIZE_LABEL_MAXIMIZE){
+    newButtonLabel = BT_MAXIMIZE_LABEL_RESTORE;
+    shared_ptr&lt;InfoElement&gt; infoElement = getInfoElementFromButtonMaxId(thisButtonId);
+    shared_ptr&lt;InfoFrame&gt; infoFrame = getInfoElementFrame(infoElement);
+    InfoElement::showOnlyGiven(infoElement, INFO_ELEMENTS);
+    InfoFrame::showOnlyGiven(infoFrame, INFO_FRAMES);
+  }else{
+    newButtonLabel = BT_MAXIMIZE_LABEL_MAXIMIZE;
+    InfoElement::restoreAll(INFO_ELEMENTS);
+    InfoFrame::restoreAll(INFO_FRAMES);
+  }
+  this.text = newButtonLabel;
+}
+
+//-------------------------------
+
+const dyn_float DF_RETURN_YES = makeDynFloat(1);
+const dyn_float DF_RETURN_NO = makeDynFloat(0);
+const dyn_string DS_RETURN_YES = makeDynString(&quot;yes&quot;);
+const dyn_string DS_RETURN_NO = makeDynString(&quot;no&quot;);
+
+continueUpgrade(){
+  PanelOffReturn(DF_RETURN_YES, DS_RETURN_YES);
+}
+
+abortUpgrade(){
+  PanelOffReturn(DF_RETURN_NO, DS_RETURN_NO);
+}
+
+//-------------------------------
+
+const dyn_string TBL_CFG_MODIF_COLS = makeDynString(&quot;section&quot;, &quot;entry&quot;);
+const dyn_string TBL_CLEANUP_COLS = makeDynString(&quot;path&quot;);
+
+showRightClickPopupMenu(int row, dyn_string columns){
+  if(row &lt; 0){return;}
+
+  const int menuIdCopyComponents = 1;
+  dyn_string menu = makeDynString(&quot;PUSH_BUTTON, Copy table to clipboard, &quot; + menuIdCopyComponents + &quot;, 1&quot;);
+
+  int selectedItemId;
+  popupMenu(menu, selectedItemId);
+
+  switch(selectedItemId)
+  {
+    case menuIdCopyComponents:
+      setClipboardText(fwInstallation_ui_getTableColumnsAsString(getShape(this.name()), columns, false));
+      break;
+  }
+}
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  abortUpgrade();
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  fillTables();
+}
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="btYes" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">449 747.0588235294116</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">449 743</prop>
+    <prop name="Size">75 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Yes</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  continueUpgrade();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-0.3446893787575302 -1</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Minimum" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.4830575256107332 0 0 1.166666666666683 0.4830575256107332 1.166666666666683</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">131.5 21.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.9985652797704833 0 0 0.9803921568627 -118.8142037302776 -13.61764705882265</prop>
+    <prop name="Location">131.5 21.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Installation Tool Upgrade to version 8.4.0</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">11 44</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">11 44</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Detected old version of Installation Tool in this project.
+Before upgrade to version 8.4.0 it is required to remove obsolete files and update config entries.</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">11 88</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">11 88</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Following actions are going to be performed</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmCfgModif" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">13 113</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.0957642725599 0 0 1.610738255033596 -5.244935543278699 -70.01342281879639</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Project config file modifications</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">13 113</prop>
+    <prop name="Size">544 150</prop>
+   </properties>
+  </shape>
+  <shape Name="txtCfgRemoveLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">62 135</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 0.999999999999969 -39 5.000000000004166</prop>
+    <prop name="Location">62 135</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Entries to be removed</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtCfgAddLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">66 207</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.000000000000011 -43 39.9999999999977</prop>
+    <prop name="Location">66 207</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Entries to be added (if not yet there)</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmCleanup" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">16 272</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.103896103896097 0 0 1.404858299595146 -8.662337662337553 -23.12145748987971</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Obsolete files cleanup</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">16 272</prop>
+    <prop name="Size">540 248</prop>
+   </properties>
+  </shape>
+  <shape Name="txtCleanupFileLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">60 326</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.000000000000011 -37 60.99999999999636</prop>
+    <prop name="Location">60 326</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Files to be removed</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtCleanupDirRecLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">65 456</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.000000000000007 -42 37.99999999999676</prop>
+    <prop name="Location">65 456</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Directories to be removed</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtCleanupDirEmptLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">69 540</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.000000000000011 -46 60.99999999999397</prop>
+    <prop name="Location">69 540</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Directories to be removed if empty</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="tblCfgRemove" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 163</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">21 163</prop>
+    <prop name="Size">572 71</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">18</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">section</prop>
+     <prop name="Width">60</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Section</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">entry</prop>
+     <prop name="Width">250</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Entry</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  showRightClickPopupMenu(row, TBL_CFG_MODIF_COLS);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tblCfgAdd" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 270</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">21 270</prop>
+    <prop name="Size">572 71</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">18</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">section</prop>
+     <prop name="Width">60</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Section</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">entry</prop>
+     <prop name="Width">250</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Entry</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  showRightClickPopupMenu(row, TBL_CFG_MODIF_COLS);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tblCleanupFile" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 410</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">21 410</prop>
+    <prop name="Size">572 71</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">18</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">path</prop>
+     <prop name="Width">250</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Path</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  showRightClickPopupMenu(row, TBL_CLEANUP_COLS);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btCleanupFileMax" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">518 384.0588235294119</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">518 380</prop>
+    <prop name="Size">75 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Maximize</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  maximizeBtnClicked();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btCleanupDirRecMax" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">518 491.0588235294118</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">518 487</prop>
+    <prop name="Size">75 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Maximize</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  maximizeBtnClicked();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btCleanupDirEmptMax" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">518 598.0588235294118</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">518 594</prop>
+    <prop name="Size">75 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Maximize</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  maximizeBtnClicked();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btCfgRemoveMax" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">518 137.0588235294119</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">518 133</prop>
+    <prop name="Size">75 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Maximize</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  maximizeBtnClicked();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btCfgAddMax" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">518 244.058823529412</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">518 240</prop>
+    <prop name="Size">75 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Maximize</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  maximizeBtnClicked();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="tblCleanupDirRec" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 517</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">21 517</prop>
+    <prop name="Size">572 71</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">18</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">path</prop>
+     <prop name="Width">250</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Path</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  showRightClickPopupMenu(row, TBL_CLEANUP_COLS);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tblCleanupDirEmpt" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 624</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">21 624</prop>
+    <prop name="Size">572 71</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">18</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">path</prop>
+     <prop name="Width">250</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Path</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  showRightClickPopupMenu(row, TBL_CLEANUP_COLS);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="spcrCfgRemove" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">160 133</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">160 133</prop>
+    <prop name="Size">352 24</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="spcrCfgAdd" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">242 240</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">242 240</prop>
+    <prop name="Size">270 24</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="spcrCleanupFile" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">147 380</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">147 380</prop>
+    <prop name="Size">365 24</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="spcrCleanupDirRec" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">181 487</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">181 487</prop>
+    <prop name="Size">331 24</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="spcrCleanupDirEmpt" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">231 594</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">231 594</prop>
+    <prop name="Size">281 24</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT8" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">19 654</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">2.819672131147574 0 0 0.8260869565217647 -42.57377049180391 174.7391304347659</prop>
+    <prop name="Location">19 654</prop>
+    <prop name="Size">184 24</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Do you want to continue? Note that these actions are necessary to run Installation Tool</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btNo" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">530 747.0588235294116</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">38</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">530 743</prop>
+    <prop name="Size">75 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">No</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  abortUpgrade();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">39</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">365.0000000000001 5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">39</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">365 5</prop>
+    <prop name="Size">239 26</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER2" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">273 86</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">40</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">273 86</prop>
+    <prop name="Size">332 20</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER3" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">41</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">569 42</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">41</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">569 42</prop>
+    <prop name="Size">36 38</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER4" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">42</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9 743</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">42</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">9 743</prop>
+    <prop name="Size">434 24</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER5" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">43</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">536 713</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">43</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">536 713</prop>
+    <prop name="Size">69 24</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="btReleaseNotes" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">45</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">475 11.61111111111089</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">44</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">475 6.5</prop>
+    <prop name="Size">129 23</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Show Release Notes</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  fwInstallation_ui_openReleaseNotes();
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="-1" Name="HEADER" serial="0">
+   <properties>
+    <prop name="shapeSerial">0</prop>
+    <prop idx="0" name="shapeSerial">1</prop>
+    <prop idx="1" name="shapeSerial">39</prop>
+    <prop idx="2" name="shapeSerial">45</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">4</prop>
+    <prop name="layoutBottomMargin">4</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="12" Name="LAYOUT_GROUP3" serial="1">
+   <properties>
+    <prop idx="0" name="shapeSerial">2</prop>
+    <prop idx="1" name="shapeSerial">41</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="12" Name="LAYOUT_GROUP4" serial="2">
+   <properties>
+    <prop idx="0" name="shapeSerial">3</prop>
+    <prop idx="1" name="shapeSerial">40</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="9" Name="LAYOUT_GROUP5" serial="3">
+   <properties>
+    <prop idx="0" name="shapeSerial">5</prop>
+    <prop idx="1" name="shapeSerial">30</prop>
+    <prop idx="2" name="shapeSerial">25</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="9" Name="LAYOUT_GROUP6" serial="4">
+   <properties>
+    <prop idx="0" name="shapeSerial">6</prop>
+    <prop idx="1" name="shapeSerial">31</prop>
+    <prop idx="2" name="shapeSerial">27</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="8" Name="LAYOUT_GROUP7" serial="5">
+   <properties>
+    <prop idx="0" name="shapeSerial">8</prop>
+    <prop idx="1" name="shapeSerial">32</prop>
+    <prop idx="2" name="shapeSerial">19</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="8" Name="LAYOUT_GROUP8" serial="6">
+   <properties>
+    <prop idx="0" name="shapeSerial">9</prop>
+    <prop idx="1" name="shapeSerial">33</prop>
+    <prop idx="2" name="shapeSerial">21</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="8" Name="LAYOUT_GROUP9" serial="7">
+   <properties>
+    <prop idx="0" name="shapeSerial">10</prop>
+    <prop idx="1" name="shapeSerial">34</prop>
+    <prop idx="2" name="shapeSerial">23</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="12" Name="FRAME_CLEANUP" serial="8">
+   <properties>
+    <prop name="shapeSerial">7</prop>
+    <prop idx="1" name="shapeSerial">13</prop>
+    <prop idx="3" name="shapeSerial">28</prop>
+    <prop idx="5" name="shapeSerial">29</prop>
+    <prop idx="0" name="groupSerial">5</prop>
+    <prop idx="2" name="groupSerial">6</prop>
+    <prop idx="4" name="groupSerial">7</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">2</prop>
+    <prop name="layoutBottomMargin">9</prop>
+    <prop name="layoutSpacing">6</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="12" Name="FRAME_CFG_MODIF" serial="9">
+   <properties>
+    <prop name="shapeSerial">4</prop>
+    <prop idx="1" name="shapeSerial">11</prop>
+    <prop idx="3" name="shapeSerial">12</prop>
+    <prop idx="0" name="groupSerial">3</prop>
+    <prop idx="2" name="groupSerial">4</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">2</prop>
+    <prop name="layoutBottomMargin">9</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="12" Name="LAYOUT_GROUP12" serial="10">
+   <properties>
+    <prop idx="1" name="shapeSerial">43</prop>
+    <prop idx="0" name="shapeSerial">35</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="12" Name="DECISION_BUTTONS" serial="11">
+   <properties>
+    <prop idx="0" name="shapeSerial">42</prop>
+    <prop idx="1" name="shapeSerial">37</prop>
+    <prop idx="2" name="shapeSerial">38</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="BODY" serial="12">
+   <properties>
+    <prop idx="1" name="groupSerial">2</prop>
+    <prop idx="0" name="groupSerial">1</prop>
+    <prop idx="3" name="groupSerial">8</prop>
+    <prop idx="2" name="groupSerial">9</prop>
+    <prop idx="4" name="groupSerial">10</prop>
+    <prop idx="5" name="groupSerial">11</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">0</prop>
+    <prop name="layoutBottomMargin">0</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

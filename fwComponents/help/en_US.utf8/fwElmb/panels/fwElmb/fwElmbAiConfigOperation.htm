@@ -1,0 +1,116 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <title>fwElmb: Analog Input Configuration Panel</title>
+  <meta http-equiv="Content-Type"
+ content="text/html; charset=iso-8859-1">
+  <meta content="Jim Cook" name="author">
+</head>
+<body>
+<p>&nbsp;</p>
+<table border="1" width="95%">
+  <tbody>
+    <tr valign="top">
+      <td bgcolor="#00cc00" width="22%"><strong>Panel Name</strong></td>
+      <td colspan="2" width="78%">
+      <p>fwElmbAiConfigOperation.pnl</p>
+      </td>
+    </tr>
+    <tr valign="top">
+      <td bgcolor="#00cc00"><strong>Introduction<br>
+      </strong></td>
+      <td colspan="2"> This panel is used for the operational setup of the ADC 
+      for a selected ELMB 
+      that has been created in the current system. Some other information 
+      regarding the ELMB is also available from this panel.</td>
+    </tr>
+    <tr valign="top">
+      <td bgcolor="#00cc00"><strong>Instructions</strong></td>
+      <td colspan="2">
+      The different controls for the panel (<a href="#Figure_1">Figure 1</a>) 
+      are described below:<p><b><i>Firmware</i></b></p>
+      <p>The three fields here are read only fields. The information is set into 
+      the text fields when the information is read from the ELMB. You cannot 
+      alter these values. They show the:</p>
+      <p><i>Software version</i> - In some cases (depending on the version) a 
+      'sub-version' may also be displayed</p>
+      <p><i>Hardware version</i> - The hardware version is displayed</p>
+      <p><i>Serial Number</i> - In most cases (apart from <b>very</b> old ELMBs) 
+      the serial number of the ELMB is displayed. If this information is not 
+      held in the ELMB, the text 'N/A' will be displayed (as it is 
+      Non-Applicable).</p>
+      <p><b><i>ADC Settings</i></b></p>
+      <p><i>Rate (Hz)</i> - The ADC conversion rate is displayed here once the 
+      information has been read from the ELMB. You may also select a value to be 
+      written to the ELMB from the drop-down list.</p>
+      <p><i>Range (V)</i> - The ADC range is displayed here once the information 
+      has been read from the ELMB. You may also select a value to be written to 
+      the ELMB from the drop-down list.</p>
+      <p><i>Highest channel number</i> - The highest channel number in use is 
+      displayed here once the information has been read from the ELMB. You may 
+      also select a value to be written to the ELMB from the drop-down list.</p>
+      <p><i>Mode</i> - The ADC conversion mode is displayed here once the 
+      information has been read from the ELMB. You may also select a new value 
+      to be written to the ELMB by clicking on the appropriate radio button.</p>
+      <p><b><i>Analog Input Transmission Type</i></b></p>
+      <p>Here you can select whether the ELMB responds to a SYNC message (by 
+      then sending the values of all the analog and digital inputs) or to an RTR 
+      (Remote Transmission Request). If 'After RTR message' is selected, you may 
+      also enter a value for the Event Timer by selecting from the drop-down 
+      list. If the value for the Event Timer is greater than zero, then the ELMB 
+      sends all the values of analog and digital inputs at the selected time 
+      interval.</p>
+      <p><b><i>Reset and Calibrate</i></b></p>
+      <p>These functions are not yet implemented.</p>
+      <p><b><i>Read and Write</i></b></p>
+      <p><i>Read - </i>Clicking the button labeled 'Read' causes the OPC Server 
+      to request all the information from the ELMB that may be displayed in the 
+      panel. If successful, all values currently set into the ELMB are shown in 
+      the relevant fields. Please note, that these values may NOT be the values 
+      saved into the EEPROM of the ELMB - they are the current settings. If you 
+      wish to read the values that are stored in the EEPROM, first <i>Reset</i> 
+      the ELMB, and once the bootup message has been received, you may then read 
+      the values.</p>
+      <p><i>Write</i> - Clicking on the button labeled 'Write' causes the values 
+      currently selected in the panel to be written to the ELMB. After clicking 
+      this button, you are given a choice whether to save these settings to 
+      EEPROM or not. Once the values are saved to the EEPROM (non-volatile 
+      memory), they will become the default configuration settings for the ELMB 
+      and therefore will still apply even after a <i>Reset</i> NMT command or a 
+      Hard Reset (power-off and power-on).</p>
+      <p>Upon success for either of these operations, some status text is 
+      displayed indicating this. If for any reason, a problem occurs, this will 
+      also be displayed.<tr valign="top">
+      <td bgcolor="#00cc00"><strong>Restrictions</strong></td>
+      <td colspan="2"><br>
+      </td>
+    </tr>
+  </tbody>
+</table>
+<p>&nbsp;</p>
+<p align="center">
+<img border="0" src="fwElmbAiConfigOperation.jpg"></p>
+<p align="center">
+Figure 1: Elmb ADC Operation panel</p>
+<a name="Figure_1"></a>
+<table border="1" width="95%">
+  <tbody>
+    <tr bgcolor="#00cc00">
+      <td colspan="3"><strong>Dollar Parameters</strong></td>
+    </tr>
+    <tr bgcolor="#00cc00">
+      <td width="23%"><strong>Name</strong></td>
+      <td width="62%"><strong>Description</strong></td>
+      <td width="15%">&nbsp;</td>
+    </tr>
+    <tr>
+      <td>$sDpName</td>
+      <td>The name of the datapoint of the ELMB Analog Input Configuration to be operated.</td>
+      <td>Required<br>
+      </td>
+    </tr>
+  </tbody>
+</table>
+<br>
+</body>
+</html>

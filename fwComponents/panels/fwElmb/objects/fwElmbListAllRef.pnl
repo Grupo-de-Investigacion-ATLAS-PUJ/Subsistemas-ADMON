@@ -1,0 +1,319 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">viewADItems</prop>
+  </prop>
+  <prop name="Size">610 391</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">71 79</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+#uses &quot;fwGeneral/fwExceptionHandling.ctl&quot;
+
+#uses &quot;fwGeneral/fwException.ctl&quot;
+pnlOpenChildPanel()
+{
+// Local Variables
+// ---------------
+	bool bDone;
+	
+	int iLength;
+	int i;
+	
+	string sChild;
+	string sLabel;
+	string sChildDp;
+	string sDpType;
+	string sConfigPanel;
+	
+	dyn_string dsExceptionInfo;
+	dyn_string dsPanelList;
+
+// Executable Code
+// ---------------
+	// Get the selection from the list
+	sChild = lstChildren.selectedText;
+
+	// Split reference to obtain DP name
+	fwGenericDpFunctions_splitReference(sChild,
+																			sLabel,
+																			sChildDp,
+																			dsExceptionInfo);
+
+	// Check the child DP exists
+	if (!dpExists(sChildDp))	{
+		fwException_raise(dsExceptionInfo,
+											&quot;ERROR&quot;,
+											&quot;The data point \&quot;&quot; + sChildDp + &quot;\&quot; does not exist&quot;,
+											&quot;&quot;);
+		fwExceptionHandling_display(dsExceptionInfo);
+		return;
+	} else {
+		// Get the type of the selected child
+		sDpType = dpTypeName(sChildDp);	
+
+		// Get the composite label
+		fwGenericDpFunctions_getLabel($sDpName,
+																	$sParentReference,
+																	sLabel,
+																	dsExceptionInfo);
+																	
+		// Get available panels for this DP
+		fwGenericDpFunctions_getPanelList(sChildDp,
+																			false,
+																			dsPanelList,
+																			dsExceptionInfo);
+		
+		// Loop through all panels, possibly looking for default?!?!
+		iLength = dynlen(dsPanelList);
+		for (i = 1; (i &lt;= iLength) &amp;&amp; (!bDone); i++) {
+			if (strpos(dsPanelList[i], sLabel + &quot;|&quot;) == 0) {
+				fwGenericDpFunctions_splitReference(dsPanelList[i],
+																						sLabel,
+																						sConfigPanel,
+																						dsExceptionInfo);
+				bDone = true;
+			}
+		}
+
+		// Check that panel exists
+		if (getPath(PANELS_REL_PATH, sConfigPanel + &quot;.pnl&quot;) == &quot;&quot;) {
+			fwException_raise(dsExceptionInfo,
+												&quot;WARNING&quot;,
+												&quot;The panel \&quot;&quot; + sConfigPanel +&quot;.pnl&quot; + &quot;\&quot; could not be found&quot;,
+												&quot;&quot;);
+			fwExceptionHandling_display(dsExceptionInfo);
+			return;
+		}
+
+		// Check for module being open, and if not, open one
+		if (!isModuleOpen(sConfigPanel + &quot;.pnl&quot;))
+			ModuleOn(sConfigPanel + &quot;.pnl&quot;, 100, 100, 100, 100, 1, 1, 1, &quot;&quot;);
+			
+		// Open the required panel
+		RootPanelOnModule(sConfigPanel + &quot;.pnl&quot;,
+											sDpType + &quot; Operation for &quot; + sChildDp,
+											sConfigPanel + &quot;.pnl&quot;,
+											makeDynString(&quot;$sDpName:&quot; + sChildDp,
+																		&quot;$sParentReference:&quot; + sLabel,
+																		&quot;$bHierarchyBrowser:&quot; + false));
+	}
+
+	// Return to calling routine
+	return;
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="txtTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">459 79</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Size">587 25</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">($sTitle)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	this.text($sTitle);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="lstChildren" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">50 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 50</prop>
+    <prop name="Size">431 331</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	dyn_errClass deError;
+
+// Executable Code
+// ---------------
+	// Check for DP existing
+	if (dpExists($sDpName)) {
+		// Check for a view and connect to the DP as necessary
+		if (dpTypeName($sDpName) == &quot;_FwViews&quot;) {
+			dpConnect(&quot;cbkDisplayChildren&quot;,
+								$sDpName + &quot;.fwReferences.children:_original.._value&quot;);
+		} else {
+			dpConnect(&quot;cbkDisplayChildren&quot;,
+								$sDpName + &quot;.fwDeclarations.fwReferences.children:_original.._value&quot;);
+		}
+	}
+
+	// Check for any errors
+	deError = getLastError();
+	if (dynlen(deError) &gt; 0)
+		this.color = &quot;DpDoesNotExist&quot;;
+		
+	// Return to calling routine
+	return;
+}
+
+void cbkDisplayChildren(string argsDp,
+												dyn_string argdsNewValue)
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	// Display the list of children
+	this.items = argdsNewValue;
+	
+	// Return to calling routine
+	return;
+}]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	// Call function to open panel selected
+	pnlOpenChildPanel();
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdOpenConfigPanel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">1362 563</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">450 50</prop>
+    <prop name="Size">151 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Open Config Panel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+// None
+
+// Executable Code
+// ---------------
+	// Call function to open panel selected
+	pnlOpenChildPanel();
+	
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

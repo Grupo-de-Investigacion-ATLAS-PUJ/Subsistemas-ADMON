@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">321 241</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">242 152</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[string NodesToRemove;
+
+remove_children()
+{
+dyn_float res;
+dyn_string ret, exInfo;
+string names, ref_obj;
+int i, ref;
+
+		ChildPanelOnReturn(&quot;fwTreeDisplay/fwTreeRemoveNodesStd.pnl&quot;,&quot;Remove Children&quot;,
+			makeDynString($1),
+			20,75, res, ret);
+		if(res[1])
+		{
+			NodesToRemove = ret;
+			strreplace(NodesToRemove,&quot; | &quot;,&quot;,&quot;);
+			for(i = 1; i &lt;= dynlen(ret); i++)
+			{
+				ref_obj = ret[i];
+				ret[i] = fwTree_getNodeDisplayName(ret[i], exInfo);
+				if((ref = fwFsm_isObjectReference(ref_obj)))
+				{
+  					ret[i] = &quot;&amp;&quot;+ret[i];
+						ret[i] += &quot;(&quot;+fwFsm_getReferencedObjectDevice(ref_obj)+&quot;)&quot;;
+				}
+			}
+			names = ret;
+			strreplace(names,&quot; | &quot;,&quot;,&quot;);
+			setValue(&quot;object_names&quot;,&quot;visible&quot;,1);
+			setValue(&quot;object_names&quot;,&quot;deleteAllItems&quot;);
+			setValue(&quot;object_names&quot;,&quot;appendItem&quot;,names);
+		}
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="Text1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">22 22</prop>
+    <prop name="Size">267 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,75,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-bold-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,700,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Remove Node:</prop>
+     <prop name="en_US.iso88591">Remove Node:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+		setValue(&quot;&quot;,&quot;text&quot;,&quot;Remove (from) Node: &quot;+$2);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tree_flag" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">40 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">40 50</prop>
+    <prop name="Size">241 81</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Remove Only Node</prop>
+       <prop name="en_US.iso88591">Remove Only Node</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Remove Node and SubTree below</prop>
+       <prop name="en_US.iso88591">Remove Node and SubTree below</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Remove Only Children</prop>
+       <prop name="en_US.iso88591">Remove Only Children</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+	if(button == 2)
+	{
+		remove_children();
+	}
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+dyn_string nodes, exInfo;
+int answer, tree_flag;
+dyn_string ret;
+
+	fwTree_getChildren($1,nodes, exInfo);
+	if(dynlen(nodes))
+	{
+		setValue(&quot;&quot;,&quot;visible&quot;,1);
+		if(fwTree_isRoot($1, exInfo) || fwTree_isClipboard($1, exInfo))
+		{
+			setValue(&quot;&quot;,&quot;number&quot;,2);
+			setValue(&quot;&quot;,&quot;enabled&quot;,0);
+			remove_children();
+		}
+	}
+	else
+	{
+		setValue(&quot;&quot;,&quot;visible&quot;,0);
+	}
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="children" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">80 130</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">80 130</prop>
+    <prop name="Size">211 51</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Remove All Children</prop>
+       <prop name="en_US.iso88591">Remove All Children</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Remove All Children of Type:</prop>
+       <prop name="en_US.iso88591">Remove All Children of Type:</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+dyn_string nodes, types, exInfo;
+string dev, type;
+int i;
+
+	if(button == 1)
+	{
+		setValue(&quot;type&quot;,&quot;visible&quot;,1);
+		setValue(&quot;type&quot;,&quot;text&quot;,&quot;Please Choose Type&quot;);
+		fwTree_getChildren($2,nodes, exInfo);
+		for(i = 1; i &lt;= dynlen(nodes); i++)
+		{
+			fwTree_getNodeDevice(nodes[i], dev, type, exInfo);
+			if(!dynContains(types, type))
+				dynAppend(types, type);			
+		}				
+		setValue(&quot;type&quot;,&quot;items&quot;,types);
+	}
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="type" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">100 179</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,34,Arial</prop>
+    </prop>
+    <prop name="Location">100 180</prop>
+    <prop name="Size">191 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">True</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main() 
+{ 
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="option" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">30 180</prop>
+    <prop name="Size">261 24</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Please Choose Option</prop>
+     <prop name="en_US.iso88591">Please Choose Option</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">In Use</prop>
+       <prop name="en_US.iso88591">In Use</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">2</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Logical</prop>
+       <prop name="en_US.iso88591">Logical</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">3</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Hardware</prop>
+       <prop name="en_US.iso88591">Hardware</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int id)
+{
+string cmd, type, names;
+dyn_float res;
+dyn_string ret;
+int answer;
+
+	getValue(&quot;&quot;,&quot;textItem&quot;,id,cmd);
+	setValue(&quot;&quot;,&quot;text&quot;,cmd);
+	if(cmd == &quot;Remove Node&quot;)
+	{
+//		_fwTree_getReferences($2, &quot;Remove&quot;, answer);
+//		if(answer == 0)
+//			PanelOffReturn(makeDynFloat(0),makeDynString());
+	}
+	else if(cmd == &quot;Remove Node and Sub Tree bellow&quot;)
+	{
+//		_fwTree_getReferences($2, &quot;Remove&quot;, answer);
+//		if(answer == 0)
+//			PanelOffReturn(makeDynFloat(0),makeDynString());
+	}
+	else if(cmd == &quot;Remove Children&quot;)
+	{
+		ChildPanelOnReturn(&quot;fwFSM/ui/fwTreeRemoveNodes.pnl&quot;,&quot;Remove Children&quot;,
+			makeDynString($2),
+			0,0, res, ret);
+		if(res[1])
+		{
+			names = ret;
+			strreplace(names,&quot; | &quot;,&quot;,&quot;);
+			setValue(&quot;object_names&quot;,&quot;visible&quot;,1);
+			setValue(&quot;object_names&quot;,&quot;deleteAllItems&quot;);
+			setValue(&quot;object_names&quot;,&quot;appendItem&quot;,names);
+		}
+	}
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="object_names" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">60 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">60 140</prop>
+    <prop name="Size">231 41</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+  </shape>
+  <shape Name="Button2" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">139 198</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,10,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1</prop>
+    </prop>
+    <prop name="Location">140 200</prop>
+    <prop name="Size">71 22</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Ok</prop>
+     <prop name="en_US.iso88591">Ok</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{ 
+	int i, tree_flag, children_flag, answer;
+	string type, cmd, names, tree;
+	dyn_string objs, ret, exInfo;
+	
+	getValue(&quot;tree_flag&quot;,&quot;number&quot;,tree_flag);
+	if((tree_flag == 0) || (tree_flag == 1))
+		objs[1] = $1;
+	else
+	{
+//		getValue(&quot;object_names&quot;,&quot;items&quot;,objs);
+//		names = objs[1];
+		names = NodesToRemove;
+		objs = strsplit(names,&quot;,&quot;);
+	}
+
+	fwTree_getTreeName($1, tree, exInfo);
+	if(tree == &quot;FSM&quot;)
+	{
+		for(i = 1; i &lt;= dynlen(objs); i++)
+		{
+			fwFsmTree_getReferences(objs[i], &quot;Remove&quot;, answer);
+			if(answer == 0)
+			{
+				dynRemove(objs, i);
+				i--;
+			}
+			removeGlobal(&quot;ReferenceList&quot;);
+		}
+	}
+
+	dynAppend(ret, tree_flag);
+	dynAppend(ret, objs);
+	if(dynlen(ret) &gt; 1)
+		PanelOffReturn(makeDynFloat(1),ret);
+	else
+		PanelOffReturn(makeDynFloat(0),makeDynString());
+} ]]></script>
+   </events>
+  </shape>
+  <shape Name="Button3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">220 198</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,10,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1</prop>
+    </prop>
+    <prop name="Location">220 200</prop>
+    <prop name="Size">71 22</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{ 
+	PanelOffReturn(makeDynFloat(0),makeDynString());
+} 
+
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

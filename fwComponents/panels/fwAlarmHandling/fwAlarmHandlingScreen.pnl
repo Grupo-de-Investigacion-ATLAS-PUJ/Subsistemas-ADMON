@@ -1,0 +1,2840 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">JCOP Alarm Screen</prop>
+  </prop>
+  <prop name="Size">1040 875</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="StartZoomPoint">0 0</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwGeneral/fwProgressBar.ctl&quot;
+#uses &quot;unDistributedControl/unDistributedControl.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+bool g_bInit = TRUE, g_bActionInProgress = FALSE, g_InClosedMode=FALSE;
+const bool g_alertRow=FALSE;  
+string g_sPvssPropertiesDp, g_sTable, g_progressTitle, g_progressText;
+dyn_string g_dsColumnsShown, g_monitoredSystems, g_missingSystems;
+dyn_bool g_dbColumnsVisible;
+dyn_string g_dsColumnsName;
+dyn_int g_diColumnsWidth;
+bool g_watchUser = TRUE, g_showDistDetails;
+int g_currentUser = -1, g_stoppedTimeThread = -1, g_idleCounter = 0;
+string g_shapeWithFocus;
+dyn_anytype g_idleCheck;
+
+_fwInitFields(dyn_anytype &amp;aesMode, dyn_dyn_anytype &amp;aesFilter, dyn_string &amp;exceptionInfo)
+{
+	time startTime, endTime;
+	dyn_uint sysIds;
+	dyn_string sysNames;
+  
+  string sFilterName;
+  bool isQuickFilter;
+  string ac;
+	
+	_fwAlarmHandlingScreen_getDefaultMode(aesMode, exceptionInfo);
+	_fwAlarmHandlingScreen_getDefaultFilter(aesFilter, exceptionInfo);
+
+	if(isDollarDefined(&quot;$sDeviceNameFilter&quot;))
+		aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_DP_NAME] = $sDeviceNameFilter;
+	if(isDollarDefined(&quot;$sDeviceAliasFilter&quot;))
+		aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_DP_ALIAS] = $sDeviceAliasFilter;
+	if(isDollarDefined(&quot;$sDeviceTypeFilter&quot;))
+		aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_DP_TYPE] = $sDeviceTypeFilter;
+	if(isDollarDefined(&quot;$sDeviceDescriptionFilter&quot;))
+		aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_DESCRIPTION] = $sDeviceDescriptionFilter;
+	if(isDollarDefined(&quot;$sAlertTextFilter&quot;))
+		aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_ALERT_TEXT] = $sAlertTextFilter;
+	if(isDollarDefined(&quot;$dsSystemNames&quot;))
+		fwGeneral_stringToDynString($dsSystemNames, aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SYSTEM], &quot;|&quot;, TRUE);
+	if(isDollarDefined(&quot;$bShowWarnings&quot;))
+		aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SEVERITY][fwAlarmHandlingScreen_SEVERITY_FILTER_OBJECT_WARNING] = (bool)$bShowWarnings;
+	if(isDollarDefined(&quot;$bShowErrors&quot;))
+		aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SEVERITY][fwAlarmHandlingScreen_SEVERITY_FILTER_OBJECT_ERROR] = (bool)$bShowErrors;
+	if(isDollarDefined(&quot;$bShowFatals&quot;))
+		aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SEVERITY][fwAlarmHandlingScreen_SEVERITY_FILTER_OBJECT_FATAL] = (bool)$bShowFatals;
+	if(isDollarDefined(&quot;$sFilterName&quot;))//if a quick filter was loaded, show it on the box
+  {
+    sFilterName = getDollarValue(&quot;$sFilterName&quot;);
+    fwAlarmHandlingScreen_loadQuickFilterOptions(sFilterName, isQuickFilter, ac, exceptionInfo);
+    if(isQuickFilter)
+    {
+      strreplace(sFilterName,fwAlarmHandlingScreen_FILTER_DP_PREFIX,&quot;&quot;);
+      quickFilterList.text = sFilterName;
+    }
+  }
+  
+	endTime = getCurrentTime();
+	startTime = endTime - 3600;
+	startHistoricalTime.text = formatTime(fwAlarmHandlingScreen_HISTORICAL_TIME_FORMAT, startTime);
+	endHistoricalTime.text = formatTime(fwAlarmHandlingScreen_HISTORICAL_TIME_FORMAT, endTime);
+}
+
+loadAndApplyFilter()
+{
+	string filterName;  
+	dyn_dyn_anytype aesFilter;
+	dyn_string exceptionInfo;
+
+  g_progressTitle = &quot;Quick Filter&quot;;
+  g_progressText = &quot;Changing alarm screen filter...&quot;;
+        
+	filterName = quickFilterList.text;
+	fwAlarmHandlingScreen_getColumnWidths(g_dsColumnsName, g_dbColumnsVisible, g_diColumnsWidth, exceptionInfo);
+        
+  if(filterName != &quot;&quot;)
+	  fwAlarmHandlingScreen_loadFilter(fwAlarmHandlingScreen_FILTER_DP_PREFIX + filterName, aesFilter, exceptionInfo);
+  else
+	  _fwAlarmHandlingScreen_getDefaultFilter(aesFilter, exceptionInfo);
+          
+	fwAlarmHandlingScreen_showFilter(aesFilter, exceptionInfo);
+	currentFilter.text = filterName;
+	fwAlarmHandlingScreen_applyFilter(g_sPvssPropertiesDp, aesFilter, exceptionInfo, !g_InClosedMode);
+        applyQuickFilter.backCol = &quot;_3DFace&quot;;
+}
+
+_fwGetDeviceTypeList()
+{
+	string type;
+	dyn_string exceptionInfo;
+	dyn_dyn_string types;
+
+	fwDevice_getAllTypes(types, exceptionInfo);
+
+	type = deviceType.text;
+	dynInsertAt(types[1], &quot;*&quot;, 1);
+	dynInsertAt(types[2], &quot;*&quot;, 1);
+	deviceType.items = types[1];
+	if(strpos(type, &quot;Loading&quot;) == 0)
+		deviceType.selectedPos = 1;
+	dpTypeList.items = types[2];
+}
+
+
+connectToBusy()
+{
+   while(!dpExists(g_sPvssPropertiesDp))
+   {
+      delay(0,100);
+   }
+   dpConnect(&quot;busyStateCB&quot;, TRUE, g_sPvssPropertiesDp + &quot;.Settings.BusyTrigger&quot; + AES_ORIVAL);     
+}
+
+busyStateCB(string dpe, int busyState)
+{
+//  DebugN(&quot;CB: &quot; + busyState);
+
+  if(busyState == AES_BUSY_START)
+  {
+    g_watchUser = FALSE;
+    removeGlobal(&quot;g_busyThread&quot;);
+    fwOpenProgressBar(g_progressTitle, g_progressText, 1);
+  }
+  if(busyState == AES_BUSY_STOP)
+  {
+    g_watchUser = TRUE;
+    finishDisplay();
+  }
+}
+
+connectToRunning()
+{
+  dpConnect(&quot;runningStateCB&quot;, TRUE, g_sPvssPropertiesDp + &quot;.Settings.RunMode&quot; + AES_ONLVAL);     
+}
+
+connectToDisplayedSystems()
+{
+  dpConnect(&quot;displayedSystemsCB&quot;, TRUE, g_sPvssPropertiesDp + &quot;.Both.Systems.Selections&quot; + AES_ONLVAL);     
+}
+
+connectToAvailableSystems()
+{
+  //check for new dist system connection. digest it every 20000ms
+  string sDistConnDp = fwInstallationRedu_getLocalDp(&quot;_DistConnections&quot;);
+  dpQueryConnectSingle(&quot;checkIfNewSystem&quot;,FALSE,&quot;idChk&quot;,&quot;SELECT '_online.._value', '_original.._value', '_original.._stime' FROM '&quot;+sDistConnDp+&quot;.Dist.ManNums'&quot;,20000);
+}
+
+checkIfNewSystem(string idChk, dyn_dyn_anytype var)
+{
+  dyn_string sysNames;
+  string localSysName=getSystemName();
+  dyn_uint ids;
+  dyn_dyn_anytype aesFilter;
+  dyn_string exceptionInfo;
+  bool newConnection=false;
+  int i;
+  
+  delay(10);//to be sure the list of system names is up to date
+  getSystemNames(sysNames,ids);
+  strreplace(localSysName,&quot;:&quot;,&quot;&quot;);
+  fwAlarmHandlingScreen_readFilter(aesFilter, exceptionInfo);
+//   DebugTN(&quot;aesFilter: &quot; +aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SYSTEM]);
+//   DebugTN(&quot;connected systems: &quot; + sysNames);
+  /*there is a new system if:
+    - the name is not included in the list of g_monitoredSystems
+    - the filter configuration includes all available systems (*)
+   */
+  if(aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SYSTEM] == &quot;*&quot;)
+  {
+    for(i=1 ; i&lt;=dynlen(sysNames) ; i++)
+      newConnection = newConnection || (localSysName!=sysNames[i] &amp;&amp; !dynContains(g_monitoredSystems,sysNames[i]));
+    if(newConnection)
+    {
+      //reload
+      fwAlarmHandlingScreen_readFilter(aesFilter, exceptionInfo);
+      fwAlarmHandlingScreen_applyFilter(g_sPvssPropertiesDp, aesFilter, exceptionInfo, !g_InClosedMode);
+    }
+  }
+//   DebugTN(&quot;newConnection: &quot;+newConnection);
+}
+
+checkIfNewSystemForDpConnect(string dpe, dyn_int systemNos)
+{
+  /*there is a new system if:
+    - the name is not included in the list of g_monitoredSystems
+    - the filter configuration includes all available systems
+    */
+  dyn_string sysNames;
+  string localSysName=getSystemName();
+  dyn_uint ids;
+  dyn_dyn_anytype aesFilter;
+  dyn_string exceptionInfo;
+  bool newConnection=false;
+  int i;
+  
+  delay(10);
+  getSystemNames(sysNames,ids);
+  strreplace(localSysName,&quot;:&quot;,&quot;&quot;);
+  fwAlarmHandlingScreen_readFilter(aesFilter, exceptionInfo);
+//   DebugTN(&quot;aesFilter: &quot; +aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SYSTEM]);
+//   DebugTN(&quot;connected systems: &quot; + sysNames);
+  if(aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SYSTEM] == &quot;*&quot;)
+  {
+    for(i=1 ; i&lt;=dynlen(sysNames) ; i++)
+      newConnection = newConnection || (localSysName!=sysNames[i] &amp;&amp; !dynContains(g_monitoredSystems,sysNames[i]));
+    if(newConnection)
+    {
+       	loadAndApplyFilter();
+    }
+  }
+//   DebugTN(&quot;newConnection: &quot;+newConnection);
+}
+
+synchronized displayedSystemsCB(string dpe, dyn_string systems)
+{
+  bool result, isConnected;
+  int missing;
+  dyn_string exceptionInfo;
+
+//DebugN(&quot;Should show details:&quot;, g_showDistDetails);
+  systemsProblems.visible = g_showDistDetails;
+  systemsState.visible = g_showDistDetails;
+    
+  if(!g_showDistDetails)
+    systems = makeDynString();
+  
+// DebugN(&quot;Systems&quot;, systems, &quot;Current Monitored:&quot;, g_monitoredSystems);  
+  //disconnect from systems no longer being displayed
+  for(int i=1; i&lt;=dynlen(g_monitoredSystems); i++)
+  {
+    if(dynContains(systems, g_monitoredSystems[i]) &lt;= 0)
+    {
+      string systemName = g_monitoredSystems[i];
+      dynRemove(g_monitoredSystems, i);
+//DebugN(&quot;Removing: &quot; + systemName);  
+      unDistributedControl_deregister(&quot;updateSystemStateCB&quot;, result, isConnected, systemName + &quot;:&quot;, exceptionInfo);
+      
+      missing = dynContains(g_missingSystems, systemName);
+      if(missing &gt; 0)
+        dynRemove(g_missingSystems, missing);
+      i--;
+      delay(1);
+    }
+  }
+  updateMissingSystemDisplay();
+
+  //connect to systems which are newly being displayed
+  for(int i=1; i&lt;=dynlen(systems); i++)
+  {
+    bool isRemote;
+    unDistributedControl_isRemote(isRemote, systems[i] + &quot;:&quot;);
+    if(isRemote)
+    {    
+      if(dynContains(g_monitoredSystems, systems[i]) &lt;= 0)
+      {
+//DebugN(&quot;Adding: &quot; + systems[i]);  
+        dynAppend(g_monitoredSystems, systems[i]);
+        unDistributedControl_register(&quot;updateSystemStateCB&quot;, result, isConnected, systems[i] + &quot;:&quot;, exceptionInfo);
+      }
+    }
+  }
+}
+
+synchronized updateSystemStateCB(string dpe, bool isConnected)
+{
+  int missing;
+  string systemName;
+  
+  systemName = dpSubStr(dpe, DPSUB_DP);
+  strreplace(systemName, c_unDistributedControl_dpName, &quot;&quot;);
+// DebugN(systemName, isConnected);  
+  if(!isConnected)
+  {
+    dynAppend(g_missingSystems, systemName);
+    dynUnique(g_missingSystems);
+  }
+  else
+  {
+    missing = dynContains(g_missingSystems, systemName);
+    if(missing &gt; 0)
+      dynRemove(g_missingSystems, missing);
+  }
+  updateMissingSystemDisplay();
+}
+
+updateMissingSystemDisplay()
+{
+//DebugN(g_missingSystems);
+  if(dynlen(g_missingSystems) &gt; 0)
+  {
+    systemsState.backCol = &quot;FwAlarmFatalUnack&quot;;
+    systemsProblems.text = &quot;Missing systems: &quot; + g_missingSystems;
+    systemsProblems.toolTipText = &quot;Missing systems: &quot; + g_missingSystems;
+  }
+  else
+  {
+    systemsState.backCol = &quot;FwStateOKPhysics&quot;;
+    systemsProblems.text = &quot;All displayed systems are connected&quot;;
+    systemsProblems.toolTipText = &quot;&quot;;
+  }    
+}
+
+countDownToShowStopped()
+{
+  dyn_string exceptionInfo;
+  
+  for(int i=1; i&lt;=8; i++)
+  {//DebugN(&quot;Counting: &quot; + i);
+    delay(1);
+  }
+//   systemsProblems.visible = FALSE;
+//   systemsState.visible = FALSE;
+//   restartButton.backCol = fwAlarmHandlingScreen_COLOUR_BUTTON_NEEDS_PRESSING;
+//   restartWarning.visible = TRUE;
+//   restartButton.visible = TRUE;
+//   runningState.visible = TRUE;
+//   runningState.backCol = &quot;FwAlarmFatalUnack&quot;;
+//   
+//   restartWarning.visible = TRUE;
+//   restartButton.visible = TRUE;
+  
+  g_stoppedTimeThread = -1;
+  
+  //if the screen was stopped, restart it
+  fwException_raise(exceptionInfo, &quot;INFO&quot;, &quot;The alarm screen stopped. Restarting it...&quot;, &quot;&quot;);  
+  aes_doStart(g_sPvssPropertiesDp);
+  //sometimes the first startup is not successful...
+  delay(0,200);
+  aes_doStart(g_sPvssPropertiesDp);
+}
+
+runningStateCB(string dpe, unsigned runMode)
+{
+  bool timerExpired;
+  dyn_anytype returnValues;
+  
+  if(runMode == AES_RUNMODE_STOPPED)
+  {
+    if(g_stoppedTimeThread == -1)
+      g_stoppedTimeThread = startThread(&quot;countDownToShowStopped&quot;);
+  }
+  else
+  {
+    if(g_stoppedTimeThread != -1)
+    {
+      stopThread(g_stoppedTimeThread);
+      g_stoppedTimeThread = -1;
+    }
+    
+//     systemsProblems.visible = g_showDistDetails;
+//     systemsState.visible = g_showDistDetails;
+//     restartButton.backCol = &quot;_3DFace&quot;;
+//     restartWarning.visible = FALSE;
+//     restartButton.visible = FALSE;
+//     runningState.visible = FALSE;
+//     runningState.backCol = &quot;FwStateOKPhysics&quot;;
+// 
+//     restartWarning.visible = FALSE;
+//     restartButton.visible = FALSE;
+    
+  }
+}
+
+finishDisplay()
+{
+	dyn_string exceptionInfo;
+
+  delay(1);
+	if(dynlen(g_dsColumnsName) &gt; 0)
+		fwAlarmHandlingScreen_setColumnWidths(g_dsColumnsName, g_dbColumnsVisible, g_diColumnsWidth, exceptionInfo);
+//DebugN(&quot;Delaying...&quot;);
+  delay(0,500);
+        
+	fwCloseProgressBar(&quot;Action complete&quot;);	
+}
+
+countRows()
+{
+	int rows, i, ackable;
+	shape aesTable;
+	string sAck;
+	
+	while(1)
+	{
+		ackable = 0;
+		aesTable = getShape(g_sTable);
+		rows = aesTable.lineCount;
+
+		for(i=0; i&lt;rows; i++)
+		{
+			getValue(aesTable, &quot;cellValueRC&quot;, i, &quot;acknowledge&quot;, sAck);
+			
+			if (sAck == &quot; !!! &quot;)	// Could be acknowledged
+				ackable++;	
+		}
+	
+		alarmTableLines.text = rows;
+		unackedAlarms.text = ackable;
+		delay(fwAlarmHandlingScreen_DATA_UPDATE_RATE);
+	}
+}
+
+updateOnlineValues()
+{
+  bool isVisible, doUpdate;
+  int onlineValueColumn, timer, previousStartRow = -1;
+  
+  timer = onlineUpdateRate.text;
+  
+  //locate online value column in table
+  getValue(AES_TABLENAME_TOP, &quot;nameToColumn&quot;, fwAlarmHandlingScreen_COLUMN_ONLINE_VALUE, onlineValueColumn);
+  while(1)
+  {
+    if(onlineUpdateRate.text == &quot;0&quot;)
+    {
+      delay(1);
+      continue;
+    }
+    
+    //if column is invisible, just wait again, in case it becomes visible
+    getValue(AES_TABLENAME_TOP, &quot;columnVisibility&quot;, onlineValueColumn, isVisible);
+    if(isVisible)
+    {
+      //if column is visible, get visible rows
+      int startRow, endRow;
+      getValue(AES_TABLENAME_TOP, &quot;lineRangeVisible&quot;, startRow, endRow);
+      doUpdate = TRUE;
+      if(startRow == previousStartRow)
+      {
+        timer--;
+        if(timer &gt; 0)
+          doUpdate = FALSE;
+        else
+          timer = onlineUpdateRate.text;
+      }
+      
+      if(doUpdate)
+        setValue(AES_TABLENAME_TOP, &quot;stop&quot;, TRUE);
+      
+// DebugTN(timer, doUpdate, &quot;Updates rows: &quot; + startRow + &quot; to &quot; + endRow);
+      for(int i=startRow; i&gt;0 &amp;&amp;  endRow&gt;0 &amp;&amp; doUpdate &amp;&amp; (i&lt;=endRow); i++)
+      {
+        int alertType;
+        anytype onlineValue;
+        string dpAttribute, checkDpAttribute, dpeName;
+    
+        //for each row, read the dp name
+        getValue(AES_TABLENAME_TOP, &quot;cellValueRC&quot;, i, _DPID_, dpAttribute);
+        if(dpAttribute == &quot;&quot;)
+          break;
+        if(!dpExists(dpAttribute))
+          continue;
+        
+        dpeName = dpSubStr(dpAttribute, DPSUB_SYS_DP_EL);
+
+        //check the alert type, if summary then skip to next for loop iteration
+        dpGet(dpeName+&quot;:_alert_hdl.._type&quot;, alertType);
+        if(alertType == DPCONFIG_SUM_ALERT)
+          continue;
+        
+        //if not summary, then get the value and write it to the cell               
+        dpGet(dpeName+&quot;:_online.._value&quot;, onlineValue);
+        getValue(AES_TABLENAME_TOP, &quot;cellValueRC&quot;, i, _DPID_, checkDpAttribute);
+        if(dpAttribute != checkDpAttribute)
+          break;
+          
+        setValue(AES_TABLENAME_TOP, &quot;cellValueRC&quot;, i, fwAlarmHandlingScreen_COLUMN_ONLINE_VALUE, dpValToString(dpeName, onlineValue));
+//DebugN(&quot;New value for: &quot; + dpeName, onlineValue);
+      }
+      
+      if(doUpdate)
+        setValue(AES_TABLENAME_TOP, &quot;stop&quot;, FALSE);
+      previousStartRow = startRow;
+    }
+    //never run update faster than once a second
+    delay(1);
+  }
+}
+
+accessControlCB(string dp, string value)
+{
+  string manageDisplayRight, filterRight;
+  dyn_string filters, exceptionInfo;
+  
+  if(g_currentUser == -1)
+    g_currentUser = getUserId();
+  
+  if(g_currentUser != getUserId())
+  {
+    if(g_watchUser)
+      returnToDefaultView();
+//    DebugN(&quot;new user:&quot; + getUserId());  
+  }
+  
+  getQuickFilterList(filters, exceptionInfo);
+  if(dynlen(filters) == 0)
+  {
+    quickFilterList.items = makeDynString(&quot;None available&quot;);
+    quickFilterList.enabled = FALSE;
+    applyQuickFilter.enabled = FALSE;
+  }
+  else
+  {
+    dynInsertAt(filters, &quot;&quot;, 1);
+    quickFilterList.items = filters;
+    quickFilterList.enabled = TRUE;
+    currentFilter.text = quickFilterList.text;
+    applyQuickFilter.enabled = TRUE;
+  }
+  
+  limitButtonAccess();
+  
+  g_currentUser = getUserId();
+}
+
+limitButtonAccess()
+{
+  bool isGranted;
+  dyn_string accessRights, exceptionInfo;
+  
+  if(isFunctionDefined(&quot;fwAccessControl_isGranted&quot;))
+  {
+    fwAlarmHandlingScreen_getAccessControlOptions(accessRights, exceptionInfo);
+
+    if(accessRights[fwAlarmHandlingScreen_ACCESS_MANAGE_DISPLAY] != &quot;&quot;)
+      fwAccessControl_isGranted(accessRights[fwAlarmHandlingScreen_ACCESS_MANAGE_DISPLAY], isGranted, exceptionInfo);
+    else
+      isGranted = TRUE;
+    
+    manageDisplayButton.enabled = isGranted;
+
+    if(accessRights[fwAlarmHandlingScreen_ACCESS_FILTER] != &quot;&quot;)
+      fwAccessControl_isGranted(accessRights[fwAlarmHandlingScreen_ACCESS_FILTER], isGranted, exceptionInfo);
+    else
+      isGranted = TRUE;
+    
+    applyFilter.enabled = isGranted;
+    aesModeSelector.enabled = isGranted;
+    applyMode.enabled = isGranted;
+    clearFilter.enabled = isGranted;
+    
+    if(accessRights[fwAlarmHandlingScreen_ACCESS_ACKNOWLEDGE] != &quot;&quot;)
+      fwAccessControl_isGranted(accessRights[fwAlarmHandlingScreen_ACCESS_ACKNOWLEDGE], isGranted, exceptionInfo);
+    else
+      isGranted = TRUE;
+    
+    acknowledgeButton.enabled = isGranted;
+  }
+  else
+  {
+    manageDisplayButton.enabled = TRUE;
+    applyFilter.enabled = TRUE;
+    aesModeSelector.enabled = TRUE;
+    applyMode.enabled = TRUE;
+    clearFilter.enabled = TRUE;
+    acknowledgeButton.enabled = TRUE;
+  } 
+}
+
+getQuickFilterList(dyn_string &amp;filtersToShow, dyn_string &amp;exceptionInfo)
+{
+  bool granted;
+  string accessRight;
+  dyn_dyn_anytype queryResults;
+
+  dpQuery(&quot;SELECT '_online.._value' FROM '&quot; + fwAlarmHandlingScreen_FILTER_DP_PREFIX + 
+          &quot;*&quot; + fwAlarmHandlingScreen_CONFIG_DP_FILTER_QUICK_FILTER + &quot;' WHERE '_online.._value' == 1&quot;, queryResults);
+  if(dynlen(queryResults) &lt;= 1)
+  {
+    filtersToShow = makeDynString();
+    return;
+  }
+
+  if(isFunctionDefined(&quot;fwAccessControl_isGranted&quot;))
+  {
+    for(int i=2; i&lt;=dynlen(queryResults); i++)
+    {
+      string dpName = dpSubStr(queryResults[i][1], DPSUB_DP);
+      strreplace(dpName, fwAlarmHandlingScreen_FILTER_DP_PREFIX, &quot;&quot;);
+
+      dpGet(dpSubStr(queryResults[i][1], DPSUB_DP) + fwAlarmHandlingScreen_CONFIG_DP_FILTER_ACCESS_RIGHT, accessRight);
+      if(accessRight == &quot;&quot;)
+        dynAppend(filtersToShow, dpName);
+      else
+      {
+        fwAccessControl_isGranted(accessRight, granted, exceptionInfo);
+        if(granted)
+          dynAppend(filtersToShow, dpName);
+      }        
+    }
+  }
+  else
+  {
+    for(int i=2; i&lt;=dynlen(queryResults); i++)
+    {
+      string dpName = dpSubStr(queryResults[i][1], DPSUB_DP);
+      strreplace(dpName, fwAlarmHandlingScreen_FILTER_DP_PREFIX, &quot;&quot;);
+      dynAppend(filtersToShow, dpName);
+    }
+  }
+}
+
+returnToDefaultView()
+{
+  bool needToReset = FALSE;
+  dyn_string exceptionInfo;
+  dyn_dyn_anytype aesFilter, visibleFilter;
+  dyn_anytype aesMode, visibleMode;
+
+  _fwAlarmHandlingScreen_getDefaultFilter(aesFilter, exceptionInfo);
+  _fwAlarmHandlingScreen_getDefaultMode(aesMode, exceptionInfo);
+  
+  fwAlarmHandlingScreen_readMode(visibleMode, exceptionInfo);
+  fwAlarmHandlingScreen_readFilter(visibleFilter, exceptionInfo);  
+    
+  if((visibleMode[fwAlarmHandlingScreen_CONFIG_OBJECT_MODE_TYPE] == AES_MODE_CURRENT)
+      &amp;&amp; (applyMode.backCol == fwAlarmHandlingScreen_COLOUR_BUTTON_NEEDS_PRESSING))
+    needToReset = TRUE;
+
+  if(visibleMode[fwAlarmHandlingScreen_CONFIG_OBJECT_MODE_TYPE] == AES_MODE_CLOSED)
+    needToReset = TRUE;
+    
+  if((visibleFilter != aesFilter))
+    needToReset = TRUE;
+    
+  fwAlarmHandlingScreen_getColumnWidths(g_dsColumnsName, g_dbColumnsVisible, g_diColumnsWidth, exceptionInfo);
+  fwAlarmHandlingScreen_showMode(aesMode, exceptionInfo);
+  fwAlarmHandlingScreen_showFilter(aesFilter, exceptionInfo);
+  startHistoricalTime.visible = FALSE;
+  endHistoricalTime.visible = FALSE;
+  selectHistoricalTimes.enabled = FALSE;
+
+  if(needToReset)
+  {
+//DebugN(&quot;Clearing filters &amp; modes&quot;);
+    g_progressTitle = &quot;Re-initialisation&quot;;
+    g_progressText = &quot;Clearing alarm filter...&quot;;
+
+    aes_doStop(g_sPvssPropertiesDp);
+    fwAlarmHandlingScreen_applyMode(g_sPvssPropertiesDp, aesMode, exceptionInfo, FALSE);
+    fwAlarmHandlingScreen_applyFilter(g_sPvssPropertiesDp, aesFilter, exceptionInfo, FALSE);
+    aes_doStart(g_sPvssPropertiesDp);
+  }
+//  else
+//DebugN(&quot;No need for Clearing filters &amp; modes&quot;);
+  
+  g_InClosedMode = aesMode[fwAlarmHandlingScreen_CONFIG_OBJECT_MODE_TYPE] == AES_MODE_CLOSED;
+  currentMode.text = aesModeSelector.number;
+  applyMode.backCol = &quot;_3DFace&quot;;
+
+  if(quickFilterList.text != &quot;None available&quot;)
+    quickFilterList.text = &quot;&quot;;
+  currentFilter.text = &quot;&quot;;
+  applyQuickFilter.backCol = &quot;_3DFace&quot;;
+}
+
+idleCheck()
+{
+  int row, column, xPos, yPos, timerIncrement = 5;
+  dyn_anytype currentState;
+  
+  while(1)
+  {
+    if(idleTimeoutValue.text != 0)
+    {
+      getCursorPosition(xPos, yPos);
+      getValue(AES_TABLENAME_TOP, &quot;currentCell&quot;, row, column);
+      currentState = makeDynAnytype(xPos, yPos, row, column, g_shapeWithFocus);
+      if(currentState == g_idleCheck)
+        g_idleCounter += timerIncrement;
+      else
+      {
+        g_idleCounter = 0;
+        g_idleCheck = currentState;
+      }
+    }
+    else
+      g_idleCounter = 0;
+
+//DebugN(g_idleCounter);    
+    if(g_idleCounter &gt; (60*(int)idleTimeoutValue.text))
+    {
+//      DebugN(&quot;TIMEOUT OCCURED&quot;);
+      returnToDefaultView();
+      g_idleCounter = 0;
+    }
+    delay(timerIncrement); 
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[// main()
+// {
+// 	int i;
+// }
+]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[// main()
+// {
+// 	int i;
+// }]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{	
+	int result, pos, updateRate, idleTimeout;
+	shape aesTable;
+	dyn_bool columnsVisible;
+	dyn_int columnsWidth;
+	dyn_string exceptionInfo, columnsName;
+	dyn_anytype aesMode;
+	dyn_dyn_anytype aesFilter;
+  bool bOk;
+	
+        if(getPath(PANELS_REL_PATH, &quot;objects/fwAccessControl/fwAccessControl_CurrentUser.pnl&quot;) != &quot;&quot;)
+          addSymbol(myModuleName(), myPanelName(), &quot;objects/fwAccessControl/fwAccessControl_CurrentUser.pnl&quot;,
+                    &quot;currentUser&quot;, makeDynString(), 780, -4, 0, 1, 1);
+        else
+          acNotAvailable.visible = TRUE;
+
+        g_sPvssPropertiesDp = aes_getPropDpName(AES_DPTYPE_PROPERTIES, TRUE, AESTAB_TOP, FALSE, FALSE); 
+	g_sTable=AES_TABLENAME_TOP;
+	
+	g_dsColumnsName = makeDynString();
+	g_diColumnsWidth = makeDynInt();
+
+	aesTable = getShape(g_sTable);
+	
+        g_progressTitle = &quot;Alarm Screen Initialisation&quot;;
+        g_progressText = &quot;Initialising display...&quot;;
+
+	while(!dpExists(g_sPvssPropertiesDp))
+	{
+//DebugN(&quot;NO DP YET&quot;);
+		delay(0, 100);	
+	}
+
+	delay(0, 200);
+
+  //check if the _AESConfig is set with fw settings
+  if (!fwAlarmHandling_AESConfig_isForFw())
+  {
+     fwGeneral_openMessagePanel(&quot;The Alarm Screen configuation is not for JCOP fw.\nJCOP fw configuration will be loaded.&quot;,bOk, exceptionInfo, &quot;Alert Screen Configuration&quot;);
+     if(bOk)
+     {
+       fwOpenProgressBar(&quot;Alarm Screen configs&quot;, &quot;Loading Alarm Screen configs, please wait...&quot;, 1); 
+       fwAlarmHandling_AESConfig_useFwConfig(exceptionInfo);
+       fwCloseProgressBar();
+       fwGeneral_openMessagePanel(&quot;JCOP fw configuration was loaded.\nPlease restart the Alarm Screen.&quot;,bOk, exceptionInfo, &quot;Alert Screen Configuration&quot;, true);
+       PanelOff();
+     }
+  }     
+  
+	connectToBusy();
+        connectToRunning();
+        fwAlarmHandlingScreen_getDistSystemDisplayOption(g_showDistDetails, exceptionInfo);
+        connectToDisplayedSystems();
+        connectToAvailableSystems();
+        
+	while(!reg_main.visible)
+	{
+//DebugN(&quot;NO TABLE YET&quot;);
+		delay(0, 100);	
+	}
+	reg_main.visible = FALSE;
+
+	while(!aesTable.visible)
+	{
+//DebugN(&quot;NO TABLE YET&quot;);
+		delay(0, 100);	
+	}
+
+	_fwInitFields(aesMode, aesFilter, exceptionInfo);
+
+	fwAlarmHandlingScreen_applyMode(g_sPvssPropertiesDp, aesMode, exceptionInfo, FALSE);
+	fwAlarmHandlingScreen_applyFilter(g_sPvssPropertiesDp, aesFilter, exceptionInfo);
+
+  
+  // Summary mode
+  int iSummaryMode;
+  fwAlarmHandlingScreen_getReductionMode(fwAlarmScreen_PROPERTIES_DP, iSummaryMode, exceptionInfo);
+  int iCurrentSummaryMode;
+  fwAlarmHandlingScreen_getReductionMode(g_sPvssPropertiesDp, iCurrentSummaryMode, exceptionInfo);
+  if (iSummaryMode != iCurrentSummaryMode)
+  {
+    fwAlarmHandlingScreen_setReductionMode(g_sPvssPropertiesDp, iSummaryMode, exceptionInfo);
+  }
+  
+	aes_doStart(g_sPvssPropertiesDp);
+	
+	_fwGetDeviceTypeList();
+	fwAlarmHandlingScreen_showMode(aesMode, exceptionInfo);
+	fwAlarmHandlingScreen_showFilter(aesFilter, exceptionInfo);
+
+	g_bInit = FALSE;
+	acknowledgeButton.enabled = TRUE;
+	printButton.enabled = TRUE;
+	closeButton.enabled = TRUE;
+        unselectRow.enabled = TRUE;
+	
+        if(!dpExists(&quot;_FwAlarmScreenPlot&quot;))
+          _fwAlarmHandling_createPlotDp(&quot;_FwAlarmScreenPlot&quot;);
+        
+	result = startThread(&quot;countRows&quot;);
+	if(result &lt; 0)
+		alarmTableLines.text = &quot;N/A&quot;;
+        
+        if(isFunctionDefined(&quot;fwAccessControl_setupPanel&quot;))
+          fwAccessControl_setupPanel(&quot;accessControlCB&quot;, exceptionInfo);
+        else
+          accessControlCB(&quot;&quot;, getUserName());
+
+        pos = 0;
+	while(pos &lt; 1)
+	{
+	  fwAlarmHandlingScreen_getColumnWidths(columnsName, columnsVisible, columnsWidth, exceptionInfo);
+	  pos = dynContains(columnsName, fwAlarmHandlingScreen_COLUMN_ALERT_VALUE);
+	  delay(0,200);
+	}
+
+	pos = dynContains(columnsName, fwAlarmHandlingScreen_COLUMN_DP_NAME);
+	g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_DP_NAME] = (columnsWidth[pos] == 0)?&quot;FALSE&quot;:&quot;TRUE&quot;;
+
+	pos = dynContains(columnsName, fwAlarmHandlingScreen_COLUMN_LOGICAL_NAME);
+	g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_LOGICAL_NAME] = (columnsWidth[pos] == 0)?&quot;FALSE&quot;:&quot;TRUE&quot;;
+
+	pos = dynContains(columnsName, fwAlarmHandlingScreen_COLUMN_DESCRIPTION);
+	g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_DESCRIPTION] = (columnsWidth[pos] == 0)?&quot;FALSE&quot;:&quot;TRUE&quot;;
+        
+	pos = dynContains(columnsName, fwAlarmHandlingScreen_COLUMN_ONLINE_VALUE);
+	g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_ONLINE_VALUE] = (columnsWidth[pos] == 0)?&quot;FALSE&quot;:&quot;TRUE&quot;;
+
+	pos = dynContains(columnsName, fwAlarmHandlingScreen_COLUMN_ALERT_VALUE);
+	g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_ALERT_VALUE] = (columnsWidth[pos] == 0)?&quot;FALSE&quot;:&quot;TRUE&quot;;
+
+	pos = dynContains(columnsName, fwAlarmHandlingScreen_COLUMN_TIME_STANDARD);
+	g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_TIME_STANDARD] = (columnsWidth[pos] == 0)?&quot;FALSE&quot;:&quot;TRUE&quot;;
+
+ 	pos = dynContains(columnsName, fwAlarmHandlingScreen_COLUMN_TIME_CAME);
+	g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_TIME_CAME] = (columnsWidth[pos] == 0)?&quot;FALSE&quot;:&quot;TRUE&quot;;
+
+  
+        fwAlarmHandlingScreen_getIdleTimeout(idleTimeout, exceptionInfo);
+        idleTimeoutValue.text = idleTimeout;
+        startThread(&quot;idleCheck&quot;);
+
+        fwAlarmHandlingScreen_getOnlineValueUpdateRate(updateRate, exceptionInfo);
+        onlineUpdateRate.text = updateRate;
+        startThread(&quot;updateOnlineValues&quot;);
+//DebugN(&quot;End&quot;);
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <reference parentSerial="-1" Name="" referenceId="1">
+   <properties>
+    <prop name="FileName">vision/aes/AEScreen.pnl</prop>
+    <prop name="Location">10 100</prop>
+    <prop name="Geometry">1 0 0 1 78 1334</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$ACTION</prop>
+      <prop name="Value">AES_ACTION_INTERACT</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$FILENAME</prop>
+      <prop name="Value">fwAES</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$SCREENTYPE</prop>
+      <prop name="Value">fwAES</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+   <shape GroupPath="" RefShapeSerial="1" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="rightClick" isEscaped="1"><![CDATA[main()
+{
+  _fwAlarmHandlingScreen_rightClickFunction(g_propDpNameTop, AESTAB_TOP, this.name);
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="19" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="BOOL" name="visible">False</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="20" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="BOOL" name="visible">False</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="21" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="BOOL" name="visible">False</prop>
+    </properties>
+   </shape>
+  </reference>
+  <shape Name="systemsState" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">417</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">380 840</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">83</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">380 840</prop>
+    <prop name="Size">31 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="systemsProblems" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">415</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">410 840</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">80</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">410 840</prop>
+    <prop name="Size">238 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="runningState" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">418</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">380 840</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">85</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">380 840</prop>
+    <prop name="Size">31 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Frame1" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">76</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 193</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Alarm Filters</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 90</prop>
+    <prop name="Size">1010 105</prop>
+   </properties>
+  </shape>
+  <shape Name="Frame2" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">77</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">465 85</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.00980392156863 0 0 1 -4.55882352941176 0</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Mode</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">465 10</prop>
+    <prop name="Size">510 75</prop>
+   </properties>
+  </shape>
+  <shape Name="startHistoricalTime" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">82</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">769 43</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">771 45</prop>
+    <prop name="Size">147 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="endHistoricalTime" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">83</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">769 63</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">771 65</prop>
+    <prop name="Size">147 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">107</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Size">127 27</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Alarm Screen</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Frame3" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">108</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">155 85</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Acknowledgement</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">155 10</prop>
+    <prop name="Size">300 75</prop>
+   </properties>
+  </shape>
+  <shape Name="Text9" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">112</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">278 27</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">36</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">280 29</prop>
+    <prop name="Size">27 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">!!!</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text10" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">113</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">278 54</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">280 56</prop>
+    <prop name="Size">27 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">x</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text11" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">114</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">313 54</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">38</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">315 56</prop>
+    <prop name="Size">27 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">xxx</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="Border3" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">115</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">278 47</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">39</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">278 27</prop>
+    <prop name="Size">31 21</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="Text12" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">116</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">348 27</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">40</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">350 29</prop>
+    <prop name="Size">106 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Unacknowledged</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text13" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">117</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">348 187.0847182315808</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">41</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.00845665961945 0 2.619450317124732</prop>
+    <prop name="Location">350 47</prop>
+    <prop name="Size">106 39</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Individual/Group
+</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="" referenceId="3">
+   <properties>
+    <prop name="FileName">fwAlarmHandling/fwAlarmHandlingFilter.pnl</prop>
+    <prop name="Location">227 120</prop>
+    <prop name="Geometry">1 0 0 1 443 -16</prop>
+    <prop name="TabOrder">42</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$bEditFilter</prop>
+      <prop name="Value">FALSE</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$dsDeviceTypes</prop>
+      <prop name="Value">"Loading device types..."</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$dsDpTypes</prop>
+      <prop name="Value"></prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sCurrentFilter</prop>
+      <prop name="Value"></prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+   <shape GroupPath="" RefShapeSerial="24" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="BOOL" name="visible">False</prop>
+    </properties>
+   </shape>
+  </reference>
+  <shape Name="Text2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">158</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">43</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 52</prop>
+    <prop name="Size">107 27</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Print alarms:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">166</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 842</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">50</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 844</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Alarms Displayed:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text4" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">167</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">190 842</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">51</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">192 844</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Unacknowledged:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="aesModeSelector" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">80</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">485 30</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">485 30</prop>
+    <prop name="Size">126 51</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Current Alarms</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Historical Alarms</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  if(button == 0)
+  {
+    selectHistoricalTimes.enabled = FALSE;
+    startHistoricalTime.visible = FALSE;
+    endHistoricalTime.visible = FALSE;
+  }
+  else
+  {
+    selectHistoricalTimes.enabled = TRUE;
+    startHistoricalTime.visible = TRUE;
+    endHistoricalTime.visible = TRUE;
+  }
+        
+  if(button != currentMode.text)
+    applyMode.backCol = fwAlarmHandlingScreen_COLOUR_BUTTON_NEEDS_PRESSING;
+  else
+    applyMode.backCol = &quot;_3DFace&quot;;
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="selectHistoricalTimes" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">81</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">615 48</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">615 48</prop>
+    <prop name="Size">141 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select Time Range...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_float df;
+	dyn_string ds;
+	time startTime, endTime;
+	
+  ChildPanelOnCentralModalReturn(&quot;fwGeneral/fwGetTimes.pnl&quot;, &quot;Specify time range...&quot;, 
+      makeDynString(&quot;&quot;), df, ds);
+
+	if(ds[1] == &quot;cancel&quot;)
+		return;
+		
+	startTime = ds[1];
+	endTime = ds[2];
+
+        if((hiddenStartTime.text != startTime) || (hiddenEndTime.text != endTime))
+        {
+          currentMode.text = -1;
+          applyMode.backCol = fwAlarmHandlingScreen_COLOUR_BUTTON_NEEDS_PRESSING;
+        }
+        
+	hiddenStartTime.text = startTime;
+	hiddenEndTime.text = endTime;
+
+	startHistoricalTime.text = formatTime(fwAlarmHandlingScreen_HISTORICAL_TIME_FORMAT, startTime);
+	endHistoricalTime.text = formatTime(fwAlarmHandlingScreen_HISTORICAL_TIME_FORMAT, endTime);
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="applyMode" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">89</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">934 44</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Set display mode</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">934 44</prop>
+    <prop name="Size">36 36</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">apply_en.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_anytype aesMode;
+	dyn_string exceptionInfo;
+
+        g_progressTitle = &quot;Mode&quot;;
+        g_progressText = &quot;Changing alarm screen mode...&quot;;
+
+	fwAlarmHandlingScreen_getColumnWidths(g_dsColumnsName, g_dbColumnsVisible, g_diColumnsWidth, exceptionInfo);
+	fwAlarmHandlingScreen_readMode(aesMode, exceptionInfo);
+	
+        currentMode.text = aesModeSelector.number;
+	fwAlarmHandlingScreen_applyMode(g_sPvssPropertiesDp, aesMode, exceptionInfo, !g_InClosedMode);
+        g_InClosedMode = aesMode[fwAlarmHandlingScreen_CONFIG_OBJECT_MODE_TYPE] == AES_MODE_CLOSED;
+        this.backCol = &quot;_3DFace&quot;;
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="hiddenStartTime" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">103</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">550 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">550 10</prop>
+    <prop name="Size">81 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="hiddenEndTime" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">104</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">640 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">640 10</prop>
+    <prop name="Size">81 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">106</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">930 835</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">930 835</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  aes_doStop(g_sPvssPropertiesDp);
+	PanelOff();
+}
+]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="Group3" referenceId="2">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">604 10</prop>
+    <prop name="Geometry">1 0 0 1 391 0</prop>
+    <prop name="TabOrder">42</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwAlarmHandling/fwAlarmHandlingScreen</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="acknowledgeButton" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">157</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">168 37</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">42</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">168 37</prop>
+    <prop name="Size">96 31</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Acknowledge</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">ackAllVisible</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">All Visible Alarms</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">ackAll</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">All Alarms in Table</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+  mapping m;
+
+  switch(id)
+  {
+    case &quot;ackAllVisible&quot;:
+      aes_prepareForTableAcknowledge(AES_CHANGED_ACKALLVIS, AESTAB_TOP, m);
+      aes_changedAcknowledgeWithRowData(AES_CHANGED_ACKALLVIS, AESTAB_TOP, m);
+      break;
+    case &quot;ackAll&quot;:
+      aes_prepareForTableAcknowledge(AES_CHANGED_ACKALL, AESTAB_TOP, m);
+      aes_changedAcknowledgeWithRowData(AES_CHANGED_ACKALL, AESTAB_TOP, m);
+      break;
+  }
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+//	this.enableItem(&quot;0&quot;, FALSE);
+//	this.enableItem(&quot;1&quot;, FALSE);
+//	this.enableItem(&quot;2&quot;, FALSE);
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="printButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">159</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">90 40</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">44</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Print alarm table</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 40</prop>
+    <prop name="Size">36 36</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">printer_en.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	aes_as_printTable(g_sPvssPropertiesDp, g_sTable, true);
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="applyFilter" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">160</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">934 153</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">44</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Modify filter</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">934 153</prop>
+    <prop name="Size">36 36</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">properties.xpm</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string dollarValue;
+	dyn_float df;
+	dyn_string ds, filters, exceptionInfo;
+	dyn_dyn_anytype aesFilter;
+
+	fwAlarmHandlingScreen_readFilter(aesFilter, exceptionInfo);
+	_fwAlarmHandlingScreen_convertFilterToDollar(aesFilter, dollarValue, exceptionInfo);
+
+	//needed to clear problem with embedded childpanelreturns after first execution
+	dpSetWait(&quot;_Ui_&quot; + myManNum() + &quot;.ReturnValue.Float&quot;, makeDynFloat(),
+						&quot;_Ui_&quot; + myManNum() + &quot;.ReturnValue.Text&quot;, makeDynString());
+
+	ChildPanelOnReturn(&quot;fwAlarmHandling/fwAlarmHandlingFilter.pnl&quot;,
+				&quot;Alarm Filter&quot;,
+				makeDynString(&quot;$bEditFilter:&quot; + TRUE,
+						&quot;$dsDeviceTypes:&quot; + deviceType.items,
+						&quot;$dsDpTypes:&quot; + dpTypeList.items,
+						&quot;$sCurrentFilter:&quot; + dollarValue),
+				0, 0, df, ds);
+        
+  getQuickFilterList(filters, exceptionInfo);
+  if(dynlen(filters) == 0)
+  {
+    applyQuickFilter.backCol = &quot;_3DFace&quot;;      
+    quickFilterList.items = makeDynString(&quot;None available&quot;);
+    quickFilterList.enabled = FALSE;
+    applyQuickFilter.enabled = FALSE;
+  }
+  else
+  {
+    dynInsertAt(filters, &quot;&quot;, 1);
+    quickFilterList.items = filters;
+    quickFilterList.enabled = TRUE;
+    currentFilter.text = quickFilterList.text;
+    applyQuickFilter.enabled = TRUE;
+  }
+        
+        
+	if(df[1] &gt; 0.5)
+	{
+		_fwAlarmHandlingScreen_convertDollarToFilter(ds[1], aesFilter, exceptionInfo);
+
+                g_progressTitle = &quot;Filter&quot;;
+                g_progressText = &quot;Performing alarm filter...&quot;;
+	
+		fwAlarmHandlingScreen_getColumnWidths(g_dsColumnsName, g_dbColumnsVisible, g_diColumnsWidth, exceptionInfo);
+		fwAlarmHandlingScreen_showFilter(aesFilter, exceptionInfo);
+		fwAlarmHandlingScreen_applyFilter(g_sPvssPropertiesDp, aesFilter, exceptionInfo, !g_InClosedMode);
+                
+                if(quickFilterList.text != &quot;None available&quot;)
+        	  quickFilterList.text = &quot;&quot;;
+        	currentFilter.text = &quot;&quot;;
+        	applyQuickFilter.backCol = &quot;_3DFace&quot;;
+	}
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="clearFilter" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">163</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">974 153</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">47</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Clear filter</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">974 153</prop>
+    <prop name="Size">36 36</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">del_en.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+	dyn_dyn_anytype aesFilter;
+
+	_fwAlarmHandlingScreen_getDefaultFilter(aesFilter, exceptionInfo);
+	
+        g_progressTitle = &quot;Alarm Screen Update&quot;;
+        g_progressText = &quot;Clearing alarm filter...&quot;;
+
+ 	fwAlarmHandlingScreen_getColumnWidths(g_dsColumnsName, g_dbColumnsVisible, g_diColumnsWidth, exceptionInfo);
+	fwAlarmHandlingScreen_showFilter(aesFilter, exceptionInfo);
+	fwAlarmHandlingScreen_applyFilter(g_sPvssPropertiesDp, aesFilter, exceptionInfo, !g_InClosedMode);
+        if(quickFilterList.text != &quot;None available&quot;)
+          quickFilterList.text = &quot;&quot;;
+        currentFilter.text = &quot;&quot;;
+        applyQuickFilter.backCol = &quot;_3DFace&quot;;
+}
+]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="alarmTableLines" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">164</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 840</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">48</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 840</prop>
+    <prop name="Size">51 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+   <events>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="unackedAlarms" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">165</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">298 840</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">49</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">298 840</prop>
+    <prop name="Size">51 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+   <events>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="manageDisplayButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">169</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">790 835</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">51</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Manage Display - Only in Current Alarms displayed</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">790 835</prop>
+    <prop name="Size">41 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">SysMgm/16x16/SysMgmSettings.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[dyn_string g_dsPreviousColumns;
+
+main()
+{
+  int reductionMode;
+  bool someColumnWasChanged;
+	string dollarValue;
+	dyn_float df;
+	dyn_string ds, exceptionInfo, systems;
+	dyn_dyn_anytype aesFilter;
+	dyn_anytype aesMode;
+  
+	g_dsPreviousColumns = g_dsColumnsShown;
+ fwAlarmHandlingScreen_getReductionMode(g_sPvssPropertiesDp, reductionMode, exceptionInfo);
+ fwAlarmHandlingScreen_getColumnWidths(g_dsColumnsName, g_dbColumnsVisible, g_diColumnsWidth, exceptionInfo);
+
+ 	ChildPanelOnModalReturn(&quot;fwAlarmHandling/fwAlarmHandlingScreenOptions.pnl&quot;,
+					&quot;Display Options&quot;,
+					makeDynString(&quot;$dsColumnsVisible:&quot; + g_dsColumnsShown,
+                      &quot;$iOnlineValueUpdateRate:&quot; + onlineUpdateRate.text,
+                      &quot;$bShowDistDetails:&quot; + g_showDistDetails,
+                      &quot;$iSummariesMode:&quot; + reductionMode,
+                      &quot;$iIdleTimeout:&quot; + idleTimeoutValue.text,
+                      &quot;$dsAllColumnsName:&quot; + g_dsColumnsName,
+                      &quot;$dbAllColumnsVisible:&quot; + g_dbColumnsVisible,
+                      &quot;$diAllColumnsWidth:&quot; + g_diColumnsWidth
+                      ),
+					0, 0, df, ds);
+ //must check access control, even if pressed cancel, settings may have changed
+ limitButtonAccess();
+
+	if(df[1] &gt; 0.5)
+	{	
+    g_progressTitle = &quot;Columns&quot;;
+    g_progressText = &quot;Altering visible columns...&quot;;
+
+    onlineUpdateRate.text = df[2];
+    idleTimeoutValue.text = (int)df[5];
+    g_showDistDetails = (bool)df[3];
+     
+    //apply new reduction mode only if it was changed
+    if(reductionMode!=(int)df[4])
+    {
+   	  fwAlarmHandlingScreen_setReductionMode(g_sPvssPropertiesDp, (int)df[4], exceptionInfo);
+   	  fwAlarmHandlingScreen_setReductionMode(fwAlarmHandlingScreen_PVSS_PROPERTIES_DP, (int)df[4], exceptionInfo);
+  		}
+    
+    //modify columns shown only if some were modified
+    if(g_dsColumnsShown != ds || reductionMode!=(int)df[4])
+    {
+    		g_dsColumnsShown = ds;
+    		checkKeepWidthSettings(fwAlarmHandlingScreen_COLUMN_ID_DP_NAME, fwAlarmHandlingScreen_COLUMN_DP_NAME);
+    		checkKeepWidthSettings(fwAlarmHandlingScreen_COLUMN_ID_LOGICAL_NAME, fwAlarmHandlingScreen_COLUMN_LOGICAL_NAME);
+    		checkKeepWidthSettings(fwAlarmHandlingScreen_COLUMN_ID_DESCRIPTION, fwAlarmHandlingScreen_COLUMN_DESCRIPTION);
+    		checkKeepWidthSettings(fwAlarmHandlingScreen_COLUMN_ID_ALERT_VALUE, fwAlarmHandlingScreen_COLUMN_ALERT_VALUE);
+    		checkKeepWidthSettings(fwAlarmHandlingScreen_COLUMN_ID_ONLINE_VALUE, fwAlarmHandlingScreen_COLUMN_ONLINE_VALUE);
+    		checkKeepWidthSettings(fwAlarmHandlingScreen_COLUMN_ID_TIME_STANDARD, fwAlarmHandlingScreen_COLUMN_TIME_STANDARD);
+    		checkKeepWidthSettings(fwAlarmHandlingScreen_COLUMN_ID_TIME_CAME, fwAlarmHandlingScreen_COLUMN_TIME_CAME);   
+    
+       _fwAlarmHandlingScreen_showHideColumns(g_sPvssPropertiesDp,
+    							makeDynString(fwAlarmHandlingScreen_COLUMN_DP_NAME,
+                  							fwAlarmHandlingScreen_COLUMN_LOGICAL_NAME,
+                  						 fwAlarmHandlingScreen_COLUMN_DESCRIPTION,
+                  							fwAlarmHandlingScreen_COLUMN_ALERT_VALUE,
+                  							fwAlarmHandlingScreen_COLUMN_ONLINE_VALUE,
+                  							fwAlarmHandlingScreen_COLUMN_TIME_STANDARD,
+                   							fwAlarmHandlingScreen_COLUMN_TIME_CAME),                           
+    							makeDynString(g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_DP_NAME],
+                            g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_LOGICAL_NAME],
+                              g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_DESCRIPTION],
+                              g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_ALERT_VALUE],
+                              g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_ONLINE_VALUE],
+                              g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_TIME_STANDARD], 
+                              g_dsColumnsShown[fwAlarmHandlingScreen_COLUMN_ID_TIME_CAME]),
+                              exceptionInfo, TRUE);   
+   }
+	}
+	fwAlarmHandlingScreen_readMode(aesMode, exceptionInfo);
+	fwAlarmHandlingScreen_applyMode(g_sPvssPropertiesDp, aesMode, exceptionInfo, g_InClosedMode);  
+}
+
+checkKeepWidthSettings(int index, string columnName)
+{
+	int pos;
+
+//in the AS, invisible columns are actually just reduced to width = 0
+//if the column is changing from visible -&gt; invisible or invisible -&gt; visible, then we need to forget the previous width
+//so if the XOR of the current state and previous state equals TRUE, then delete the width stored for the column
+
+//DebugN(g_dsColumnsShown, g_dsPreviousColumns);
+//DebugN(g_dsColumnsShown[index], g_dsPreviousColumns[index], (g_dsColumnsShown[index] == &quot;TRUE&quot;) ^ (g_dsPreviousColumns[index] == &quot;TRUE&quot;));
+
+	if((g_dsColumnsShown[index] == &quot;TRUE&quot;) ^ (g_dsPreviousColumns[index] == &quot;TRUE&quot;))
+	{
+//DebugN(&quot;Remove settings for: &quot; + columnName);
+		pos = dynContains(g_dsColumnsName, columnName);
+		dynRemove(g_dsColumnsName, pos);
+		dynRemove(g_dbColumnsVisible, pos);
+		dynRemove(g_diColumnsWidth, pos);
+	}
+}
+]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="onlineUpdateRate" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">213</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">770 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">53</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">770 80</prop>
+    <prop name="Size">161 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="restartWarning" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">257</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">410 840</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">55</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">410 840</prop>
+    <prop name="Size">158 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Alarm Screen Stopped!!!&quot;;
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="restartButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">258</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">580 835</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">57</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,75,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">580 835</prop>
+    <prop name="Size">71 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Restart</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  aes_doStart(g_sPvssPropertiesDp);
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">260</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">718 146</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">61</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">720 148</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Quick Filters:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="quickFilterList" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">261</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">720.9999999999999 164</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">63</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">721 164</prop>
+    <prop name="Size">140 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  if(currentFilter.text != quickFilterList.text)
+    applyQuickFilter.backCol = fwAlarmHandlingScreen_COLOUR_BUTTON_NEEDS_PRESSING;
+  else
+    applyQuickFilter.backCol = &quot;_3DFace&quot;;
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="applyQuickFilter" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">262</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">894 153</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">65</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Set quick filter</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">894 153</prop>
+    <prop name="Size">36 36</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">apply_en.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  loadAndApplyFilter();
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="RECTANGLE2" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">316</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">580 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">69</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.481003533401874 0 0 1.52380952380952 501.017950626913 -5.23809523809524</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">580 10</prop>
+    <prop name="Size">421 21</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="LINE2" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">318</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">780 19</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">71</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_ButtonShadow</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">780 19</prop>
+    <prop name="End">780 41</prop>
+   </properties>
+  </shape>
+  <shape Name="LINE3" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">319</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">780 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonShadow</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">72</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">780 40</prop>
+    <prop name="End">978 40</prop>
+   </properties>
+  </shape>
+  <shape Name="currentFilter" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">320</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">740 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">74</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">740 100</prop>
+    <prop name="Size">81 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="currentMode" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">368</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">390 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">76</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">390 10</prop>
+    <prop name="Size">81 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = aesModeSelector.number;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="acNotAvailable" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">369</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">790 11</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">77</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">790 11</prop>
+    <prop name="Size">189 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Access Control not available&quot;;
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="unselectRow" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">370</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">680 835</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">79</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">680 835</prop>
+    <prop name="Size">101 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Deselect Rows</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_int lines;
+  
+  getValue(g_sTable, &quot;getSelectedLines&quot;, lines);
+  setValue(g_sTable, &quot;removeSelectLines&quot;, lines);
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  g_shapeWithFocus = this.name;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="idleTimeoutValue" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">463</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">190 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">86</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">190 90</prop>
+    <prop name="Size">121 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">508</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">348 246.6452495759681</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">87</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.00845665961945 0 3.492600422832981</prop>
+    <prop name="Location">350 60</prop>
+    <prop name="Size">106 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">acknowledged</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="fwAlarmScreenGenericAlarmClass" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">556</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">88</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">96 16</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">fwAlarmScreen</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

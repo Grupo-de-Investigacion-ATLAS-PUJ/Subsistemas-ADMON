@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   <prop name="en_US.iso88591"></prop>
+  </prop>
+  <prop name="Size">832 439</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 30</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">VBox</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[void PopulatePanel()
+{
+  TABLE1.deleteAllLines();
+  string dpe=&quot;fwDeprecated.deprecatedList&quot;;
+  //dpConnect(&quot;DeprecatedDPCB&quot;,true,dpe);
+  string sql=&quot;SELECT '_original.._value' FROM '&quot;+_fwDeprecated_DPE+&quot;'&quot;;
+  dpQueryConnectSingle(&quot;DeprecatedDPCB&quot;,true,&quot;&quot;,sql,500);
+  string alertDPE=dpSubStr(_fwDeprecated_DPE,DPSUB_SYS_DP)+&quot;.count&quot;;
+  dpConnect(&quot;AlertChangedCB&quot;,true, alertDPE+&quot;:_alert_hdl.._act_state_color&quot;,alertDPE+&quot;:_alert_hdl.._act_state_text&quot;);
+
+}
+
+AlertChangedCB(string dpeColor,string alColor, string dpeText,string alText)
+{
+
+    if (alText!=&quot;&quot;) AlarmText.visible=true; else AlarmText.visible=false;
+  AlarmText.backCol=alColor;
+  AlarmText.text=alText;
+}
+
+void DeprecatedDPCB(anytype userData, dyn_dyn_anytype result)
+{
+
+  int len=dynlen(result);
+  if (len&lt;2) return; // ignore empty CBs
+
+  dyn_string values=result[len][2];
+
+  TABLE1.deleteAllLines();
+  dyn_string funcNames, callers;
+  for (int i=1;i&lt;=dynlen(values);i++) {
+    dyn_string ds=strsplit(values[i],&quot;#&quot;);
+    dynAppend(funcNames,ds[1]);
+    dynAppend(callers,ds[2]);
+  }
+  TABLE1.appendLines(dynlen(funcNames),&quot;Name&quot;,funcNames,&quot;Caller&quot;,callers);
+  Title.text=&quot;Calls to deprecated functions and panels (&quot;+dynlen(funcNames)+&quot;)&quot;;
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  PopulatePanel();
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="Title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">11.5 11.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.998435054773083 0 0 0.9729729729729731 -0.4820031298904545 -0.1891891891891917</prop>
+    <prop name="Location">11.5 11.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,16,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,16,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Calls to deprecated functions and panels (#) </prop>
+     <prop name="en_US.iso88591">Calls to deprecated functions and panels (#) </prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="TABLE1" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9 69</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Draggable">True</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">9 69</prop>
+    <prop name="Size">814 304</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">15</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">Name</prop>
+     <prop name="Width">400</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Function/panel</prop>
+      <prop name="en_US.iso88591">Function/panel</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">Caller</prop>
+     <prop name="Width">400</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Called From</prop>
+      <prop name="en_US.iso88591">Called From</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.columnStretchable(0,false);
+  this.columnStretchable(1,true);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="CloseButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">743 409.3636363636364</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">743 405</prop>
+    <prop name="Size">80 25</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">226 405</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">226 405</prop>
+    <prop name="Size">511 25</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER2" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">339 9</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">339 9</prop>
+    <prop name="Size">484 23</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER5" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9 379</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="minimumSize">-1 10</prop>
+    <prop name="maximumSize">-1 20</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Ignored"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">9 379</prop>
+    <prop name="Size">814 20</prop>
+    <prop name="Orientation">vertical</prop>
+   </properties>
+  </shape>
+  <shape Name="ResetButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9 409.3636363636364</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">9 405</prop>
+    <prop name="Size">80 25</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Reset</prop>
+     <prop name="en_US.iso88591">Reset</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  dyn_float df;
+  dyn_string ds;
+  ChildPanelOnCentralModalReturn(&quot;fwGeneral/fwOkCancel.pnl&quot;,&quot;CLEAR_THE_DEPRECATED_LOG&quot;,makeDynString(&quot;$text:Really clean the list of deprecated functions?&quot;),df,ds);
+  if (dynlen(df)&gt;0 &amp;&amp; df[1]&gt;0) {
+    _fwGeneral_fwDeprecatedClear();
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="CopyToClipboard" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">95 409.3636363636364</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">95 405</prop>
+    <prop name="Size">125 25</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Copy to Clipboard</prop>
+     <prop name="en_US.iso88591">Copy to Clipboard</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  string txt;
+  TABLE1.updatesEnabled(false);
+  int num = TABLE1.lineCount;
+  for (int i=0;i&lt;num;i++) {
+    dyn_anytype line;
+    getValue(&quot;TABLE1&quot;,&quot;getLineN&quot;,i,line);
+    if (txt!=&quot;&quot;) txt+=&quot;\n&quot;;
+    txt+=line[1] + &quot;;&quot;+line[2];
+  }
+  setClipboardText(txt);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="AlarmText" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9 40.40000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">9 38</prop>
+    <prop name="Size">814 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="3" Name="LAYOUT_GROUP1" serial="1">
+   <properties>
+    <prop idx="0" name="shapeSerial">0</prop>
+    <prop idx="1" name="shapeSerial">4</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="3" Name="LAYOUT_GROUP2" serial="2">
+   <properties>
+    <prop idx="0" name="shapeSerial">8</prop>
+    <prop idx="2" name="shapeSerial">3</prop>
+    <prop idx="3" name="shapeSerial">2</prop>
+    <prop idx="1" name="shapeSerial">10</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP3" serial="3">
+   <properties>
+    <prop idx="2" name="shapeSerial">1</prop>
+    <prop idx="3" name="shapeSerial">7</prop>
+    <prop idx="1" name="shapeSerial">12</prop>
+    <prop idx="0" name="groupSerial">1</prop>
+    <prop idx="4" name="groupSerial">2</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

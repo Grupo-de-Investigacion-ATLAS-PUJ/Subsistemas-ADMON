@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">fwInstallation is configuring the project ...</prop>
+  </prop>
+  <prop name="Size">450 110</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">210 179</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96.00324909747292</prop>
+  <prop name="PDPI">96.00324909747292</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">9</prop>
+  <prop name="layoutRightMargin">9</prop>
+  <prop name="layoutTopMargin">9</prop>
+  <prop name="layoutBottomMargin">9</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[const mapping ACTION_CODE_TO_LABEL = makeMapping(
+        0,  &quot;&quot;,
+        1,  &quot;&quot;,
+        2,  &quot;Please wait while all component post-install scripts\n&quot; +
+            &quot;are being executed ...&quot;,
+        4,  &quot;Please wait while all component post-delete scripts\n&quot; +
+            &quot;are being executed ...&quot;,
+        64, &quot;fwInstallation has finished all of the important confguration\n&quot; +
+            &quot;tasks and is working now on registering help packages&quot;);
+
+char gCurrentActionCode;
+
+synchronized monitorFwScriptsExecutionCB(string dp1, char actionCode,
+                                         string dp2, char totalSteps,
+                                         string dp3, char currentStep){
+    if(!actionCode &amp;&amp; !totalSteps &amp;&amp; !currentStep){
+        ModuleOff(myModuleName());
+        return;
+    }
+    if(gCurrentActionCode != actionCode){
+        gCurrentActionCode = actionCode;
+        if(ACTION_CODE_TO_LABEL.contains((int)actionCode)){
+            Label1.text = ACTION_CODE_TO_LABEL[(int)actionCode];
+        }else{
+            Label1.text = &quot;Please wait while fwInstallation is configuring the project ...&quot;;
+        }
+    }
+    if(PROGRESS_BAR1.totalSteps != (int)totalSteps){
+        PROGRESS_BAR1.totalSteps = totalSteps;
+    }
+    PROGRESS_BAR1.progress = (int)currentStep;
+}
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    setWindowTitle(myModuleName(), &quot;fwInstallation is configuring the project...&quot;);
+    self.windowFlags = &quot;WindowStaysOnTopHint&quot;;
+    //titleBar(false);
+
+    Label2.text = &quot;In the meantime you may want to consult the Log Viewer to check\n&quot; +
+                  &quot;if the configuration is progressing without problems&quot;;
+
+    dyn_string scripts;
+    dyn_string componentsList;
+    _fwInstallation_GetComponentsWithPendingPostInstall(componentsList, scripts);
+
+    string fwScriptsReportDpe = fwInstallation_getInstallationPendingActionsDp() + &quot;.postInstallFiles&quot;;
+    dpConnect(&quot;monitorFwScriptsExecutionCB&quot;,
+              fwScriptsReportDpe + &quot;:_original.._userbyte2&quot;, // action code
+              fwScriptsReportDpe + &quot;:_original.._userbyte3&quot;, // total steps
+              fwScriptsReportDpe + &quot;:_original.._userbyte4&quot;); // current step
+}
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="PROGRESS_BAR1" shapeType="PROGRESS_BAR" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 70</prop>
+    <prop name="Size">441 41</prop>
+    <extended>
+     <prop type="CHAR_STRING" name="format">%v/%m</prop>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="Label1" shapeType="Label" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">90 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 20</prop>
+    <prop name="Size">361 41</prop>
+    <extended>
+     <prop type="ENUM" name="textFormat">2</prop>
+     <prop type="ENUM" name="alignment">1</prop>
+     <prop type="ENUM" name="frameShape">0</prop>
+     <prop type="BOOL" name="wordWrap">False</prop>
+     <prop type="ENUM" name="layoutDirection">0</prop>
+     <prop type="BOOL" name="scaledContents">False</prop>
+     <prop type="ENUM" name="inputMethodHints">0</prop>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="Label2" shapeType="Label" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 150</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 150</prop>
+    <prop name="Size">421 26</prop>
+    <extended>
+     <prop type="ENUM" name="frameShape">0</prop>
+     <prop type="CHAR_STRING" name="text"></prop>
+     <prop type="ENUM" name="layoutDirection">0</prop>
+     <prop type="ENUM" name="alignment">1</prop>
+     <prop type="BOOL" name="wordWrap">False</prop>
+     <prop type="BOOL" name="scaledContents">False</prop>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="RECTANGLE1" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">60 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">30 30</prop>
+    <prop name="maximumSize">35 35</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[none,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[fit,any,pictures/sysmgm_32x32.png]]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">60 30</prop>
+    <prop name="Size">-44 41</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="1" Name="LAYOUT_GROUP3" serial="0">
+   <properties>
+    <prop idx="0" name="shapeSerial">6</prop>
+    <prop idx="1" name="shapeSerial">2</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP4" serial="1">
+   <properties>
+    <prop idx="1" name="shapeSerial">1</prop>
+    <prop idx="2" name="shapeSerial">4</prop>
+    <prop idx="0" name="groupSerial">0</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

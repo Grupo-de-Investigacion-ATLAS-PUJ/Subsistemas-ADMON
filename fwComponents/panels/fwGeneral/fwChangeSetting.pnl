@@ -1,0 +1,638 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">401 227</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">20 20</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	string elementType, formatString;
+	dyn_string exceptionInfo;
+	
+	elementType = dpElementType($sDpName + $dpSetName);
+	fwConfigs_getBestFormatForDpeType(elementType, formatString, exceptionInfo);
+  // We only set the EmptyifZero format option, 
+  // other options are in fwConfigs_setTextFieldsFormat(), yet they should be refactored - the aliginment should not be a bool!   
+  dyn_bool formatOptions;
+  formatOptions[1]=true;
+  // FWCORE-3329
+  // For int-typed values  we set it to FALSE
+  // check if this is integer format, such as &quot;%15d&quot;, by looking at the &quot;d&quot; letter at the end
+  if (substr(formatString,strlen(formatString)-1)==&quot;d&quot;) {
+    formatOptions[1]=false;
+  } 
+  
+  	fwConfigs_setTextFieldsFormat(makeDynString(&quot;NewValue&quot;), formatString, formatOptions, exceptionInfo);									
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="Text1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Device Name</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="label1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">150 72</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">184 74</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Text4</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int length, pos;
+	string deviceModel;
+	dyn_string par, exceptionInfo;
+	dyn_dyn_string elements;
+
+	fwDevice_getModel(makeDynString($sDpName), deviceModel, exceptionInfo);
+	fwDevice_getConfigElements(dpTypeName($sDpName), fwDevice_ALL, elements, exceptionInfo, deviceModel);
+
+	pos = dynContains(elements[1], $dpSetName);
+	if(pos &gt; 0)
+	{
+		label1.text = elements[2][pos] + &quot;:&quot;;
+		label2.text = elements[2][pos] + &quot;:&quot;;
+	}
+	else
+	{
+		par = strsplit($dpSetName, &quot;.&quot;);
+		length = dynlen(par);
+		label1.text = par[length] + &quot;:&quot;;
+		label2.text = par[length] + &quot;:&quot;;
+	}
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="label2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">150 144</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">184 146</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Text5</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int len;
+	dyn_string par;
+
+	par = strsplit($dpSetName,&quot;.&quot;);
+	len = dynlen(par);
+//	DebugN($dpSetName,par,len);
+	this.text = par[len] + &quot;:&quot;;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="Frame1" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 177</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">New Setting</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 127</prop>
+    <prop name="Size">380 50</prop>
+   </properties>
+  </shape>
+  <shape Name="Frame2" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 105</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Current Setting</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 55</prop>
+    <prop name="Size">380 50</prop>
+   </properties>
+  </shape>
+  <shape Name="OldLabel" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">201 70</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">201 70</prop>
+    <prop name="Size">100 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main() 
+{ 
+  	if(dpConnect(&quot;work&quot;, $sDpName + $dpSetName) == -1) 
+		this.backCol = &quot;DpDoesNotExist&quot;;
+  		
+} 
+work(string dp, string str) 
+{ 
+  	this.text = str;
+} 
+]]></script>
+   </events>
+  </shape>
+  <shape Name="NewValue" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">201 142</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">201 142</prop>
+    <prop name="Size">100 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[6s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Button1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">317 142</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">317 142</prop>
+    <prop name="Size">64 28</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	bool negateRange, ignoreOutside, inclusiveMin, inclusiveMax, doesExist, testResult;
+	int result;
+	dyn_string errorInfo;
+	string elementType, currentValue, processedNewValue, desiredValue, minText, maxText;
+	anytype comparisonValue;
+	unsigned uValue;
+	int iValue;
+	bool bValue;
+	float fValue, minValue, maxValue;
+	string sValue;
+	
+	elementType = dpElementType($sDpName + $dpSetName);
+	
+	//dpGet($sDpName + $dpSetName, desiredValue);
+	desiredValue = NewValue.text;
+  	if(elementType != DPEL_STRING)
+	{
+		if(desiredValue == &quot;&quot;)
+		{
+			fwException_raise(	errorInfo, 
+								&quot;ERROR&quot;, 
+								&quot;The new setting value must not be empty&quot;, 
+								&quot;&quot;);
+			fwExceptionHandling_display(errorInfo);
+			return;
+		}
+	}
+
+	switch(elementType)
+	{
+		case DPEL_INT:
+		//DebugN(&quot;int&quot;);
+			result = sscanf(desiredValue, &quot;%d&quot;, iValue);
+			processedNewValue = iValue;
+			comparisonValue = iValue;
+			testResult = TRUE;
+			break;
+		case DPEL_UINT:
+		//DebugN(&quot;unsigned&quot;);
+			result = sscanf(desiredValue, &quot;%d&quot;, iValue);
+			if(iValue &lt; 0)
+				result = -1;
+			processedNewValue = iValue;
+			comparisonValue = iValue;
+			testResult = TRUE;
+			break;
+		case DPEL_FLOAT:
+		//DebugN(&quot;float&quot;);
+			result = sscanf(desiredValue, &quot;%f&quot;, fValue);
+			if(strlen(desiredValue) != strlen((string)fValue))
+			{
+				result = -1;
+//DebugN(&quot;Mismatch&quot;, strlen(desiredValue), strlen((string)fValue));
+				break;
+			}
+			processedNewValue = fValue;
+			comparisonValue = fValue;
+			testResult = TRUE;
+			break;
+		case DPEL_BOOL:
+		case DPEL_STRING:
+		//DebugN(&quot;string&quot;);
+//			result = sscanf(desiredValue, &quot;%s&quot;, sValue);
+			processedNewValue = desiredValue;
+			comparisonValue = desiredValue;
+			result = 1;
+			testResult = FALSE;
+			break;
+		default:
+			fwException_raise(	errorInfo, 
+								&quot;ERROR&quot;, 
+								&quot;Data point element type is not supported (&quot; + elementType + &quot;)&quot;, 
+								&quot;&quot;);
+			fwExceptionHandling_display(errorInfo);
+			dpGet($sDpName + $dpSetName, currentValue);
+			NewValue.text = currentValue;
+			return;
+			break;
+	}		
+//DebugN(result, processedNewValue);
+		
+	if(result == 0 || result == -1)
+	{
+		fwException_raise(	errorInfo, 
+							&quot;ERROR&quot;, 
+							&quot;The new setting value has an invalid format&quot;, 
+							&quot;&quot;);
+		fwExceptionHandling_display(errorInfo);
+		return;
+	}
+
+//DebugN($maxValue, $minValue, processedNewValue);
+
+	if(testResult)
+	{
+		if(isDollarDefined(&quot;$maxValue&quot;))
+			maxValue = $maxValue;
+		else
+			maxValue = comparisonValue;
+			
+		if(isDollarDefined(&quot;$minValue&quot;))
+			minValue = $minValue;
+		else
+			minValue = comparisonValue;
+//DebugN(minValue, maxValue);	
+		if((comparisonValue &gt; maxValue) || (comparisonValue &lt; minValue))
+		{
+			sprintf(minText, &quot;%.3f&quot;, minValue);
+			sprintf(maxText, &quot;%.3f&quot;, maxValue);
+		
+		        if((isDollarDefined(&quot;$maxValue&quot;)) &amp;&amp; (isDollarDefined(&quot;$minValue&quot;)))
+                        {
+			  fwException_raise(errorInfo, &quot;ERROR&quot;,
+					    &quot;The value is outside the valid range: &quot; + minText + &quot; to &quot; + maxText, &quot;&quot;);
+                        }
+                        else if(isDollarDefined(&quot;$maxValue&quot;))
+                        {
+			  fwException_raise(errorInfo, &quot;ERROR&quot;,
+					    &quot;The value must be below &quot; + maxText, &quot;&quot;);
+                        }
+                        else if(isDollarDefined(&quot;$minValue&quot;))
+                        {
+			  fwException_raise(errorInfo, &quot;ERROR&quot;,
+					    &quot;The value must be above &quot; + minText, &quot;&quot;);
+                        }
+                          
+                        fwExceptionHandling_display(errorInfo);		
+			return;
+		}
+
+		fwPvRange_get(	$sDpName + $dpSetName, doesExist, minValue,
+						maxValue, negateRange, ignoreOutside, inclusiveMin, 
+						inclusiveMax, errorInfo);
+	
+		if(dynlen(errorInfo) &gt; 0)
+			fwExceptionHandling_display(errorInfo);
+	
+		if(doesExist)
+		{
+			if((comparisonValue &gt; maxValue) || (comparisonValue &lt; minValue))
+			{
+				sprintf(minText, &quot;%.3f&quot;, minValue);
+				sprintf(maxText, &quot;%.3f&quot;, maxValue);
+				
+				fwException_raise(	errorInfo, 
+									&quot;ERROR&quot;,
+									&quot;The value is outside the PVSS range: &quot; + minText + &quot; to &quot; + maxText, 
+									&quot;&quot;);
+				fwExceptionHandling_display(errorInfo);		
+				return;
+			}
+			else
+				dpSet($sDpName + $dpSetName, processedNewValue);
+		}
+		else
+			dpSet($sDpName + $dpSetName, processedNewValue);
+	}
+	else
+		dpSet($sDpName + $dpSetName, processedNewValue);
+	
+	if(elementType == DPEL_BOOL)
+	{	
+		dpGet($sDpName + $dpSetName, processedNewValue);
+		NewValue.text = processedNewValue;
+	}
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Button2" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">317 191</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">317 191</prop>
+    <prop name="Size">64 28</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="Button10" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">3061 3422</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1</prop>
+    </prop>
+    <prop name="Location">317 69</prop>
+    <prop name="Size">64 28</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Details</prop>
+     <prop name="de_AT.iso88591">Details</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+
+	fwGeneral_openDetailsPanel($sDpName + $dpSetName, exceptionInfo);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="sChannelName" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">100 106</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">100 10</prop>
+    <prop name="Size">291 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	this.text = $sDpName;
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

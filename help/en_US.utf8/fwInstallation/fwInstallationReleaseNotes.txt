@@ -1,0 +1,580 @@
+20-06-2024 Release Notes for fwInstallation-9.1.3
+
+* Solved issues *
+- FWINS-2295: Fix infinite recursion problem when attempting a connection with DB with wrong
+              schema (regression; a fix introduced in 8.1.1 stopped working for WinCC OA 3.19)
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/49928
+
+-------------------------------------------------
+
+11-03-2024 Release Notes for fwInstallation-9.1.2
+
+* Solved issues/Improvements *
+- FWINS-2294: Dependency checking working incorrectly for the non-local peer in redundant system,
+              if the components/versions installed on both peers are different.
+              A fix for this issue includes a performance optimization of dependency checking
+              during installation and operation for any setup (standard and redundant)
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/47726
+
+-------------------------------------------------
+
+06-02-2024 Release Notes for fwInstallation-9.1.1
+
+* Solved issues/Improvements *
+- FWINS-2288: Improve readability of fwInstallation_popup panel (word wrapping in text area,
+              selectable icon - info/warning)
+- FWINS-2289: Consistent icons in fwInstallation dialog panels, DependencyDelete and ShowErrors
+              panels layouted
+- FWINS-2290: Delay initialization of DB-Agent while post-installs are being executed to avoid
+              simultaneous execution of ASCII import by both managers where one will fail
+- FWINS-2291: Add log messages during components installation: information on DB-Agent triggered
+              component installation, installation options in use, subcomponents installation
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/37194
+
+-------------------------------------------------
+
+30-10-2023 Release Notes for fwInstallation-9.1.0
+
+First production-grade Installation Tool release for WinCC OA 3.19.
+
+* Solved issues/Improvements *
+- FWINS-2276: DB Agent synchronization of project paths and dist connections in central mode now
+              triggers an update of corresponding DB tables storing current configuration of the
+              project
+- FWINS-2277: Popup panels displaying list of components selected to be installed or removed are
+              resizeable
+- FWINS-2279: Fixed unnecessary multiple dependency warning popups during removal of a component
+              that has subcomponents (subcomponents are now removed in order according to their
+              mutual dependencies)
+- FWINS-2283: Missing required components are highlighted in the component details panel
+- FWINS-2284: Popup message with progress displayed in gedi during execution of postinstall
+              scripts, project help registration now takes place after running component scripts
+- FWINS-2285: On Windows avoid that specific cmd commands executed with system() call print their
+              stdout/stderr directly to the manager log.
+- FWINS-2287: On Linux fix problem with failing cleanup of old, broken symlinks to 3.16 WinCC OA
+              help during project Qt help generation in post-install.
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/36655
+
+-------------------------------------------------
+
+31-03-2023 Release Notes for fwInstallation-9.0.0
+
+Initial developer-grade Installation Tool release for WinCC OA 3.19.
+
+Please note that fwInstallation-9.0.0 is not backwards compatible with earlier WinCC OA versions
+(notably 3.16) and must not be used there. Note also that fwInstallation-8.4.x, dedicated for
+WinCC OA 3.16 is not forward compatible with WinCC OA 3.19.
+
+* 3.19 compatibility *
+- FWINS-2247: Compatibility with projects using SQLite database (support for new set of ASCII
+              and DATA managers)
+- FWINS-2248: Compatibility of framework help integration with WinCC OA 3.19 native help system
+- FWINS-2249: Compatibility with CTRL syntax in 3.19 (removed usage of new reserved keywords)
+- FWINS-2250: Fixed CTRL code warnings reported by interpreter in 3.19 (e.g. Y2038, too many
+              arguments passed to function call)
+- FWINS-2264: Removed unnecessary dpCreate call when registering component installation (in case of
+              a component upgrade) in internal installation tool datapoint. This was causing errors
+              in the log in SQLite projects prior to P001.
+- FWINS-2274: Add detection of WinCC OA 3.19 installation on Windows when it is CERN-branded
+
+* Cleanup *
+- FWINS-2269: Removed fwInstallation dependency on fwConfigurationDBSystemInformation component
+- FWINS-2272: Removed Configuration DB System Information schema creation files from package;
+              These files are now distributed with fwConfigurationDBSystemInformation component
+
+* Improvements *
+- FWINS-2226: Standarization of panels' widgets background and foreground colors to enable usage
+              of the tool with dark color palette
+- FWINS-2252: Support for opening component help file that is located directly in help/ directory
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/30926
+
+-------------------------------------------------
+
+17-02-2023 Release Notes for fwInstallation-8.4.6
+
+* Improvements *
+- FWINS-2107: Installation Details window with possiblility to copy rows from log table to
+              clipboard. Panel layouted
+- FWINS-2253: Ensure Installation panel is closed automatically when user choose to restart project
+              after component installation
+- FWINS-2256: fwInstallation_popup() with support for displaying HTML formatted text in a panel
+              (eg. clickable links)
+- FWINS-2259: Make sure Installation panel that is already open, but not visible, is brought back
+              on the screen when user clicks the gedi menu JCOP Framework -> Installation
+- FWINS-2262: Ensure all component installation log messages are printed to the log file
+              (by temporary disabling WinCC OA mechanism to suppress log messages of the same type
+              after 50 being produced, which is the case for log messages '10/fwInstallation')
+
+* Redu fixes/improvements *
+- FWINS-2255 &
+  FWINS-2260: fwInstallationRedu_execScriptConnectedToBothPeers to start CTRL manager with
+              different number depending on the peer to which caller is connected. New manager
+              numbers are 111 (peer1) and 112 (peer2), replacing 101. Ensuring required DPs for
+              CTRL manager exist to avoid warnings during start
+- FWINS-2261: Fixed warnings about non-existing DPs printed to the log on the first start of the
+              installation panel in a new redundant project
+- FWINS-2263: Give user a possibility to parametrize a result of checking if system is redundant by
+              supplying user-managed DP 'fwReduInfo'. See help for fwInstallation_isRedundant() for
+              information on how to configure this mechanism.
+
+* Bugfixes *
+- FWINS-2243: Fixed problem with DB errors printed to log when agent establishes connection to DB
+              and schema owner is different than the user used to connect
+- FWINS-2244: Prevent exception during components installation that may occur when subcomponent is
+              missing in component package. Improved information about this installation issue
+- FWINS-2257: Clean up existing CDBSI schema upgrade scripts from double semicolons. These were
+              causing failure during execution of these SQL scripts
+- FWINS-2265: Fixed issue with DB-agent removing all components from centrally managed project
+              when retrieval of the list of registered components from central DB failed due to
+              intermittent DB problems
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/35342
+
+-------------------------------------------------
+
+22-02-2022 Release Notes for fwInstallation-8.4.5
+
+* Redu API functions improvements *
+- FWINS-2236: fwInstallationRedu_myReduHostNum() reimplemented with new logic to produce correct
+              results also when from scattered managers
+- FWINS-2237: fwInstallationRedu_getActivePeer() improved to handle the situation when internal
+              datapoints of Redu managers contain inconsistent data and to report to log when
+              probed distributed system is not reachable (CMS contribution)
+
+* Other improvements *
+- FWINS-2240: Prevent displaying "Requested module does not exist (...)" log warning when user
+              closes fwInstallation.pnl panel
+- FWINS-2241: Removed redundant 'cmd /c' passed to system() on Windows when starting ASCII import
+              or opening help file in system browser. Prevents spawning unnecessary additional
+              'cmd' process
+
+* Bugfixes *
+- FWINS-2239: Fixed issue causing a corruption of a project config.redu file on component
+              reinstallation/upgrade, when it contains config.redu entries;
+              project config.redu is now treated same as the main project config file - backup
+              and proper cleanup ensured on components installation/removal actions
+- FWINS-2238: Fixed problem with an exception in fwInstallationAgent script occuring when distPeer
+              entry in project config file contains tab (\t) delimiter
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/34880
+
+-------------------------------------------------
+
+25-10-2021 Release Notes for fwInstallation-8.4.4
+
+* Bugfix release *
+- FWINS-2235: Fixed routine for searching component libraries to be included in includes_legacy.ctl
+	library. In certain cases libraries were searched in wrong path and thus not found.
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/35015
+
+-------------------------------------------------
+
+22-09-2021 Release Notes for fwInstallation-8.4.3
+
+* FWINS-2227: Corrected checking if manager stopped *
+New API functions added: fwInstallationManager_getState and fwInstallationManager_isStopped.
+Existing implementations, intended to check if manager is stopped or not, were updated to call the
+new function instead of fwInstallationManager_isRunning. This is because in certain corner cases
+that function may produce 'false', when manager is not stopped (e.g. it is in init or blocked
+state).
+
+* Other bugfixes and improvements *
+- FWINS-2193 Components with pending post-installs are no longer marked as incorrectly installed. They are
+	marked with new flag (light blue color in the Installed Components list in main Installation
+	Tool panel)
+- FWINS-2228 Time units in DB Agent synchronization period selector in Advanced Options panel are in full
+	form instead of abbreviated form
+- FWINS-2229 Fixed issue preventing component post-delete scripts from being executed after component deletion
+- FWINS-2230 Fixed problem with lots of warnings reported after checking for file issues (eg. during periodic
+	DB-Agent sync) after upgrading fwInstallation to 8.4.2 when not all of the components were
+	reinstalled.
+- FWINS-2232: fwInstallationRedu_myReduHostNum not producing the proper result on scattered panels.
+	When used in scattered systems demands –data –event args in cmd line to be redundant, 
+	otherwise function falls back on local config file
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/34820
+
+-------------------------------------------------
+
+19-11-2020 Release Notes for fwInstallation 8.4.2
+
+* Modifications related to ASCII import logs of components installation *
+As of this version all logs coming from ASCII imports performed by the Installation Tool (e.g.
+during component installation) are written to one ASCII import log file -
+'fwInstallation_WCCOAascii_log.txt'. Logs from subsequent imports are appended to that file instead
+of overwriting it.
+Note the extension of the file (*.txt) - because it is different than *.log, messages appended
+there are not displayed in Log Viewer. This is to avoid flooding Log Viewer with very detailed
+information on ASCII importation process. If relevant, they should be consulted on log file, that
+now preserves them. To open the log, click 'View Log' button at the bottom of main Installation
+Tool panel and select 'ASCII import log' from the drop-down menu.
+To prevent log file from growing to an excessive size, a threshold limit of 25 MB is defined. If
+ASCII import log file exceeds that limit, it is renamed by appending a '.bak' suffix and a new log
+file is created when next ASCII import is performed.
+-------------------
+Both ASCII import log file name and size threshold are configurable. Their values are stored in
+internal datapoint of Installation Tool. Any modifications need to be done directly on datapoint
+elements, as configuration panel is not provided for this release.
+*) To restore displaying ASCII import logs in Log Viewer open para, select 'Internal Datapoints',
+   type 'fwInstallationInfo' in DP filter field and press Enter. Navigate to asciiImportLogSettings
+   -> fileName DPE and modify its value to have the *.log extension
+   (eg. fwInstallation_WCCOAascii_log.log)
+*) To restore overwriting of ASCII import log content by each subsequent ASCII import, set the
+   asciiImportLogSettings -> rotationSize DPE value to 0. Setting -1 disables the log size limit,
+   any positive value indicates the threshold limit in MB.
+
+* Other bugfixes and improvements *
+- In redundant system, a severe error message, about problem with reading libraries loaded with
+  config entry, is no longer displayed in the log, when Installation Tool is started for the first
+  time on the second peer
+- Choosing 'Run PostInstall scripts' option, after interactive component installation is completed,
+  stops countdown for project restart. It prevents the situation, when restart is triggered because
+  of countdown finished, while post-install scripts are still being executed
+- Selection of 'Restart Project' option, after interactive components installation is completed,
+  causes main Installation Tool panel to close immediately, speeding up project restart routine
+- Modal pop-up panels appearing during interactive component installation are uncovered and
+  reactivated after non-modal panels are opened subsequently [may not work in slow setups]
+- File issues checking contains now results also for bin/, colorDB/ and msg/ directories
+- Component installation directory, registered using initialization script
+  (fwInstallation/fwInstallation_projectRegistration.ctl), is now created, if it did not exist
+- On Linux, WinCC OA help files are not registered directly in project help collection, but
+  through symbolic links created inside project help directory
+  
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/33888
+
+-------------------------------------------------
+
+25-06-2020 Release Notes for fwInstallation 8.4.1
+
+Please note that as of version 8.4.0 Installation Tool requires WinCC OA 3.16 with
+patch 013 (or later). WinCC OA 3.15 is no longer supported.
+
+* QtHelp integration - usability improvements *
+Pop-up asking to close WinCC OA help during component installation or removal is now
+displayed only, if customized help for current project is opened (e.g. it will not appear,
+if WinCC OA help is open from Project Console [F1]).
+As of this version it is only obligatory to close the WinCC OA help during component removal
+on Windows. In any other case closing the help is optional, yet recommended, as list of
+available help collections is updated only after help is opened again.
+On Windows Qt help files are now correctly overwritten when WinCC OA help is open, preventing
+component installation from failing. There is no possibility, however, on Windows to remove
+the Qt help files, that are in use. If this is the case, component removal is not marked as
+failed, but only a warning is displayed to the log, asking to remove problematic files
+manually later, when it will be possible.
+
+* Other bugfixes and improvements *
+- Standalone panel with list of components is now resizeable (fwInstallationList.pnl,
+  used e.g. in UNICOS)
+- Panels with .xml extension are now supported in fwInstallation_Packager.pnl panel
+- Improved readability  of log messages regarding ASCII import warnings/errors. Added bried
+  explanation for codes 55 and 56. These are typical ones and can be safely ignored, if appear
+  during framework component installation.
+- Postinstall script for FSM tree installation, generated using fwInstallation_Packager.pnl,
+  contains necessary #uses statement
+- Problem with displaying file issues (panel files displayed in libraries and vice versa)
+  is fixed
+- Problem with an 'Index out of range' exception, when DB Agent connects to DB for the first
+  time in a project, that was registered using a DB Editor & Navigator, is fixed
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/32407
+
+-------------------------------------------------
+
+07-11-2019 Release Notes for fwInstallation 8.4.0
+
+Please note that this version of Installation Tool requires WinCC OA 3.16 with
+patch 013 (or later). WinCC OA 3.15 is no longer supported.
+
+* Migration to UTF-8 character encoding enforced by WinCC OA 3.16. *
+fwInstallation files were reviewed to ensure compatibility with UTF-8 character encoding.
+No significant modifications were made, although a few non-ASCII characters were removed
+from comments in panel files.
+In addition the help files and fwInstallation message catalog were moved from en_US.iso88591/
+to en_US.utf8/ subdirectories.
+
+* Relocation of scripts and library files *
+fwInstallation scripts and library files were moved to fwInstallation/ subdirectories
+in scripts/ and libs/ directories. *.lst files are kept in previous location (scripts/).
+fwInstallation libraries are continued to be loaded by CTRL and UI managers through
+LoadCtrlLibs config file entry. There is no need to load them with #uses statement
+in users scripts.
+If such statements already exists (eg. #uses "fwInstallation.ctl") they should be either
+removed or updated to point to the new location of libraries (for previous example:
+#uses "fwInstallation/fwInstallation.ctl")
+
+* Relocation of Configuration DB System Information schema files *
+SQL files containing definition of the Configuration DB System Information schema were
+moved to data/fwInstallation/ directory to separate them from project configuration files.
+
+* Cleanup of icon files *
+Content of images/ and pictures/ directory in fwInstallation package was reviewed.
+As a result, the images/ directory, that contained irrelevant files, was removed from package.
+Several icons in pictures directory were removed as they were not used or possible to replace
+with standard WinCC OA icons.
+
+** Upgrade of Installation Tool from versions < 8.4.0 **
+Due to major changes made in this release of fwInstallation and in particular relocation of
+library files, an upgrade/cleanup procedure has to be carried out when migrating project with
+fwInstallation version < 8.4.0.
+This procedure includes: 
+- update fwInstallation LoadCtrlLibs entries in the project config file
+- removal of obsolete/relocated files/directories
+- update of internal fwInstallation datapoints
+An effort has been put to make upgrade functionality flexible, so that it can cover different
+use cases. A number of different configurations have been checked and confirmed to work correctly.
+However, due to numerous factors, that have to be taken into account, it may happen, that the
+upgrade will not be completed successfully. Please report such problem with description of the
+environment, that is used, to Icecontrols.Support@cern.ch.
+-------------------
+Please find below step-by-step description for interactive upgrade performed by starting
+Installation Tool main panel:
+1) Ensure that UI manager that runs Installation Tool panel is stopped.
+2) Copy fwInstallation in version 8.4.0 to the project directory
+3) Start UI manager and open Installation Panel - at this point multiple warnings
+"Multiple definition of function (...)" and "Variable already defined (...)" will be written
+to the log - they can be ignored.
+4) Necessity of upgrade procedure is detected at this point and pop-up panel listing neccessary
+changes is displayed. User has to agreed to proceed.
+5) Changes are applied to the project.
+6) Pop-up panel informing user about necessity of restart of the UI manager is displayed.
+This is required to reload the fwInstallation libraries.
+7) After confirmation from the user, manager is stopped and has to be started again manually,
+unless it is added to project console with starting mode "always".
+   Installation Tool is now in 8.4.0 version.
+-------------------
+Remarks:
+*) To avoid warnings about duplicated function and variables defnitions it is possible to use
+-loadNoCtrlLib option for a manager that runs installation panel. Following command can be used:
+WCCOAui -currentproj -loadNoCtrlLib -loadCtrlLibs "panel.ctl" -p fwInstallation/fwInstallation.pnl
+Use this option only while performing the upgrade. After upgrade is completed, manager will be
+stopped automatically after user's confirmation, as in step 7) of the procedure above. This is to
+prevent normal operation with no default libraries loaded, which may lead to unexpected errors.
+When starting manager the next time, do not use -loadNoCtrlLib option anymore.
+*) Please note that upgrade may be performed silently (without UI) by Database Agent manager if
+it is started after the new version of fwInstallation is copied to the project.
+Avoid situation when UI with Installation Tool and Database Agent manager starts simultaneously.
+If Database Agent manager already performed upgrade, restart UI manager, to reload the libraries.
+*) After upgrade is finished and fwInstallation libraries are removed from their previous location,
+there may be warnings displayed to the log about attempts to load not existing libraries, because
+components that are installed may attempt to load fwInstallation libs from previous location.
+It is advised not to start any other managers (UI, CTRL) and upgrade all of the components to
+version compatible with fwInstallation-8.4.0 (eg. jcop-framework-8.4.0).
+
+* XML panel format *
+All fwInstallation panels have been converted to XML format. Panel names were not changed
+though, the .pnl extension has been kept.
+Language-dependent entries different than en_US.utf8 were removed to reduce panels size
+and ease their maintenance.
+Predefined table rows in various panels were removed, after verifying that they are
+not relevant. This was done to mitigate the problem with different behavior of such rows
+in panels with XML format.
+
+* QtHelp integration *
+As of version 8.4.0 fwInstallation has integrated functionality to build custom QtHelp collection
+for a project, based on Qt help files delivered with framework components. For this purpose a new
+<qtHelp> tag for component XML file was introduced.
+Generation of Qt help collection is performed in a post-install/post-delete routine.
+Custom project documentation is available in the Help -> WinCC OA Overview menu in gedi.
+In addition, the WinCC OA help for the High Speed Programming and Testing Framework
+is filtered out from a project documentation. These two topics are still accessible via generic
+WinCC OA Help in Project Administrator or Project Console.
+-------------------
+Note that accessing Qt help files for components via remote desktop is not supported currently.
+There are limitations in WinCC OA already reported to ETM and some issues have to be addressed 
+directly in the installation tool as well.
+-------------------
+Important Notice:
+On Windows, component Qt help files are locked by the program that uses them. It is usually 
+assistant application. If it is opened, prior to component installation user will be asked to
+confirm closing all opened instances of it in order to continue.
+However, it is also possible, that UI manager, that runs WinCC OA gedi, will lock these files.
+In particular, when a Script Editor is opened, help files are locked.
+In this case attempt to overwrite/remove help file will fail and as a result component will be
+marked as incorrectly installed.
+It is advised to close UI managers, that runs gedi, prior to component installation on Windows
+(gedi can be used to access Installation Panel if Script Editor has not been opened)
+
+* New format of component config file tags *
+Component tag identifies entries that are added to the config file by a particular component.
+Its format has been changed in order to be more compacted. It now consists of 2 lines:
+begin and end. Please find below an example:
+#--------- begin <component>        - Do not edit it manually
+<component config entries>
+#----------- end <component>        -------------------------
+Old format is still recognized to ensure proper cleanup when upgrading components from previous
+versions.
+Note that component tag is not updated in the project config file, unless the component is
+installed/upgraded with version 8.4.0 of fwInstallation. It is possible that these two different
+component tags will appear the config file for different components.
+-------------------
+A bug has been fixed, that caused component config entries not being removed during upgrade of
+a component when new version of it does not provide any config entries to be added to the
+project config.
+
+* Installation Tool Advanced Options panel improvements *
+- Added functionality to handle DB-Init file. It is now possible to create or remove a file,
+that contains credentials to the Configuration DB System Information database for DB-Agent.
+This file is used to automatically initialize DB connection.
+Please remember, that when this file is present and contains valid credentials, the connection
+will be initialized automatically, even when it was previously disabled in a panel.
+Note that when fwInstallation is not in the PROJ_PATH, then DB-init file cannot be handled
+from the panel, yet its existence is still detected. Any modifications in the file have to be
+preformed externally.
+- Added option to regenerate Qt help collection for a project.
+- Improvements made for list of project paths. Main project directory (PROJ_PATH) cannot be
+moved up in the list and cannot be selected as component installation directory.
+
+* Component Installation Improvements and Bugfixes *
+- Pop-up error message about circular dependencies, that was displayed always when interactive
+component installation failed, now is displayed only when there is really a problem with circular
+dependencies among component. In such case additional debug information are available in the log.
+For other errors a generic pop-up error is shown, please consult the log to get detailed info.
+- Circular dependency, that occurs during installation of required component or subcomponent,
+due to late dependency resolving is now detected and entering infinite loop of component
+installation is prevented.
+
+* Legacy library to quickly load all components libraries *
+To provide an option to load all necessary libraries easily, after migration to #uses statements
+in jcop-framework, Installation Tool now creates a 'includes_legacy.ctl' library. This contains
+loads with #uses all main libraries of installed components. It is then possible to add the
+following entry to the project config file: 'LoadCtrlLibs = "includes_legacy.ctl"' to ensure
+that all libraries are loaded as in the pre 8.4.0 versions of jcop-framework.
+Using this option is not recommended, unless it is really justified (eg. problems in a production
+environment). An effort should be done to ensure proper compatibility of users components with new
+library loading policy.
+Note that the content of the library is autogenerated after the component installation/removal,
+thus it should not be modified manually.
+
+* Backward incompatibility with fwConfigurationDBSystemInformation < 8.4.0 *
+Due to strong coupling between fwInstallation and fwConfigurationDBSystemInformation
+components it is not possible to use fwConfigurationDBSystemInformation component in version
+< 8.4.0 in a project with fwInstallation with version 8.4.0 or higher.
+Release of fwConfigurationDBSystemInformation component version 8.4.0 is being prepared.
+Beta of 8.4.0 version is available currently.
+In case of project components upgrade, please first upgrade fwInstallation to version >= 8.4.0
+and later install fwConfigurationDBSystemInformation version >= 8.4.0.
+Please do not attempt to use fwConfigurationDBSystemInformation in the transition state.
+
+* Other improvement/bugfixes *
+- Alternate row colors in fwInstallation panels tables.
+- fwInstallation_moveFile() wrapper for moveFile() function, which behaviour was changed as of
+WinCC OA 3.16. The file/directory in the target path cannot be overwritten anymore. Wrapper
+function restores previous behaviour, to ensure proper functioning of fwInstallation.
+- Fixed problems with interpreting config file section, that has a '.' (dot) in a name as a key
+value-pair (eg. [smi3.15]).
+- Fixed problem with removal of project paths, that contains backslashes, from the project config
+file by Installation Agent
+
+Complete list of resolved cases is available under the following link:
+https://its.cern.ch/jira/projects/FWINS/versions/31106
+
+-------------------------------------------------
+
+01-03-2019 Release Notes for fwInstallation 8.3.1
+Jira filter:	https://its.cern.ch/jira/projects/FWINS/versions/30925
+
+This release contains only one, yet significant, change:
+FWINS-2162:	Modified behaviour of the config file manipulation during component installation. As of this version, all component config entries are added to the project config file, without checking, if entry is already there. Hence duplicated entries in the project config file are possible. This has no negative impact on the project and eliminates problem of hidden dependencies between components on the config entries.
+
+-------------------------------------------------
+
+22-01-2019 Release Notes for fwInstallation 8.3.0
+Jira filter:	https://its.cern.ch/jira/projects/FWINS/versions/29977
+
+Fixed bugs:
+FWINS-2113:	In main Installation panel the list of components installed on redundant peer is not correct when 'Show sub-components' option is selected.
+FWINS-2131:	Using fwInstallationManager_add() it is not possible to add manager with option that is a part of an option string of another manager of same type, that already is in console. For example: cannot add SIM manager "-num 6" when SIM manager "-num 65" exists.
+FWINS-2133:	fwInstallation_getHostMemorySize() returns wrong values on Windows (KB instead of B) and on Linux (when memory is <~10GB)
+FWINS-2135:	fwInstallation Agent DB synchronization lock is not released when Agent restarts the project after remote component installation.
+FWINS-2138:	fwInstallation_getInstalledComponentDps() returns list of datapoints without system name when called in non-redundant system and in 1st peer of redundant system, but when called in 2nd peer, the list contains system name. Note: In 8.3.0 returned datapoints always contain the system name.
+FWINS-2143:	1) Subcomponent is registered by fwInstallation as normal component when it is installed as required component. 2) Wrong information displayed in fwInstallationDependency.pnl when missing component is preceeding in the table by component which is available.
+FWINS-2144:	In redundant project, in some cases, the wrong redu peer hostname is displayed in main installation panel.
+FWINS-2152:	Problem with component installation when its source path contains space characters - ASCII import error.
+
+Cleanup:
+FWINS-2099:	Deprecated legacy function fwInstallation_updateComponentVersionFormat() that was filling component version string (when empty) with the value of component version stored as a float.
+FWINS-2126:	Indentified and deprecated fwInstallation panels that are not used.
+FWINS-2147:	Removed calls to obsolete function fwInstallationXml_decode() and marked it as deprecated.
+
+New Features:
+FWINS-2054:	Project name and event manager host are displayed at the bottom of the main installation panel.
+FWINS-2079:	New component XML tag to specify binary files <bin>. They are treated in special way and their path must follow the pattern: ./bin/[componentName/][relativePathToPreserve/][versionDirectory/]binaryFileName. Binary file are copied directly to the bin/ directory or under the relativePathToPreserve/ path if present. If binary file is placed in a directory named as WinCC OA version (eg. 3.15/) then it is copied to the installation directory only if project is running in the corresponding WinCC OA version.
+FWINS-2134:	New function to check component package integrity, compatible with changes made to treat properly binary files. Previous function: fwInstallation_verifyPackage() was deprecated together with fwInstallation_checkScript() that is obsolete since version 8.1.1.
+FWINS-2136:	Added string constant in fwInstallation libraries to indicate the pre-release tag (e.g. SNAPSHOT-201810100723). Note that in final release it is set to an empty string. Full Installation tool version (number + tag) is stored in internal datapoint.
+
+Improvements:
+FWINS-1989:	Added exit() call in post-install manager code to protect against situation when manager hangs due to started threads that were not finished or connected functions that were not disconnected.
+FWINS-2132:	_fwInstallation_getStringFromSystemCommand() uses argument of system() function to retrieve output of system commands instead of reading it from temporary files.
+FWINS-2139:	Improved displaying of installed components in main panel. Faster filling of the table. Hiding/showing subcomponents is done with filtering instead of reloading.
+FWINS-2141:	ASCII import errors during component installation on Linux are now correctly detected (on Windows they are detected starting from WinCC OA 3.16 P003). To preserve current behavior, in silent mode installation proceed despite of an error. During interactive installation user can choose wheter to continue installation or not.
+FWINS-2146:	Getting list of componets that user selected on a panel for installation/removal is done now with a single library function.
+FWINS-2148:	During component installation, hardware driver is added to the project console, only when this driver is available in the system. Example: OPC driver is no longer added to a console of a project hosted on a machine with Linux.
+
+-------------------------------------------------
+
+15-06-2018 Release Notes for fwInstallation 8.2.0
+
+This version introduces initial support for WinCC OA 3.16.
+
+Fixed bugs:
+FWINS-2005:	fwInstallationRedu_myReduHostNum() function does not work when redundant network connections are used.
+FWINS-2116:	fwInstallationDB_deleteAllRequiredProjectPaths() function does not remove paths when called on a second peer of a redundant system.
+FWINS-2118:	Removed incorrect UTF-encoded labels to avoid problems in UTF projects (required for WinCC OA 3.16 support).
+FWINS-2119:	Values of some arguments are not passed when fwInstallation_installComponent() is called for a subcomponent.
+
+Improvements:
+FWINS-2095:	XML component description files are no longer reloaded when visibility of subcomponents is changed.
+FWINS-2104:	Multiple improvements for the code handling config file entries.
+FWINS-2121:	Pre-release tags are now not taken into account when required component versions are checked. Example: 8.2.0-beta-01 version is valid when required version is 8.2.0.
+FWINS-2123:	It is now possible to disable certain fwInstallationAgent DB synchronization steps (project paths, project managers, distributed connections, component file issues, redundancy configuration, Devices and Applications) from 'Advanced options'-> 'Synchronization Configuration'.
+
+-------------------------------------------------
+
+07-05-2018 Release Notes for fwInstallation 8.1.2
+
+Fixed bugs:
+FWINS-1981:	Component help not working in OWS UIs.
+FWINS-2155:	Control Manager running post-install scripts may never stop running in a redundant system if some dpConnections were made.
+
+-------------------------------------------------
+
+15-03-2018 Release Notes for fwInstallation 8.1.1
+
+Fixed bugs:
+FWINS-1888:	Attempting to connect to a DB without the Configuration DB System Information schema results in a growing memory leak.
+FWINS-2088:	Backslashes in paths to component description files stored in the DB schema (FW_SYS_STAT_COMP_IN_GROUPS.DESCRIPTION_FILE column) are not handled properly.
+FWINS-2097:	Installation of a component that has duplicated sections in its config file (i.e. [ui] repeated twice) leads to inconsistent entries in the project's config file.
+FWINS-2098:	fwInstallationManager_remove() function cannot remove managers from remote project's console as it ignores non-default host and port parameters.
+FWINS-2100:	Re-installation or installation of a new version of a component on Linux operating system results in duplication of entries in the config file when it is saved with Windows (CR+LF) line endings.
+FWINS-2109:	Component version comparison doesn't treat pre-release tags (e.g. X.Y.Z-beta-W) correctly.
+
+New features:
+FWINS-2094:	Added a possibility to hide certain components in the list of available components (e.g. test components). In order to do that, following entry has to be added to the component XML file: <hiddenComponent>Yes</hiddenComponent>. User can enable displaying of hidden components by selecting 'Show hidden components' option.
+FWINS-2103:	List of installed components can be now copied as a text. To do so, right-click on the components table and select option 'Copy components list to clipboard' in the pop-up menu.
+FWINS-2110:	Added a new API function fwInstallation_getSections() that returns all sections from the project config file that match a specified pattern.
+
+Improvements:
+FWINS-2022:	XML parser no longer displays errors in the log when it encounters non-component XML files (e.g. when searching recursively for components).
+FWINS-2026:	Database configuration pop-up at the first start of the main Installation panel was removed. It still accessible in the 'Advanced options' window.
+FWINS-2027:	'Select directory' pop-up at the first start of the main Installation panel now contains additional predefined directories, selectable from the drop-down list. Added a warning when selected directory is not empty.
+FWINS-2090:	Standardized retrieval of file name and directory path from file paths in fwInstallation libraries. Functions to perform these actions are implemented using native WinCC OA functions.
+FWINS-2102:	Added information on what is the default option when drivers and simulators are added to the project console during component installation (the options are: activate driver, activate simulator, do not activate any).
+FWINS-2105:	Checking of component init and post-install scripts at the beginning of installation is now disabled due to side-effects of the WinCC OA checkScript() function (loading of libraries and misleading error messages in the log).
+

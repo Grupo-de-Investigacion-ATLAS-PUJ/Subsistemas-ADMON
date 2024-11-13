@@ -1,0 +1,948 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   <prop name="en_US.iso88591"></prop>
+  </prop>
+  <prop name="Size">641 391</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">-1 40</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[dyn_string DPE_LIST;
+int DPE_TYPE;
+bool DPES_OK;
+
+// mode in which the panel is used
+int panelMode;
+const int OBJECT	= 1;
+const int SINGLE_DPE		= 2;
+const int MULTIPLE_DPES	= 3;
+
+dyn_dyn_anytype dpeConfigObject;
+
+_fwEnableFormatItems(bool shouldShow, bool initValues = FALSE)
+{
+	dyn_string exceptionInfo;
+	string elementType;
+
+	_fwConfigs_getConfigOptionsForDpeType(DPE_TYPE, fwConfigs_PVSS_FORMAT, elementType, exceptionInfo);
+
+	if(initValues)
+	{
+		switch (DPE_TYPE)  
+	    {  
+	    	case DPEL_UINT:  
+	    	case DPEL_UINT_STRUCT:  
+	      	case DPEL_INT:  
+		    case DPEL_INT_STRUCT:  
+		    case DPEL_DYN_UINT:  
+	  	    case DPEL_DYN_UINT_STRUCT:  
+	    	case DPEL_DYN_INT:
+	      	case DPEL_DYN_INT_STRUCT:
+				beforeDigits.text = &quot;15&quot;;
+				afterDigits.text = &quot;0&quot;;
+		        break;  
+		    case DPEL_FLOAT:  
+	  	    case DPEL_FLOAT_STRUCT:  
+	    	case DPEL_DYN_FLOAT:  
+	      	case DPEL_DYN_FLOAT_STRUCT:  
+				beforeDigits.text = &quot;15&quot;;
+				afterDigits.text = &quot;3&quot;;
+		        break;  
+		    default:  
+				beforeDigits.text = &quot;0&quot;;
+				afterDigits.text = &quot;0&quot;;
+		        break;  
+	   	}  
+   	}
+
+	switch(elementType)
+	{
+		case fwConfigs_ANALOG_OPTIONS:
+			afterDigits.visible = shouldShow;
+			afterTitle.visible = shouldShow;
+			chbExponential.visible = shouldShow;       
+			break;
+		default:
+			afterDigits.visible = FALSE;
+			afterTitle.visible = FALSE;
+			chbExponential.visible = FALSE;       
+			break;
+	}
+
+	beforeTitle.visible = shouldShow;
+	beforeDigits.visible = shouldShow;
+}
+
+saveSettings(dyn_string &amp;exceptionInfo)
+{
+	string sFormat, point = &quot;.&quot;, dataType;
+	bool expo;
+	int before = 0, after = 0;
+
+ 	if(!DPES_OK)
+	{
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_MIXEDORBADDPETYPES&quot;), &quot;&quot;);
+		return;		
+	}
+
+	okButton.enabled = FALSE;
+	applyButton.enabled = FALSE;
+	closeButton.enabled = FALSE;
+	if(panelMode == MULTIPLE_DPES)
+		fwOpenProgressBar(&quot;Configuration panel&quot;, &quot;Saving configuration...&quot;, 1);
+
+	if(formatOnOff.state(0))
+	{
+		before = beforeDigits.text;
+		after = afterDigits.text;
+		expo = chbExponential.state(0);
+																									
+		switch (DPE_TYPE)  
+		{  
+			case DPEL_UINT:
+			case DPEL_UINT_STRUCT:
+			case DPEL_INT:
+			case DPEL_INT_STRUCT:
+			case DPEL_DYN_UINT:
+			case DPEL_DYN_UINT_STRUCT:
+			case DPEL_DYN_INT:
+			case DPEL_DYN_INT_STRUCT:
+				dataType = &quot;d&quot;;
+				break;
+			case DPEL_FLOAT:
+			case DPEL_FLOAT_STRUCT:
+			case DPEL_DYN_FLOAT:
+			case DPEL_DYN_FLOAT_STRUCT:
+				dataType=(expo)?&quot;e&quot;:&quot;f&quot;;
+				break;  
+			default:
+				dataType = &quot;s&quot;;
+				break;
+		}  	
+	
+		sprintf(sFormat, &quot;%d%1s%d%1s&quot;, before, point, after, dataType);
+		sFormat = &quot;%&quot; + sFormat;
+	//	DebugN(&quot;sFormat&quot;,sFormat);
+			
+		if(panelMode != OBJECT)
+		{
+			fwFormat_setMultiple(DPE_LIST, sFormat, exceptionInfo);		
+		}
+		else
+		{
+			dpeConfigObject[fwFormat_DPE_OBJECT_FORMAT][1] = sFormat;
+			fwGeneral_setGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+//			DebugN(&quot;Modified &quot;, dpeConfigObject);
+		}
+	}
+	else
+	{	
+		beforeDigits.text = 0;
+		afterDigits.text = 0;
+		chbExponential.state(0, FALSE);
+		
+		if(panelMode != OBJECT)
+		{
+			fwFormat_deleteMultiple(DPE_LIST, exceptionInfo);
+		}
+		else
+		{
+			dpeConfigObject[fwFormat_DPE_OBJECT_FORMAT][1]  = &quot;&quot;;
+			fwGeneral_setGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+//			DebugN(&quot;Modified &quot;, dpeConfigObject);
+		}
+		
+	}
+	
+	okButton.enabled = TRUE;
+	applyButton.enabled = TRUE;
+	closeButton.enabled = TRUE;
+	if(panelMode == MULTIPLE_DPES)
+		fwCloseProgressBar(&quot;Configuration complete&quot;);
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	bool doesExist, expo;
+	int i, elementType, configType, before, after;
+	string dpe, sFormat, dataType, point, errorString;
+	dyn_string systems, exceptionInfo;
+	
+	elementNameField.editable(FALSE);		
+	
+	if(isDollarDefined(&quot;$sDpe&quot;))
+	{
+		dpe = $sDpe;
+		strreplace(dpe, &quot; &quot;, &quot;&quot;);
+	    DPE_LIST = strsplit(dpe, &quot;|&quot;);
+	}
+
+	switch(dynlen(DPE_LIST))
+	{
+			case 0:
+				if(isDollarDefined(&quot;$sDpeConfigObjectVarName&quot;))	// object passed to the panel
+				{
+					if(getGlobalType($sDpeConfigObjectVarName) != DYN_DYN_ANYTYPE_VAR)
+					{
+						elementNameField.text(&quot;Wrong config object name&quot;);
+						formatOnOff.enabled = FALSE;
+						applyButton.enabled = FALSE;
+						okButton.enabled = FALSE;
+						fwException_raise(exceptionInfo, 
+															&quot;WARNING&quot;, &quot;The config object &quot; + $sDpeConfigObjectVarName + 
+															&quot; doesn't exists or hasn't got the proper format.&quot;, 
+															&quot;&quot;);
+						fwExceptionHandling_display(exceptionInfo);					
+						return;
+					}					
+					
+					panelMode = OBJECT;					
+					fwGeneral_getGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+					//DebugN(\&quot;fwAlertConfigPanel: \&quot;, dpeAlertConfigObject);
+					
+					// read from config object
+					DPE_LIST[1] = dpeConfigObject[fwConfigs_DPE_OBJECT_DPE_NAME][1];						
+					DPE_TYPE		= dpeConfigObject[fwConfigs_DPE_OBJECT_DPE_TYPE][1];
+					sFormat			= dpeConfigObject[fwFormat_DPE_OBJECT_FORMAT][1];
+					
+					if(sFormat == &quot;&quot;)
+						doesExist = FALSE;
+					else
+						doesExist = TRUE;
+					
+					elementNameField.text(DPE_LIST[1]);
+					DPES_OK = TRUE;
+				}
+				else // neither dpes nor object passed, nothing to do in the panel
+				{
+					elementNameField.text(&quot;No Data Point Elements&quot;);
+					formatOnOff.enabled = FALSE;
+					applyButton.enabled = FALSE;
+					okButton.enabled = FALSE;
+					fwException_raise(exceptionInfo, &quot;WARNING&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_NODATAPOINTSTOCONFIG&quot;), &quot;&quot;);
+					fwExceptionHandling_display(exceptionInfo);					
+					return;
+				}
+				break;
+			case 1:
+				panelMode = SINGLE_DPE;
+				dpe = DPE_LIST[1];
+				elementNameField.text(dpe);
+				DPES_OK = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_FORMAT, DPE_TYPE, exceptionInfo, errorString);
+				if(!DPES_OK)
+					fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+				else
+					fwFormat_get(DPE_LIST[1], doesExist, sFormat, exceptionInfo);
+				break;
+			default:
+				panelMode = MULTIPLE_DPES;
+				dpe = DPE_LIST[1];
+
+				_fwConfigs_getSystemsInDpeList(DPE_LIST, systems, exceptionInfo);
+				if(dynlen(systems) == 1)
+					elementNameField.text(&quot;Multiple Data Point Elements (from &quot; + systems[1] + &quot;)&quot;);
+				else
+					elementNameField.text(&quot;Multiple Data Point Elements (from multiple systems)&quot;);
+
+				DPES_OK = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_FORMAT, DPE_TYPE, exceptionInfo, errorString);
+				if(!DPES_OK)
+					fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+
+				doesExist = FALSE;
+				dpeDetails.visible = TRUE;
+				break;
+	}
+
+	okButton.enabled = DPES_OK;
+	applyButton.enabled = DPES_OK;
+
+	if(dynlen(exceptionInfo) &gt; 0)
+	{
+		fwExceptionHandling_display(exceptionInfo);
+		return;
+	}
+		
+	if(doesExist)
+	{
+		sFormat = strltrim(sFormat, &quot;%&quot;);
+		
+		switch(DPE_TYPE)
+		{
+			case DPEL_UINT:
+			case DPEL_UINT_STRUCT:
+			case DPEL_INT:
+			case DPEL_INT_STRUCT:
+			case DPEL_DYN_UINT:
+			case DPEL_DYN_UINT_STRUCT:
+			case DPEL_DYN_INT:
+			case DPEL_DYN_INT_STRUCT:
+				dataType = &quot;d&quot;;
+				break;
+			case DPEL_FLOAT:
+			case DPEL_FLOAT_STRUCT:
+			case DPEL_DYN_FLOAT:
+			case DPEL_DYN_FLOAT_STRUCT:
+				dataType = &quot;e&quot;;
+				break;
+			default:
+				dataType = &quot;s&quot;;
+				break;
+		} 
+
+		if(strpos(sFormat, &quot;e&quot;) == (strlen(sFormat) - 1))
+			expo = TRUE;
+	
+		if(strpos(sFormat, &quot;.&quot;) &gt; 0 || strpos(sFormat, &quot;,&quot;) &gt; 0)
+			sscanf(sFormat, &quot;%d%1s%d&quot;, before, point, after);
+	  else if (strlen(sFormat) &gt; 1)
+			sscanf(sFormat, &quot;%d&quot;, before);
+	
+		chbExponential.state(0) = expo;
+		beforeDigits.text = before;
+		afterDigits.text = after;
+	
+		_fwEnableFormatItems(TRUE);
+		formatOnOff.state(0, TRUE);
+	}
+	else
+	{
+		_fwEnableFormatItems(FALSE, TRUE);
+		formatOnOff.state(0, FALSE);
+	}
+
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);	
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="Text3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-160-100-100-*-*-iso8859-1|-19,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Format Configuration</prop>
+     <prop name="en_US.iso88591">Format Configuration</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text4" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">255 131</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 55</prop>
+    <prop name="Size">117 23</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">DP Element:</prop>
+     <prop name="en_US.iso88591">DP Element:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="beforeTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">90 146</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">90 145</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,16,arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,16,arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Maximum number of digits:</prop>
+     <prop name="en_US.iso88591">Maximum number of digits:</prop>
+     <prop name="de_AT.iso88591">Max. Stellenanzahl:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="afterTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">350 145</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">350 145</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,16,arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,16,arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Number of decimal places:</prop>
+     <prop name="en_US.iso88591">Number of decimal places:</prop>
+     <prop name="de_AT.iso88591">Nachkommastellen:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="elementNameField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">347 103</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">90 50</prop>
+    <prop name="Size">541 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="dpeDetails" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">460 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">460 10</prop>
+    <prop name="Size">121 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select Elements</prop>
+     <prop name="en_US.iso88591">Select Elements</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string errorString;
+	dyn_string returnedDpeList, systems, exceptionInfo;
+	dyn_float cancelOrOk;
+
+	ChildPanelOnCentralModalReturn(&quot;fwConfigs/fwDpeSelector.pnl&quot;, &quot;Choose Data Point Elements&quot;,
+									makeDynString(&quot;$dsAllDpes:&quot;+$sDpe, &quot;$dsIncludedDpes:&quot;+DPE_LIST, &quot;$sConfigType:&quot;+fwConfigs_PVSS_FORMAT),
+									cancelOrOk, returnedDpeList);
+	if(cancelOrOk[1] &gt; 0.5)
+	{
+		if(DPE_LIST != returnedDpeList)
+		{
+			DPE_LIST = returnedDpeList;
+			DPES_OK = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_FORMAT, DPE_TYPE, exceptionInfo, errorString);
+			if(!DPES_OK)
+				fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+
+			_fwConfigs_getSystemsInDpeList(DPE_LIST, systems, exceptionInfo);
+
+			if(dynlen(DPE_LIST)== 1)
+				elementNameField.text(DPE_LIST[1]);
+			else
+			{
+				if(dynlen(systems) == 1)
+					elementNameField.text(&quot;Multiple Data Point Elements (from &quot; + systems[1] + &quot;)&quot;);
+				else
+					elementNameField.text(&quot;Multiple Data Point Elements (from multiple systems)&quot;);
+			}
+
+			okButton.enabled = DPES_OK;
+			applyButton.enabled = DPES_OK;
+
+			formatOnOff.state(0) = FALSE;
+			_fwEnableFormatItems(FALSE, TRUE);
+		}
+	}	
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="formatOnOff" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">10 90</prop>
+    <prop name="Size">156 26</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Format ON/OFF</prop>
+       <prop name="en_US.iso88591">Format ON/OFF</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	bool status;
+	dyn_string exceptionInfo;
+	
+	status = this.state(0);
+	
+	if(!DPES_OK)
+	{
+		this.state(0) = FALSE;
+		
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_MIXEDORBADDPETYPES&quot;), &quot;&quot;);
+		if(dynlen(exceptionInfo)&gt;0)
+			fwExceptionHandling_display(exceptionInfo);
+		return;
+	}
+
+	if(status==TRUE)
+	{
+		_fwEnableFormatItems(TRUE);
+	}
+	else
+	{	
+		_fwEnableFormatItems(FALSE);
+	}
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="beforeDigits" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">250 139</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,16,arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,16,arial</prop>
+    </prop>
+    <prop name="Location">252 140</prop>
+    <prop name="Size">67 24</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">1024</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+  </shape>
+  <shape Name="afterDigits" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">507 139</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,16,arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,16,arial</prop>
+    </prop>
+    <prop name="Location">509 140</prop>
+    <prop name="Size">47 24</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">20</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+  </shape>
+  <shape Name="chbExponential" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">90 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">90 180</prop>
+    <prop name="Size">101 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Exponential</prop>
+       <prop name="en_US.iso88591">Exponential</prop>
+       <prop name="de_AT.iso88591">Exponentiell</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  int  before;
+  
+  getValue(&quot;beforeDigits&quot;,&quot;text&quot;,before);
+  setValue(&quot;beforeDigits&quot;,&quot;text&quot;,(state &amp;&amp; before&lt;2)?2:before);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="applyButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">39</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">460 350</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+     <prop name="en_US.iso88591">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+
+	saveSettings(exceptionInfo);
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int x, y;
+
+	if(isDollarDefined(&quot;$bHierarchyBrowser&quot;))
+	{
+		if(!$bHierarchyBrowser)
+			closeButton.visible = TRUE;
+		else
+		{
+			getValue(&quot;&quot;, &quot;position&quot;, x, y);
+			this.position(x + 90,y);	
+		}
+	}
+	else
+		closeButton.visible = TRUE;
+		
+	this.visible = TRUE;	
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1492 929</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">550 350</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="okButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">41</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">370 350</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+
+	saveSettings(exceptionInfo);
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+	else
+		PanelOff();
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	if(isDollarDefined(&quot;$bHierarchyBrowser&quot;))
+	{
+		if(!$bHierarchyBrowser)
+			this.visible = TRUE;
+	}
+	else
+		this.visible = TRUE;	
+}
+]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="Group2" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">604 10</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwConfigs/fwFormatConfig</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+ </shapes>
+</panel>

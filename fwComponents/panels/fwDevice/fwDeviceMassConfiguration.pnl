@@ -1,0 +1,4472 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   <prop name="en_US.iso88591"></prop>
+  </prop>
+  <prop name="Size">1000 835</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 70</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[// ------------------------------------------------------------------------------------------------
+// ------------------------------------------ CONSTANTS -------------------------------------------
+// ------------------------------------------------------------------------------------------------
+
+// indexes to access table columns
+const int DEVICE_DP_NAME_COLUMN      = 2;
+const int DEVICE_MODEL_COLUMN	       = 5;
+const int INCLUDE_COLUMN 		         = 11;
+
+// indexes to access table columns (new ones, that need to be finished)
+const int _COLUMN_NUM 					= 1;
+const int _COLUMN_DEVICE_DP_NAME 	= 2;
+const int _COLUMN_DEVICE_DP_ALIAS 	= 3;
+const int _COLUMN_DEVICE_DP_TYPE 	= 4;
+const int _COLUMN_DEVICE_MODEL 		= 5;
+const int _COLUMN_DEVICE_COMMENT 	= 6;
+const int _COLUMN_DEVICE_ADDRESS 	= 7;
+const int _COLUMN_DEVICE_ALARM 		= 8;
+const int _COLUMN_DEVICE_ARCHIVE		= 9;
+const int _COLUMN_DEVICE_DPFUNCTION	= 10;
+const int _COLUMN_DEVICE_SELECTED	= 11;
+
+// constants for config action selection
+const string CONFIG_ACTION_SET       = &quot;Set&quot;;
+const string CONFIG_ACTION_DEFAULT   = &quot;Default&quot;;
+const string CONFIG_ACTION_CLEAR     = &quot;Clear&quot;;
+
+// ------------------------------------------------------------------------------------------------
+// --------------------------------------- Global variables ---------------------------------------
+// ------------------------------------------------------------------------------------------------
+
+bool g_bMultipleTypesShown;
+string dpType;
+string deviceDpNameRestricted;
+string deviceDpAliasRestricted;
+string g_sSelectedDpType;
+
+dyn_int selectedDpElements;
+dyn_string g_dsConfigOptions;
+dyn_string g_dsDpesShown;
+dyn_string g_dsDpTypes;
+
+// g_allDpElements[x][1] - dp element name
+// g_allDpElements[x][2] - device definition name
+dyn_dyn_string g_allDpElements;
+
+// ------------------------------------------------------------------------------------------------
+// --------------------------------------- Global functions ---------------------------------------
+// ------------------------------------------------------------------------------------------------
+
+/** Fills &quot;device properties&quot; table with the elements stored 
+    in the global dyn_dyn_string called g_allDpElements 
+
+@par Constraints
+  Must exist:
+      dyn_string g_allDpElements
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+*/
+void updateDpElementTable(bool bShowOnlyFunctionalProperties)
+{
+  devicePropertiesTable.deleteAllLines();
+  for(int i = 1; i&lt;=dynlen(g_allDpElements); i++)
+  {          
+    if(bShowOnlyFunctionalProperties) // only device definition 
+    {
+      if(strlen(g_allDpElements[i][2])!=0)
+      { 
+        devicePropertiesTable.appendLine(&quot;elements&quot;,g_allDpElements[i][1],&quot;properties&quot;,g_allDpElements[i][2],&quot;types&quot;,g_allDpElements[i][3], &quot;selected&quot;, FALSE);
+      }
+    }
+    else
+    {
+      devicePropertiesTable.appendLine(&quot;elements&quot;,g_allDpElements[i][1],&quot;properties&quot;,g_allDpElements[i][2],&quot;types&quot;,g_allDpElements[i][3], &quot;selected&quot;, FALSE);
+    }     
+  }
+  
+  onlyConfElements.enabled = TRUE; 
+  deviceDefCheckBox.enabled = TRUE; 
+
+  elementNumber.text = &quot;0/&quot; + devicePropertiesTable.lineCount + &quot; selected&quot;;  
+}
+
+
+/** Updates the list of datapoint elements on which the actual mass configuration will be executed.
+    Triggered by back/next buttons as well as tab register changes.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+*/
+void updateMassConfigSelection()
+{
+  dyn_string dsDpe;
+  dyn_string exceptionInfo;
+
+  // build the device element names from the selected devices and the selected dpe names
+  dsDpe = buildDpeList(exceptionInfo);      
+            
+  if(dynlen(exceptionInfo) == 0)
+  {
+	  displayMassConfigSelection(chooseConfigDropdown.selectedText, dsDpe, exceptionInfo);
+      
+    if(dynlen(exceptionInfo) &gt; 0)
+    {
+      fwExceptionHandling_display(exceptionInfo);          
+    }
+  }
+  else
+  {
+    fwExceptionHandling_display(exceptionInfo);
+  }
+}
+
+
+/** Get all selected DPEs in the &quot;settings overview&quot; table and send them to a defined config panel.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+  
+@param sPanelName        input, name of the config panel to be opened
+@param dsDollarParameter input, array of dollar parameters to be passed to newly opened panel
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+void openConfigPanel(string sPanelName, dyn_string dsDollarParameter, dyn_string &amp;exceptionInfo)
+{
+  // list with dp elements which are sent to the config panel
+	dyn_string dpeList = getSelectedDpeList();
+	dyn_string dsReturn;
+	dyn_float  dfReturn;
+
+	if(dynlen(dpeList) == 0)
+	{
+		fwException_raise(exceptionInfo,&quot;No elements selected&quot;,&quot;No device properties selected for mass configuration.&quot;,&quot;&quot;);
+	}    
+        
+	if(dynlen(exceptionInfo) == 0)
+	{
+		dynAppend(dsDollarParameter, &quot;$sDpe:&quot; + dpeList);
+		ChildPanelOnCentralModalReturn(sPanelName, sPanelName, dsDollarParameter, dfReturn, dsReturn);          
+	}
+	else
+	{
+		fwExceptionHandling_display(exceptionInfo);
+	}
+}
+
+dyn_string getSelectedDpeList() {
+ dyn_string dpeList; 
+ 
+ for(int i = 0; i &lt; settingsOverviewTable.lineCount(); i++) {   
+		if(settingsOverviewTable.cellValueRC(i, &quot;Device property name&quot;) != &quot;&quot;) {
+			dynAppend(dpeList, settingsOverviewTable.cellValueRC(i, &quot;Device property name&quot;));
+		}	
+	}
+ return dpeList;
+}
+
+
+/** Returns the indices of the selected device properties' lines in the &quot;device property&quot; table.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+  
+@return   Array of int, indices
+*/
+dyn_int getSelectedLines()
+{
+  dyn_string diLines;
+  
+  for(int index = 0; index &lt; devicePropertiesTable.lineCount(); index++)
+  {
+    if(devicePropertiesTable.cellValueRC(index, &quot;selected&quot;))
+    {
+      dynAppend(diLines, index);
+    }
+  }
+ 
+  return diLines;
+}
+
+
+/** Makes available appropriate configs in the &quot;choose config&quot; dropdown list 
+    on the config-tab in the Mass Configuration Panel
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+  
+@param   bShowOnlyFunctionalConfigs   input, flag determining the scope of shown configs
+*/
+void displayAllRelevantConfigs(bool bShowOnlyFunctionalConfigs)
+{   
+  dyn_bool diConfigPossibleForSelectedElement;
+  dyn_string exceptionInfo;
+  int directionCode;
+
+  // delete all items in the settings list
+  chooseConfigDropdown.deleteAllItems();
+           
+  // determine whether only to show functional configs or all  
+  if(bShowOnlyFunctionalConfigs)
+  {
+    diConfigPossibleForSelectedElement = getPossibilityForConfigs(exceptionInfo);
+    
+    // if no lines are selected there is no point to move on to the next steps
+    if(dynlen(exceptionInfo) &gt; 0)
+    {
+      return;
+    }
+
+    directionCode = getDirectionCode(diConfigPossibleForSelectedElement);
+    
+    // add items to the setting/config list
+  	for(int i = 1; i &lt;= (MAX_CONFIG_INDEX+1); i++) // msg conv and cmd conv are not included
+  	{
+  	  if(dynlen(diConfigPossibleForSelectedElement) &gt;= i &amp;&amp; g_dsConfigOptions[i]!= &quot;&quot;)  
+      {
+        if(diConfigPossibleForSelectedElement[i])  // if configured
+        {
+          if(g_dsConfigOptions[i]==fwDevice_CONFIG[fwDevice_CONVERSION_INDEX]) // split up the conversion (msg and cmd)
+          {
+            switch(directionCode)
+            {
+              case 1:
+                // means: Command conversion is definable
+                chooseConfigDropdown.appendItem(g_dsConfigOptions[12]);
+                break;
+              case 2:
+                // means: Message conversion is definable
+                chooseConfigDropdown.appendItem(g_dsConfigOptions[11]);
+                break;
+              case 3:
+                // Both can be defined
+                chooseConfigDropdown.appendItem(g_dsConfigOptions[11]); 
+                chooseConfigDropdown.appendItem(g_dsConfigOptions[12]);	
+                break;
+              default:
+                break;
+            }          
+          }
+          else
+          {
+            chooseConfigDropdown.appendItem(g_dsConfigOptions[i]);
+          }
+        }
+      }	
+  	}
+  }
+  else
+  {
+    for(int i = 1; i &lt;= dynlen(g_dsConfigOptions); i++)
+    {
+      if(g_dsConfigOptions[i]!= &quot;&quot; &amp;&amp; g_dsConfigOptions[i]!= &quot;CONVERSION&quot;) { // g_dsConfigOptions[i] may be empty because constants are used in the indexing (see init script)
+        chooseConfigDropdown.appendItem(g_dsConfigOptions[i]);
+      }       
+    }  
+  }
+  
+  chooseConfigDropdown.selectedPos(1); // Choose the 1st one by default. There will always be N of them (see initialise script of the panel)
+  enableConfigDefaultActions();
+}
+
+
+/** Enable UI controls of &quot;config tab&quot; to allow the user to do the mass configuration.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+  
+@param bEnabled     input, state of UI elements to be achieved
+*/
+void enableConfigTabControls(bool bEnabled)
+{  
+  setSettings.enabled = bEnabled;
+  chooseConfigDropdown.enabled = bEnabled;
+  configActionDropdown.enabled = bEnabled;
+  showFunctionalConfigsCheckbox.enabled = bEnabled;
+  
+  if(bEnabled)
+  {
+    chooseConfigLabel.foreCol = &quot;_WindowText&quot;;
+  }
+  else
+  {
+    chooseConfigLabel.foreCol = &quot;grey&quot;;
+  }
+}
+
+
+/** Sets the default configuration for the selected devices in the device list. 
+    It does not require values in the &quot;device properties&quot; table. 
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+  
+@param iConfig           input, representing specific kind of config
+@param sCommand          input, command address or alarm config
+@param exceptionInfo     output, returns possible exception to calling function
+@param all               input, should all properties be configured, or just those selected?
+*/
+void configureDefault(int iConfig, string sCommand, dyn_string &amp;exceptionInfo, bool all = true) { 
+	dyn_anytype line;
+	dyn_string dpeList;
+ 	
+ fwProgressBar_ShowEmbeddedProgressBar(10, 805);
+ 
+ if (all) {
+    dpeList = makeDynString(&quot;&quot;);
+ } else {
+    dpeList = getSelectedDeviceProperties() ;
+ }
+  
+	for(int i = 0; i &lt; searchResultTable.lineCount; i++) {
+		line = searchResultTable.getLineN(i);
+		if(line[INCLUDE_COLUMN] == TRUE) {
+		  configureDefaultSingle(
+        iConfig,
+        sCommand, 
+        makeDynString(
+            line[DEVICE_DP_NAME_COLUMN], 
+            &quot;&quot;, 
+            &quot;&quot;, 
+            line[DEVICE_MODEL_COLUMN]
+        ),
+        dpeList,
+        exceptionInfo
+    );
+		}
+	}
+	
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+		
+	fwProgressBar_HideEmbeddedProgressBar();
+}
+
+/**
+Get the elements that have been selected in the device properties table.
+
+@return dyn_string Array of properties.
+*/
+private dyn_string getSelectedDeviceProperties() {
+  dyn_string diLines;
+  
+  for(int index = 0; index &lt; devicePropertiesTable.lineCount(); index++) {
+    if(devicePropertiesTable.cellValueRC(index, &quot;selected&quot;)) {
+      dynAppend(diLines, devicePropertiesTable.cellValueRC(index, &quot;elements&quot;));
+    }
+  }
+  return diLines;
+}
+
+private void configureDefaultSingle(int iConfig, string sCommand, dyn_string deviceInfo, dyn_string dpes = makeDynString(&quot;&quot;), dyn_string &amp;exceptionInfo) {
+ 	 dyn_bool canHaveDefaults;
+   
+			fwDevice_canHaveDefaults(
+     deviceInfo,
+					canHaveDefaults, 
+     exceptionInfo
+   );
+  
+			if(canHaveDefaults[1]) {	
+				switch(iConfig) {
+					case fwDevice_ADDRESS_INDEX:
+						switch(sCommand) {
+							case fwDevice_ADDRESS_SET:
+								fwDevice_setAddress(deviceInfo[1], makeDynString(fwDevice_ADDRESS_DEFAULT), exceptionInfo, &quot;&quot;, dpes);
+								break;
+							case fwDevice_ADDRESS_UNSET:
+								fwDevice_setAddress(deviceInfo[1], makeDynString(fwDevice_ADDRESS_NONE), exceptionInfo, &quot;&quot;, dpes);
+								break;			
+							default:
+								break;					
+						}
+						break;
+					case fwDevice_ALERT_INDEX:
+						fwDevice_setAlert(deviceInfo[1], sCommand, exceptionInfo, dpes);
+						break;
+					case fwDevice_ARCHIVE_INDEX:
+						/* Archive class still has to be chosen. How??
+						dyn_string archiveClasses;
+						archiveClasses = archiveClassList.items();
+						pos = archiveClassList.selectedPos();
+						fwDevice_setArchive(devices[i], &quot;&quot;, sCommand, exceptionInfo);
+						*/
+						break;
+					case fwDevice_DPFUNCTION_INDEX:
+						fwDevice_setDpFunction(
+          deviceInfo[1],
+          sCommand,
+          exceptionInfo,
+          /*definitionDp=*/&quot;&quot;,
+          /*deviceHierarchy=*/&quot;&quot;,
+          /*replacements=*/fwDevice_emptyMap,
+          /*skipNotExisting=*/false,
+          dpes
+      );
+					default:
+						break;					
+				}
+			}  
+}
+
+
+/** How this works: 
+    
+      1) displayMassConfigSelection() - Call the right function for getting all the data related to the selected setting.
+      2) getAddressData() - Gets all the data for the selected dpes and the setting which is chosen.
+      3) drawTable() - Updates the table with the new data.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param configType        input, type of the config as string
+@param dpes              input, list of selected device properties
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+void displayMassConfigSelection(const string configType, const dyn_string dpes, dyn_string &amp;exceptionInfo)
+{
+  dyn_dyn_string elements;
+  dyn_string columnNames;
+  dyn_int columnWidths; 
+  int rowHeight;
+  int number;
+  
+  fwProgressBar_ShowEmbeddedProgressBar(10, 805);
+
+  // empty the element settings table
+  clearDpeList();
+  
+  getValue(&quot;settingsOverviewTable&quot;, &quot;columnCount&quot;,number);
+  for(int i=(number-1); i &gt; 0; i--)
+      settingsOverviewTable.deleteColumn(i);                
+
+  switch(configType)
+  {
+        case fwConfigs_FW_ADDRESS:
+            getAddressData(dpes, elements, columnNames, columnWidths, rowHeight, exceptionInfo);
+            break;
+        case fwConfigs_FW_ALERT_HDL:  
+            getAlarmData(dpes, elements, columnNames, columnWidths, rowHeight, exceptionInfo);  
+            break;
+        case fwConfigs_FW_ORIGINAL:
+            getValues(dpes, elements, columnNames, columnWidths, rowHeight, exceptionInfo);
+            break;
+        case fwConfigs_FW_ARCHIVE:
+            getArchiveData(dpes, elements, columnNames, columnWidths, rowHeight, exceptionInfo);
+            break;
+        case fwConfigs_FW_PV_RANGE:
+            getRangeData(dpes, elements, columnNames, columnWidths, rowHeight, exceptionInfo);
+            break;
+        case fwConfigs_FW_CMD_CONV:
+            getConversionData(dpes, elements, columnNames, columnWidths, rowHeight, &quot;CMD&quot;, exceptionInfo);
+            break;
+        case fwConfigs_FW_MSG_CONV:
+            getConversionData(dpes, elements, columnNames, columnWidths, rowHeight, &quot;MSG&quot;, exceptionInfo);
+            break;              
+        case fwConfigs_FW_SMOOTH:
+            getSmoothingData(dpes, elements, columnNames, columnWidths, rowHeight, exceptionInfo);
+            break;       
+        case fwConfigs_FW_UNIT:
+            getUnitData(dpes, elements, columnNames, columnWidths, rowHeight, exceptionInfo);
+            break;  
+        case fwConfigs_FW_FORMAT:
+            getFormatData(dpes, elements, columnNames, columnWidths, rowHeight, exceptionInfo); 
+            break;                                    
+        case fwConfigs_FW_DP_FUNCT:
+            getDpfunctionData(dpes, elements, columnNames, columnWidths, rowHeight, exceptionInfo); 
+            break;                
+        //default:          
+  }         
+      
+  drawTable(columnNames, columnWidths, rowHeight, elements);
+            
+  // if there are elements in the table make the set button visible
+  if(settingsOverviewTable.lineCount &gt; 0)
+  {
+    enableConfigTabControls(TRUE);
+  }
+  else
+  {
+    enableConfigTabControls(FALSE);
+  } 
+      
+  fwProgressBar_HideEmbeddedProgressBar();
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/** Updates the user feedback showing the number of selected items in the device table in relation 
+    to the number of found devices.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+*/
+void updateDeviceSelectionInfo()
+{
+  dyn_string dsLine;
+  int iCount = 0;
+  
+  for(int i = 0; i &lt; searchResultTable.lineCount; i++)
+  {
+    dsLine = searchResultTable.getLineN(i);
+    if(dsLine[dynlen(dsLine)] == TRUE)
+    {
+      iCount = iCount+1;
+    }
+  }
+  
+  deviceNumber.text = iCount + &quot;/&quot; + searchResultTable.lineCount + &quot; selected&quot;;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/** Updates the user feedback showing the number of selected items in the datapoint element table
+    in relation to the number of found DPEs.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+*/
+void updateDPESelectionInfo()
+{
+  dyn_string dsLine;
+  int iCount = 0;
+  
+  for(int i = 0; i &lt; devicePropertiesTable.lineCount; i++)
+  {
+    dsLine = devicePropertiesTable.getLineN(i);
+    if(dsLine[dynlen(dsLine)] == TRUE)
+    {
+      iCount = iCount+1;
+    }
+  }
+  
+  elementNumber.text = iCount + &quot;/&quot; + devicePropertiesTable.lineCount + &quot; selected&quot;;
+}
+
+
+/** Show initial state of the panel's layers.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+*/
+void showInitialSetup()
+{
+  LayerOff(2);
+  LayerOff(3);
+  LayerOff(4);
+  LayerOff(5); 
+}
+
+
+/** Enables the &quot;set default&quot; and &quot;clear&quot; buttons for the selected type of config if applicable.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+*/
+void enableConfigDefaultActions()
+{
+  if(chooseConfigDropdown.selectedText() == fwConfigs_FW_ADDRESS
+     || chooseConfigDropdown.selectedText() == fwConfigs_FW_ALERT_HDL
+     || chooseConfigDropdown.selectedText() == fwConfigs_FW_DP_FUNCT)
+  {
+    configActionDropdown.deleteAllItems();
+    configActionDropdown.appendItem(CONFIG_ACTION_SET);
+    configActionDropdown.appendItem(CONFIG_ACTION_DEFAULT);
+    configActionDropdown.appendItem(CONFIG_ACTION_CLEAR);
+  }
+  else
+  {
+    configActionDropdown.deleteAllItems();
+    configActionDropdown.appendItem(CONFIG_ACTION_SET);
+  }
+}
+
+
+/** Selected lines are highlighted for a better overview.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param tableName     input, name of the table to select line within
+@param row           input, the row to be selected
+*/
+void setLineSelection(string tableName, int row)
+{
+  bool isSelected;
+  string columnName;
+  shape tableShape = getShape(tableName);
+  
+  for(int i = 0; i &lt; tableShape.columnCount; i++)
+  {
+    columnName = tableShape.columnName(i);
+    isSelected = tableShape.cellValueRC(row, &quot;selected&quot;);
+    
+    if(isSelected)
+    {
+      tableShape.cellBackColRC(row, columnName, &quot;FwTableSelection&quot;);
+    }
+    else
+    {
+      tableShape.cellBackColRC(row, columnName, &quot;_3DFace&quot;);
+    }
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/** Enables the selection UI controls defining the starting point of the mass configuration workflow.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param bState     input, state to set controls enabled/disabled
+*/
+void enableSelectionControls(bool bState)
+{
+  selectButton.enabled(bState);
+  deviceTypesCombo.enabled(bState);
+  deviceNameText.enabled(bState);
+  deviceAliasText.enabled(bState);
+  deviceCommentText.enabled(bState);
+  
+  contentTab.enabled(bState);
+}
+
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------- Auxiliary functions --------------------------------------
+// ------------------------------------------------------------------------------------------------
+
+/** Resets the &quot;device properties tab&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+*/
+void resetDevicePropertiesTab()
+{
+  devicePropertiesTable.deleteAllLines();
+  onlyConfElements.enabled = FALSE;
+  deviceDefCheckBox.enabled = FALSE;  
+  elementNumber.text = &quot;0/0 selected&quot;;
+}
+
+
+/** Get all addresses and types to elements under a datapoint type. It is recursive 
+    because of cases with embed DP type elements.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dptName       input, name of the datapoint type which you want to get the address for all dpes
+@param elements      output, list with all addresses and dpe types in the structure 
+                             elements[row][1] - address
+                             elements[row][2] - type
+@param startPath     input, only for recursive calls in the function
+*/
+void getDpeAddresses(string dptName, dyn_dyn_string &amp;elements, dyn_string startPath=makeDynString())
+{
+	int elementType;		
+	dyn_int folders = makeDynInt(DPEL_TYPEREF, DPEL_STRUCT); // have to add more structs
+	dyn_string elementPath; // used to build the path to the element
+	
+	dyn_dyn_int elementsType;  
+	dyn_dyn_string dpElements;
+
+	// get the dpt structure
+	dpTypeGet(dptName, dpElements, elementsType);     
+        
+	for(int i = 1; i &lt;= dynlen(dpElements); i++)  // rows
+	{                      
+  string element;
+		for(int j = 1; j &lt;= dynlen(dpElements[i]); j++)  // columns
+		{          
+			// delete elements from path
+			if(dynlen(elementPath) &gt; dynlen(dpElements[i]))
+				for(int x=dynlen(elementPath); x&gt;=dynlen(dpElements[i]); x--)
+					dynRemove(elementPath,x); 
+			// add blank elements to element path
+			else if(dynlen(elementPath) &lt; j)
+				dynAppend(elementPath,&quot;&quot;);
+                           
+			// change / create path             
+			if(strlen(dpElements[i][j])!=0 &amp;&amp; elementPath[j]!=dpElements[i][j])                                      
+				elementPath[j]=dpElements[i][j];   
+                
+			// recursive call if DP element is of embed type
+   	if(dynlen(elementsType[i]) &gt;= j) {
+     	if(elementsType[i][j] == DPEL_TYPEREF) {
+					    getDpeAddresses(dpElements[i][dynlen(dpElements[i])], elements, elementPath);       
+      }
+    }  
+                                    
+			// if last element is reached and not if it's not a folder 
+			// then add together all elements to a string  
+			if(dynlen(dpElements[i]) == j &amp;&amp; dynContains(folders,elementsType[i][j]) == 0)
+			{  
+				for(int x = 2; x &lt;= dynlen(startPath); x++) // skip 1: DPT name
+					element = element + &quot;.&quot; + startPath[x];
+                         
+				for(int x = 2; x &lt;= dynlen(elementPath); x++) // skip 1: DPT name
+					element = element + &quot;.&quot; + elementPath[x];
+   
+				for(int x = 1; x &lt;= dynlen(elementsType[i]); x++) // get element type
+					if(elementsType[i][x] != 0)
+						elementType = elementsType[i][x]; 
+    
+				dynAppend(elements, makeDynAnytype(element, elementType));  
+			}
+
+			// if an embed type is found the next element is the DPT name
+			// which we don't want
+			if(dynlen(elementsType[i]) &gt;= j)
+				if(elementsType[i][j] == DPEL_TYPEREF)
+					break;
+          
+		}     
+	}   
+}
+
+
+/** Show initial state of wizard after selection parameters have been set.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+*/
+void showInitialWizardStep()
+{
+  contentTab.activeRegister(0);
+  
+  backButton.enabled(FALSE);
+  nextButton.visible(TRUE);
+  LayerOn(2);
+  LayerOn(3);
+  LayerOff(4);
+  LayerOff(5);
+  
+  wizardStartBg.visible(FALSE);
+  wizardStartText.visible(FALSE);
+}
+
+
+/** Gets contents to show values table of &quot;mass configuration selection&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dpes              input, list of selected device properties
+@param elements          output, content for table as array
+@param columnNames       output, names of columns as array
+@param columnWidths      output, widths of columns in pixel as array
+@param rowHeight         output, specific height of rows
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+private void getValues(dyn_string dpes, dyn_dyn_string &amp;elements, dyn_string &amp;columnNames, dyn_int &amp;columnWidths, int &amp;rowHeight, dyn_string &amp;exceptionInfo)
+{
+  columnNames    = makeDynString(&quot;Device property name&quot;,&quot;Value&quot;);
+  columnWidths   = makeDynInt(600, 307);       
+  rowHeight = 20;
+            
+  for(int i=1; i&lt;=dynlen(dpes); i++)
+  { 
+        elements[i][1] = dpes[i];
+        elements[i][2] = &quot;updateValue,&quot;+dpes[i];    
+  }  
+}
+     
+
+/** Gets contents to show address table of &quot;mass configuration selection&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dpes              input, list of selected device properties
+@param elements          output, content for table as array
+@param columnNames       output, names of columns as array
+@param columnWidths      output, widths of columns in pixel as array
+@param rowHeight         output, specific height of rows
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+private void getAddressData(	dyn_string dpes, dyn_dyn_string &amp;elements, dyn_string &amp;columnNames, 
+										dyn_int &amp;columnWidths, int &amp;rowHeight, dyn_string &amp;exceptionInfo)
+{
+        bool isActive; 
+        dyn_anytype config;
+        bool configExists;
+        
+        columnNames = makeDynString(&quot;Device property name&quot;,&quot;Type&quot;,&quot;Driver&quot;,&quot;Root name&quot;,&quot;Direction&quot;,&quot;Datatype&quot;,&quot;Details&quot;);
+        columnWidths = makeDynInt(400,80,60,100,80,80,107); 
+        rowHeight = 20;  
+          
+        int count;
+        for(int i=1; i&lt;=dynlen(dpes); i++)
+        {             
+              fwPeriphAddress_get(dpes[i], configExists, config, isActive, exceptionInfo);
+                  
+              if((!configExists &amp;&amp; onlyConfElements.state(0)) || dynlen(exceptionInfo)!=0)
+                    continue;
+              count++;                  
+                            
+              dyn_string values;        
+              if(configExists)
+              {
+                    string direction;  
+                    if(config[fwPeriphAddress_DIRECTION]==DPATTR_ADDR_MODE_OUTPUT_SINGLE)
+                      direction = &quot;Out&quot;;
+                    else if(config[fwPeriphAddress_DIRECTION]==DPATTR_ADDR_MODE_INPUT_SPONT)
+                      direction = &quot;In&quot;;
+                    else if(config[fwPeriphAddress_DIRECTION]==DPATTR_ADDR_MODE_IO_SPONT ||
+                            config[fwPeriphAddress_DIRECTION]==DPATTR_ADDR_MODE_IO_POLL ||
+                            config[fwPeriphAddress_DIRECTION]==DPATTR_ADDR_MODE_IO_SQUERY)
+                      direction = &quot;In/Out&quot;;
+                    else
+                      direction = config[fwPeriphAddress_DIRECTION];
+
+                    string addrType;
+                    if(config[fwPeriphAddress_TYPE]==fwPeriphAddress_TYPE_OPCCLIENT)
+                      addrType = &quot;OPC&quot;;
+                    else if(config[fwPeriphAddress_TYPE]==fwPeriphAddress_TYPE_DIMCLIENT)
+                      addrType = &quot;DIM&quot;;
+                    else if(config[fwPeriphAddress_TYPE]==fwPeriphAddress_TYPE_DIP)
+                      addrType = &quot;DIP&quot;;                    
+                    else if(config[fwPeriphAddress_TYPE]==fwPeriphAddress_TYPE_MODBUS)
+                      addrType = &quot;MODBUS&quot;;  
+                    else if(config[fwPeriphAddress_TYPE]==fwPeriphAddress_TYPE_S7)
+                      addrType = &quot;S7&quot;;  
+                    else if(config[fwPeriphAddress_TYPE]==fwPeriphAddress_TYPE_CMW)
+                      addrType = &quot;CMW&quot;;  
+                    else
+                      addrType = config[fwPeriphAddress_TYPE];  
+                                                 
+                    string details;
+                    if(config[fwPeriphAddress_TYPE]==fwPeriphAddress_TYPE_OPCCLIENT)
+                      details = config[fwPeriphAddress_OPC_GROUP_IN]+&quot;, &quot;+config[fwPeriphAddress_OPC_GROUP_OUT];
+                    else
+                      details = &quot;-&quot;;
+                                       
+                    values = makeDynString(dpes[i],
+                                           addrType,
+                                           config[fwPeriphAddress_DRIVER_NUMBER],										
+  			                   config[fwPeriphAddress_ROOT_NAME],									
+  			                   direction,																																
+  			                   config[fwPeriphAddress_DATATYPE],
+                                           details);
+              }
+              else
+                    values = makeDynString(dpes[i],&quot;-NA-&quot;,&quot;-NA-&quot;,&quot;-NA-&quot;,&quot;-NA-&quot;,&quot;-NA-&quot;,&quot;-NA-&quot;);                    
+                                  
+              for(int j=1; j&lt;=dynlen(values); j++)
+                elements[count][j] = values[j];
+                         
+        }
+}            
+
+
+/** Gets contents to show alarm table of &quot;mass configuration selection&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dpes              input, list of selected device properties
+@param elements          output, content for table as array
+@param columnNames       output, names of columns as array
+@param columnWidths      output, widths of columns in pixel as array
+@param rowHeight         output, specific height of rows
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+private void getAlarmData(dyn_string dpes, dyn_dyn_string &amp;elements, dyn_string &amp;columnNames, dyn_int &amp;columnWidths, int &amp;rowHeight, dyn_string &amp;exceptionInfo)
+{
+	    bool configExists, isActive;
+	    int alertConfigType;
+	    dyn_float alertLimits;
+	    dyn_string alertClasses,summaryDpeList,alertPanelParameters, alertTexts;
+	    string alertPanel, alertHelp;
+            
+            columnNames = makeDynString(&quot;Device property name&quot;,&quot;Alarm text&quot;,&quot;Alarm classes&quot;,&quot;Ranges&quot;,&quot;Type&quot;);
+            columnWidths = makeDynInt(400,150,150,100,107);                
+            rowHeight = 20;
+            
+            int rowNumber;
+            for(int i=1; i&lt;=dynlen(dpes); i++)
+            { 
+                  fwAlertConfig_get(dpes[i], configExists,alertConfigType,alertTexts,alertLimits,alertClasses,
+                                    summaryDpeList,alertPanel,alertPanelParameters,alertHelp,isActive,exceptionInfo);
+
+                  if((!configExists &amp;&amp; onlyConfElements.state(0)) || dynlen(exceptionInfo)!=0)
+                    continue;
+                  
+                  rowNumber++;
+                                    
+                  //ranges and row heights
+                  if(dynlen(alertTexts)==5)
+                      rowHeight = 100;
+                  else if(dynlen(alertTexts)==4 &amp;&amp; rowHeight&lt;80)
+                      rowHeight = 80;
+                  else if(dynlen(alertTexts)==3 &amp;&amp; rowHeight&lt;60)
+                      rowHeight = 60;        
+                  else if(dynlen(alertTexts)==2 &amp;&amp; rowHeight&lt;40)
+                      rowHeight = 40;                            
+   
+                  string alertTexts2, alertClasses2, alertLimits2;
+                  for(int j=dynlen(alertTexts);j&gt;=1;j--)
+                  {
+                        alertTexts2 += alertTexts[j]+&quot;\n&quot;;
+                        alertClasses2 += alertClasses[j]+&quot;\n&quot;;
+                  }
+                  
+                  if(alertConfigType == DPCONFIG_ALERT_BINARYSIGNAL)
+                    alertLimits2 = &quot;TRUE\nFALSE&quot;;
+                  else
+                  {
+                    for(int j=dynlen(alertLimits);j&gt;=1;j--)
+                      alertLimits2 += alertLimits[j]+&quot;\n&quot;;
+                  }                 
+                  dyn_string values = makeDynString(dpes[i],
+                                                      alertTexts2 ,										
+			                              alertClasses2 ,									
+			                              alertLimits2 ,																																
+			                              alertConfigType);
+                                                      
+                  for(int j=1; j&lt;=dynlen(columnNames); j++)
+                        elements[rowNumber][j] = values[j];                                          
+            }   
+}
+  
+
+/** Gets contents to show archives table of &quot;mass configuration selection&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dpes              input, list of selected device properties
+@param elements          output, content for table as array
+@param columnNames       output, names of columns as array
+@param columnWidths      output, widths of columns in pixel as array
+@param rowHeight         output, specific height of rows
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+private void getArchiveData(dyn_string dpes, dyn_dyn_string &amp;elements, dyn_string &amp;columnNames, dyn_int &amp;columnWidths, int &amp;rowHeight, dyn_string &amp;exceptionInfo)
+{
+        bool configExists, isActive; 
+        string archiveClass;
+        int archiveType, smoothProcedure;
+        float deadband, timeInterval;
+    
+        columnNames = makeDynString(&quot;Device property name&quot;,&quot;Arc. class&quot;,&quot;Arc. type&quot;,&quot;Smoothing&quot;,&quot;Deadband&quot;,&quot;Time int.&quot;,&quot;Active&quot;);
+        columnWidths = makeDynInt(400,100,75,100,82,75,75);
+        rowHeight = 20;
+    
+        int rowNumber;
+        for(int i=1; i&lt;=dynlen(dpes); i++)
+        {
+                  fwArchive_get(dpes[i], configExists, archiveClass, archiveType, smoothProcedure, deadband, timeInterval, isActive, exceptionInfo);
+              
+                  if((!configExists &amp;&amp; onlyConfElements.state(0)) || dynlen(exceptionInfo)!=0)
+                      continue;
+                  rowNumber++;   
+                         
+                  elements[rowNumber][1] = dpes[i];
+                  elements[rowNumber][2] = archiveClass;
+                  elements[rowNumber][3] = archiveType;
+                  elements[rowNumber][4] = smoothProcedure;
+                  elements[rowNumber][5] = deadband;
+                  elements[rowNumber][6] = timeInterval;
+                  elements[rowNumber][7] = isActive;             
+        }
+
+}
+
+/** Gets contents to show range table of &quot;mass configuration selection&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dpes              input, list of selected device properties
+@param elements          output, content for table as array
+@param columnNames       output, names of columns as array
+@param columnWidths      output, widths of columns in pixel as array
+@param rowHeight         output, specific height of rows
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+private void getRangeData(dyn_string dpes, dyn_dyn_string &amp;elements, dyn_string &amp;columnNames, dyn_int &amp;columnWidths, int &amp;rowHeight, dyn_string &amp;exceptionInfo)
+{
+        dyn_bool configExists;
+        dyn_int pvRangeTypes;
+        dyn_dyn_anytype configData;
+        
+        columnNames = makeDynString(&quot;Device property name&quot;,&quot;Range type&quot;,&quot;Negate&quot;,&quot;Ignore outs.&quot;,&quot;Min.val.incl.&quot;,&quot;Max.val.incl.&quot;, &quot;Min.val.&quot;,&quot;Max.val.&quot;);
+        columnWidths = makeDynInt(400,77,60,80,80,80,65,65);
+        rowHeight = 20;          
+
+        fwPvRange_getObjectMany(dpes, configExists, pvRangeTypes, configData, exceptionInfo);
+                    
+        if(dynlen(exceptionInfo)&gt;0)
+          return;       
+                
+        int rowNumber;
+        for(int i=1; i&lt;=dynlen(dpes); i++)
+        {            
+                  if(!configExists[i] &amp;&amp; onlyConfElements.state(0))
+                      continue;
+                  rowNumber++;   
+                  
+                  elements[rowNumber][1] = dpes[i];
+                  
+                  // if no configs set NA and move on to next dpe
+                  if(!configExists[i])
+                  {
+                        for(int j=2; j&lt;=dynlen(columnNames); j++)
+                            elements[rowNumber][j] = &quot;-NA-&quot;;             
+                        continue;
+                  }
+                         
+                  elements[rowNumber][3] = configData[i][fwPvRange_NEGATE_RANGE];
+                  elements[rowNumber][4] = configData[i][fwPvRange_IGNORE_OUTSIDE];      
+                              
+                  if(pvRangeTypes[i]==DPCONFIG_MINMAX_PVSS_RANGECHECK) //MIN MAX
+                  {  
+                        elements[rowNumber][2] = &quot;MINMAX&quot;;
+                        elements[rowNumber][5] = configData[i][fwPvRange_INCLUSIVE_MINIMUM];
+                        elements[rowNumber][6] = configData[i][fwPvRange_INCLUSIVE_MAXIMUM]; 
+                        elements[rowNumber][7] = configData[i][fwPvRange_MINIMUM_VALUE];    
+                        elements[rowNumber][8] = configData[i][fwPvRange_MAXIMUM_VALUE];                 
+                  }
+                  else // Remove columns that only are required by MINMAX.
+                  {
+                        for(int j=dynlen(columnNames); j&gt;5; j--)
+                        {
+                             dynRemove(columnNames,j);
+                             dynRemove(columnWidths,j);
+                        }     
+                        columnNames[dynlen(columnNames)] = &quot;Values&quot;;               
+                  }
+                  
+                  if(pvRangeTypes[i]==DPCONFIG_SET_PVSS_RANGECHECK) //SET
+                  {
+                        elements[rowNumber][2] = &quot;SET&quot;;
+                        elements[rowNumber][5] = configData[i][fwPvRange_VALUE_SET];
+                  }
+                  else if(pvRangeTypes[i]==DPCONFIG_MATCH_PVSS_RANGECHECK) // MATCH
+                  {
+                        elements[rowNumber][2] = &quot;MATCH&quot;;
+                        elements[rowNumber][5] = configData[i][fwPvRange_VALUE_PATTERN];
+                  }
+                              
+        } 
+}
+
+
+/** Gets contents to show conversion table of &quot;mass configuration selection&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dpes              input, list of selected device properties
+@param elements          output, content for table as array
+@param columnNames       output, names of columns as array
+@param columnWidths      output, widths of columns in pixel as array
+@param rowHeight         output, specific height of rows
+@param confType          output, type of config as string
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+private void getConversionData(dyn_string dpes, dyn_dyn_string &amp;elements, dyn_string &amp;columnNames, dyn_int &amp;columnWidths, int &amp;rowHeight, string confType, dyn_string &amp;exceptionInfo)
+{
+        dyn_bool configExists;
+        int configType;
+        dyn_int conversionType;
+        dyn_int order;
+        dyn_dyn_float arguments;
+        
+        if(confType==&quot;MSG&quot;)
+              configType = DPCONFIG_CONVERSION_RAW_TO_ING_MAIN; // message conversion
+        else
+              configType = DPCONFIG_CONVERSION_ING_TO_RAW_MAIN; // command conversion
+        
+        columnNames = makeDynString(&quot;Device property name&quot;,&quot;Conv. type&quot;,&quot;Order&quot;,&quot;Arguments&quot;,&quot;Conf.type&quot;);
+        columnWidths = makeDynInt(400,100,100,150,157);
+        rowHeight = 20;          
+                        
+        fwConfigConversion_getMany(dpes, configExists, configType, conversionType, order, arguments, exceptionInfo);
+        if(dynlen(exceptionInfo)!=0)
+          return;        
+        
+        int rowNumber;
+        for(int i=1; i&lt;=dynlen(dpes); i++)
+        {            
+                  if(!configExists[i] &amp;&amp; onlyConfElements.state(0))
+                      continue;
+                  rowNumber++;   
+
+                  elements[rowNumber][1] = dpes[i];    
+                                      
+                  if(configExists[i])
+                  {
+                        if(conversionType[i]==DPDETAIL_CONV_POLY)
+                          elements[rowNumber][2] = &quot;Polynomial&quot;;
+                        else if(conversionType[i]==DPDETAIL_CONV_LIN_INT)
+                          elements[rowNumber][2] = &quot;Base curve&quot;;
+                        else if(conversionType[i]==DPDETAIL_CONV_INVERT)
+                          elements[rowNumber][2] = &quot;Invert&quot;;     
+                        else
+                          elements[rowNumber][2] = conversionType[i];                      
+                        
+                        elements[rowNumber][3] = order[i];
+
+                        elements[rowNumber][4] = arguments[i]; 
+                              
+                        if(configType==DPCONFIG_CONVERSION_RAW_TO_ENG_MAIN)
+                          elements[rowNumber][5] = &quot;Message&quot;;
+                        else if(configType==DPCONFIG_CONVERSION_ING_TO_RAW_MAIN) 
+                          elements[rowNumber][5] = &quot;Command&quot;;  
+                        else
+                          elements[rowNumber][5] = configType;  
+                  }
+                  else
+                  {
+                        elements[rowNumber][2] = &quot;-NA-&quot;;
+                        elements[rowNumber][3] = &quot;-NA-&quot;;
+                        elements[rowNumber][4] = &quot;-NA-&quot;;
+                        elements[rowNumber][5] = &quot;-NA-&quot;;
+                  }                                       
+        } 
+
+                
+}
+
+
+/** Gets contents to show smoothing table of &quot;mass configuration selection&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dpes              input, list of selected device properties
+@param elements          output, content for table as array
+@param columnNames       output, names of columns as array
+@param columnWidths      output, widths of columns in pixel as array
+@param rowHeight         output, specific height of rows
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+private void getSmoothingData(dyn_string dpes, dyn_dyn_string &amp;elements, dyn_string &amp;columnNames, dyn_int &amp;columnWidths, int &amp;rowHeight, dyn_string &amp;exceptionInfo)
+{
+        dyn_bool configExists;
+        dyn_int smoothProcedure;
+        dyn_float deadband;
+        dyn_float timeInterval;
+        
+        columnNames = makeDynString(&quot;Device property name&quot;,&quot;Smooth procedure&quot;,&quot;Deadband&quot;,&quot;Interval&quot;);
+        columnWidths = makeDynInt(400,300,100,107);
+        rowHeight = 20;          
+
+        fwSmoothing_getMany(dpes, configExists, smoothProcedure, deadband, timeInterval, exceptionInfo); 
+
+        if(dynlen(exceptionInfo)!=0)
+          return;        
+                                    
+        int rowNumber;
+        for(int i=1; i&lt;=dynlen(dpes); i++)
+        {            
+                  if(!configExists[i] &amp;&amp; onlyConfElements.state(0))
+                      continue;
+                  rowNumber++;   
+
+                  elements[rowNumber][1] = dpes[i];                           
+                  if(configExists[i])
+                  {
+                        if(smoothProcedure[i]==DPATTR_VALUE_SMOOTH)
+                          elements[rowNumber][2] = &quot;Value dependent&quot;;
+                        else if(smoothProcedure[i]==DPATTR_VALUE_REL_SMOOTH)
+                          elements[rowNumber][2] = &quot;Relative value dependent&quot;;
+                        else if(smoothProcedure[i]==DPATTR_TIME_SMOOTH)
+                          elements[rowNumber][2] = &quot;Time dependent&quot;;                        
+                        else if(smoothProcedure[i]==DPATTR_TIME_AND_VALUE_SMOOTH)
+                          elements[rowNumber][2] = &quot;Value and time dependent&quot;; 
+                        else if(smoothProcedure[i]==DPATTR_TIME_AND_VALUE_REL_SMOOTH)
+                          elements[rowNumber][2] = &quot;Relative value and time dependent&quot;; 
+                        else if(smoothProcedure[i]==DPATTR_TIME_OR_VALUE_SMOOTH)
+                          elements[rowNumber][2] = &quot;Value or time dependent&quot;;
+                        else if(smoothProcedure[i]==DPATTR_TIME_OR_VALUE_REL_SMOOTH)
+                          elements[rowNumber][2] = &quot;Relative value or time dependent&quot;;
+                        else if(smoothProcedure[i]==DPATTR_COMPARE_OLD_NEW)
+                          elements[rowNumber][2] = &quot;Old-new comparison&quot;;
+                        else if(smoothProcedure[i]==DPATTR_OLD_NEW_AND_TIME_SMOOTH)
+                          elements[rowNumber][2] = &quot;Old-new comparison and time&quot;;
+                        else if(smoothProcedure[i]==DPATTR_OLD_NEW_OR_TIME_SMOOTH)
+                          elements[rowNumber][2] = &quot;Old-new comparison or time&quot;;
+                        else
+                          elements[rowNumber][2] = smoothProcedure[i];   
+                                                                                                                                                                                                  
+                        elements[rowNumber][3] = deadband[i];
+                        elements[rowNumber][4] = timeInterval[i];
+                  }
+                  else
+                  {
+                        elements[rowNumber][2] = &quot;-NA-&quot;;
+                        elements[rowNumber][3] = &quot;-NA-&quot;;
+                        elements[rowNumber][4] = &quot;-NA-&quot;;
+                  }                                 
+        } 
+}
+
+
+/** Gets contents to show unit table of &quot;mass configuration selection&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dpes              input, list of selected device properties
+@param elements          output, content for table as array
+@param columnNames       output, names of columns as array
+@param columnWidths      output, widths of columns in pixel as array
+@param rowHeight         output, specific height of rows
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+private void getUnitData(dyn_string dpes, dyn_dyn_string &amp;elements, dyn_string &amp;columnNames, dyn_int &amp;columnWidths, int &amp;rowHeight, dyn_string &amp;exceptionInfo)
+{
+        dyn_bool configExists;
+        dyn_string dsUnit;
+        
+        columnNames = makeDynString(&quot;Device property name&quot;,&quot;Unit&quot;);
+        columnWidths = makeDynInt(600,307);
+        rowHeight = 20;          
+
+        fwUnit_getMany(dpes, configExists, dsUnit, exceptionInfo);
+
+        if(dynlen(exceptionInfo)&gt;0)
+          return;
+                                    
+        int rowNumber;
+        for(int i=1; i&lt;=dynlen(dpes); i++)
+        {            
+                  if(!configExists[i] &amp;&amp; onlyConfElements.state(0))
+                      continue;
+                  rowNumber++;   
+                         
+                  elements[rowNumber][1] = dpes[i];                   
+                  if(configExists[i])
+                        elements[rowNumber][2] = dsUnit[i];
+                  else
+                        elements[rowNumber][2] = &quot;-NA-&quot;;                               
+        } 
+}
+
+
+/** Gets contents to show format table of &quot;mass configuration selection&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dpes              input, list of selected device properties
+@param elements          output, content for table as array
+@param columnNames       output, names of columns as array
+@param columnWidths      output, widths of columns in pixel as array
+@param rowHeight         output, specific height of rows
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+private void getFormatData(dyn_string dpes, dyn_dyn_string &amp;elements, dyn_string &amp;columnNames, dyn_int &amp;columnWidths, int &amp;rowHeight, dyn_string &amp;exceptionInfo)
+{
+        dyn_bool configExists;
+        dyn_string dsFormat;
+        
+        columnNames = makeDynString(&quot;Device property name&quot;,&quot;&quot;);
+        columnWidths = makeDynInt(600,307);
+        rowHeight = 20;          
+
+        fwFormat_getMany(dpes, configExists, dsFormat, exceptionInfo);
+                        
+        if(dynlen(exceptionInfo)&gt;0)
+          return;
+            
+        int rowNumber;
+        for(int i=1; i&lt;=dynlen(dpes); i++)
+        {            
+                  if(!configExists[i] &amp;&amp; onlyConfElements.state(0))
+                      continue;
+                  rowNumber++;   
+                         
+                  elements[rowNumber][1] = dpes[i];                   
+                  if(configExists[i])
+                        elements[rowNumber][2] = dsFormat[i];
+                  else
+                        elements[rowNumber][2] = &quot;-NA-&quot;;                                     
+        } 
+}
+
+
+/** Gets contents to show DP function table of &quot;mass configuration selection&quot;.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param dpes              input, list of selected device properties
+@param elements          output, content for table as array
+@param columnNames       output, names of columns as array
+@param columnWidths      output, widths of columns in pixel as array
+@param rowHeight         output, specific height of rows
+@param exceptionInfo     output, returns possible exception to calling function
+*/
+private void getDpfunctionData(dyn_string dpes, dyn_dyn_string &amp;elements, dyn_string &amp;columnNames, dyn_int &amp;columnWidths, int &amp;rowHeight, dyn_string &amp;exceptionInfo)
+{
+        dyn_bool configExists;
+        dyn_dyn_string functionParams;
+        dyn_dyn_string functionGlobals;
+        dyn_string functionDefinition;
+        
+        columnNames = makeDynString(&quot;Device property name&quot;,&quot;Params&quot;,&quot;Globals&quot;,&quot;Definition&quot;);
+        columnWidths = makeDynInt(400,240,130,137);
+        rowHeight = 20;          
+
+        fwDpFunction_getDpeConnectionMany(dpes, configExists, functionParams, functionGlobals, functionDefinition, exceptionInfo);
+
+        if(dynlen(exceptionInfo)!=0)
+          return;        
+                   
+        int rowNumber;
+        for(int i=1; i&lt;=dynlen(dpes); i++)
+        {            
+                  if(!configExists[i] &amp;&amp; onlyConfElements.state(0))
+                      continue;
+                  rowNumber++;   
+
+                  elements[rowNumber][1] = dpes[i]; 
+                  
+                   //ranges and row heights
+                  if(dynlen(functionParams[i])==5)
+                      rowHeight = 100;
+                  else if(dynlen(functionParams[i])==4 &amp;&amp; rowHeight&lt;80)
+                      rowHeight = 80;
+                  else if(dynlen(functionParams[i])==3 &amp;&amp; rowHeight&lt;60)
+                      rowHeight = 60;        
+                  else if(dynlen(functionParams[i])==2 &amp;&amp; rowHeight&lt;40)
+                      rowHeight = 40;      
+                                  
+                  for(int j=1;j&lt;=dynlen(functionParams[i]); j++)
+                      functionParams[i][j] = dpSubStr(functionParams[i][j],DPSUB_SYS_DP);
+
+                  if(configExists[i])
+                  {
+                      string returnString;
+                      fwGeneral_dynStringToString(functionParams[i],returnString,&quot;\n&quot;);
+                      elements[rowNumber][2] = returnString; 
+                      
+                      fwGeneral_dynStringToString(functionGlobals[i],returnString,&quot;\n&quot;);
+                      elements[rowNumber][3] = returnString; 
+                      
+                      fwGeneral_dynStringToString(functionDefinition[i],returnString,&quot;\n&quot;);
+                      elements[rowNumber][4] = returnString;                                             
+                  }
+                  else
+                  {
+                      elements[rowNumber][2] = &quot;-NA-&quot;;   
+                      elements[rowNumber][3] = &quot;-NA-&quot;;
+                      elements[rowNumber][4] = &quot;-NA-&quot;;
+                  }                                 
+        } 
+}
+
+
+/** Draws the table called settingsOverviewTable
+
+@par Constraints
+	Must exist:
+      dyn_string g_dsDpesShown
+
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+
+@param columnNames		    input, The text of the column heading
+@param columnWidths	      input, Parallel array of the default width in pixels
+@param rowHeight	        input, In pixels
+@param ddsTableElements   input, Each cells text content
+*/
+private void drawTable(dyn_string columnNames, dyn_int columnWidths, int rowHeight, dyn_dyn_string ddsTableElements)
+{
+  for(int i=1; i&lt;=dynlen(columnNames); i++)
+  {
+    settingsOverviewTable.insertColumn(i);
+    settingsOverviewTable.columnName(i,columnNames[i]);
+    settingsOverviewTable.columnHeader(i, columnNames[i]);
+  }   
+
+  for(int rowNumber=1; rowNumber&lt;=dynlen(ddsTableElements); rowNumber++)
+  {
+    settingsOverviewTable.appendLine(&quot;number&quot;, rowNumber, &quot;Device property name&quot;, &quot;&quot;); 
+    
+    for(int columnNumber=1; columnNumber&lt;=dynlen(columnNames); columnNumber++)
+    {
+      settingsOverviewTable.cellValueRC(rowNumber-1, columnNames[columnNumber], ddsTableElements[rowNumber][columnNumber]);
+      if(strpos(ddsTableElements[rowNumber][columnNumber],&quot;updateValue,&quot;)==0)
+      {
+        string cellValue = ddsTableElements[rowNumber][columnNumber];
+        strreplace(cellValue, &quot;updateValue,&quot;, &quot;&quot;);
+        g_dsDpesShown[rowNumber] = cellValue;
+        dpConnect(&quot;updateValue&quot;, cellValue);
+      }
+    }
+  }
+    
+  for(int i=1; i&lt;=dynlen(columnWidths); i++)
+  {
+    settingsOverviewTable.columnWidth(i, columnWidths[i]);
+  }
+
+  settingsOverviewTable.rowHeight(rowHeight);
+  summaryLabel.text = dynlen(ddsTableElements) + &quot; selected DPEs&quot;;
+}
+
+
+/** When changes are done in the element settings or in the selection of devices the selected
+    device properties subject to change have to be reset.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+*/
+void clearDpeList()
+{
+  g_dsDpesShown = makeDynString();
+  settingsOverviewTable.deleteAllLines();  
+  
+  enableConfigTabControls(FALSE);
+}
+
+
+/** dpConnect to table fields
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+  
+@param dp1     input, datapoint to connect with
+@param value   input, passed info form datapoint
+*/
+void updateValue(string dp1, anytype value)
+{                
+  int pos;
+  
+  pos = dynContains(g_dsDpesShown, dpSubStr(dp1, DPSUB_SYS_DP_EL));
+  if(pos &gt; 0)
+    setValue(&quot;settingsOverviewTable&quot;, &quot;cellValueRC&quot;, pos-1, &quot;Value&quot;, value);        
+}
+
+
+/** Creates an array that stores for all selected device properties whether a config option 
+    is possible for them or not.
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+  
+@param exceptionInfo     output, returns possible exception to calling function
+
+@return  Array of bool, config possibility for selected device properties
+*/
+dyn_bool getPossibilityForConfigs(dyn_string &amp;exceptionInfo)
+{
+  dyn_bool diConfigPossibleForSelectedElement;
+  dyn_bool possibleConfigs;
+  dyn_string selDpElements;
+  dyn_int selLines;
+  
+  // start with all settings available
+  for(int i=1; i&lt;=dynlen(g_dsConfigOptions); i++)
+  {
+    diConfigPossibleForSelectedElement[i] = TRUE;
+  }
+
+  selLines = getSelectedLines();
+  
+  if(dynlen(selLines)&gt; 0) 
+  { 
+    // find out what kind of configs are available for the selected elements
+    for(int selectedLineIndex = 1; selectedLineIndex &lt;= dynlen(selLines); selectedLineIndex++)
+    {
+      selDpElements[selectedLineIndex] = devicePropertiesTable.cellValueRC(selLines[selectedLineIndex],&quot;elements&quot;);
+      fwDevice_getElementPossibleConfigs(dpType, selDpElements[selectedLineIndex], possibleConfigs, exceptionInfo);
+    
+      // decide whether each config is appropriate (meaningful for all of the selected DPEs)
+      for(int configIndex=1; configIndex &lt;= dynlen(possibleConfigs); configIndex++) 
+      { 
+        if(!possibleConfigs[configIndex])
+        {
+          diConfigPossibleForSelectedElement[configIndex] = FALSE; 
+        }
+      }
+    }
+  }
+  else
+  {
+    fwException_raise(exceptionInfo,&quot;No elements selected&quot;,&quot;No device properties selected for mass configuration.&quot;,&quot;&quot;);
+  }
+
+  return diConfigPossibleForSelectedElement;
+}
+
+
+/** Returns the consistent direction code of the address config of the selected DPEs
+      0 = inconsistent or not recognised
+      1 = output
+      2 = input
+      3 = input/output
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+  
+@param   possibleConfForSelElements   input, list of all configs possible for the selected elements
+
+@return  Int, represents direction code
+*/
+int getDirectionCode(dyn_bool possibleConfForSelElements)
+{
+  int directionCode, newDirectionCode;
+  dyn_string dpeList;
+  dyn_string exceptionInfo;
+  
+  directionCode = 0;
+  
+  // get the directionCode of the selected elements. This is needed by the Conversion config. Priority: output &gt; input &gt; (input and output)
+  if(possibleConfForSelElements[fwDevice_CONVERSION_INDEX])
+  {    
+    dpeList = buildDpeList(exceptionInfo);   
+    
+    directionCode = getDirectionCodeOfAddressConfig(dpeList[1]);
+    
+    for(int dpeIndex=2; dpeIndex &lt;=dynlen(dpeList); dpeIndex++) // for each of the device properties (dpes) we selected in the table
+    {
+      newDirectionCode = getDirectionCodeOfAddressConfig(dpeList[dpeIndex]);
+          
+      // 0&lt;= new direction code &lt;=3
+      // Check if new direction code is the same as existing direction code
+      if(newDirectionCode != directionCode)
+      {
+        directionCode = 0;// direction code is in conflict
+        break;
+      }
+    }                
+  }
+  
+  return directionCode;
+}
+
+
+/** Return the direction code of the address config of one DPE
+      0 = not recognised
+      1 = output
+      2 = input
+      3 = input/output
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+  
+@param   dpe     input, name of the DPE to be checked
+
+@return  Int, direction code of specific DPE
+*/
+int getDirectionCodeOfAddressConfig(string dpe)
+{
+  dyn_anytype config;
+  dyn_string exceptionInfo;
+  bool configExists, isActive;
+  int directionCode;
+  dyn_dyn_int directionGroups;
+ 
+  // define the pattern for what settings that should be displayed for the conversion
+  directionGroups[1] = makeDynInt(DPATTR_ADDR_MODE_OUTPUT, DPATTR_ADDR_MODE_OUTPUT_SINGLE); //output = 1
+  directionGroups[2] = makeDynInt(DPATTR_ADDR_MODE_INPUT_SPONT, DPATTR_ADDR_MODE_INPUT_SQUERY, DPATTR_ADDR_MODE_INPUT_POLL); //input = 2 
+  directionGroups[3] = makeDynInt(DPATTR_ADDR_MODE_IO_SPONT,DPATTR_ADDR_MODE_IO_POLL,DPATTR_ADDR_MODE_IO_SQUERY); // input and output = 3
+ 
+  directionCode = 0;   
+  
+  fwPeriphAddress_get(dpe, configExists, config, isActive, exceptionInfo);
+    
+  for(int iDirectionGroup = 1; iDirectionGroup &lt;= dynlen(directionGroups); iDirectionGroup++)
+  {
+    if(dynContains(directionGroups[iDirectionGroup],(int)config[fwPeriphAddress_DIRECTION]))
+    {
+      directionCode = iDirectionGroup;
+      break;
+    }
+  }
+    
+  return directionCode;    
+}
+
+
+/** Creates an array of the selected devices together with their selected properties
+    (product of both lists).
+
+@par Constraints
+  None
+  
+@par Usage
+	Private to the panel
+
+@par PVSS managers
+	VISION
+  
+@param exceptionInfo     output, returns possible exception to calling function
+
+@return  Array of string, device selection and their properties
+*/
+dyn_string buildDpeList(dyn_string &amp;exceptionInfo)
+{
+  int index;
+  dyn_string elements, dpeList;
+  dyn_int diLines;
+  dyn_anytype result, line;
+  
+  dpeList = makeDynString();
+  
+  diLines = getSelectedLines();
+
+  if(dynlen(diLines) &gt; 0)
+  {         
+    for(index = 1; index &lt;= dynlen(diLines); index++)
+  	{
+      result = devicePropertiesTable.getLineN(diLines[index]);
+      dynAppend(elements, result[1]);
+    }        
+  
+  	for(index = 0; index &lt; searchResultTable.lineCount; index++)
+  	{
+  		line = searchResultTable.getLineN(index);
+  		if(line[INCLUDE_COLUMN] == TRUE)
+      {  
+        for(int j = 1; j &lt;=dynlen(elements); j++)
+        {
+  			  dynAppend(dpeList, line[DEVICE_DP_NAME_COLUMN] + elements[j]);
+        }
+      }
+  	}
+
+    if(dynlen(dpeList)==0)
+    {
+      fwException_raise(exceptionInfo,&quot;Devices&quot;,&quot;No devices selected.&quot;,&quot;&quot;);  
+      return dpeList;
+    }
+  }
+
+  return dpeList;  
+}
+
+
+
+
+
+
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[#uses &quot;fwDevice/fwDevice.ctl&quot;
+#uses &quot;fwDevice/fwDeviceMassConfiguration.ctl&quot;
+
+main()
+{
+	dyn_string exceptionInfo;
+	
+	fwDevice_initialize();
+	
+	// Initialize list of configs to have same indexes as in fwDevice library
+	g_dsConfigOptions[fwDevice_ADDRESS_INDEX]= fwConfigs_FW_ADDRESS;
+	g_dsConfigOptions[fwDevice_ALERT_INDEX] = fwConfigs_FW_ALERT_HDL;
+	g_dsConfigOptions[fwDevice_ARCHIVE_INDEX] = fwConfigs_FW_ARCHIVE;
+	g_dsConfigOptions[fwDevice_PVRANGE_INDEX] = fwConfigs_FW_PV_RANGE;
+	g_dsConfigOptions[fwDevice_CONVERSION_INDEX] = fwDevice_CONFIG[fwDevice_CONVERSION_INDEX];  // FIX         
+	g_dsConfigOptions[fwDevice_SMOOTHING_INDEX] = fwConfigs_FW_SMOOTH;
+	g_dsConfigOptions[fwDevice_UNIT_INDEX] = fwConfigs_FW_UNIT;
+	g_dsConfigOptions[fwDevice_FORMAT_INDEX]	= fwConfigs_FW_FORMAT;	
+	g_dsConfigOptions[fwDevice_DPFUNCTION_INDEX]	= fwConfigs_FW_DP_FUNCT;
+	g_dsConfigOptions[fwDevice_ORIGINAL_INDEX]	= fwConfigs_FW_ORIGINAL;
+	g_dsConfigOptions[11] = fwConfigs_FW_MSG_CONV; // FIX
+	g_dsConfigOptions[12] = fwConfigs_FW_CMD_CONV; // FIX        
+       
+  /*
+      FIX above: The conversion is not split up into message and command in the device library. 
+      The function called enableIndividualElements() in scopeLib is also affected by this.
+  */
+  chooseConfigDropdown.items(g_dsConfigOptions);
+  chooseConfigDropdown.selectedPos(1);
+   
+  enableConfigDefaultActions();
+               
+	if(isDollarDefined(&quot;$sDpName&quot;))
+	{
+		if(isDollarDefined(&quot;$sHierarchyType&quot;))
+		{
+			switch($sHierarchyType)
+			{
+				case fwDevice_HARDWARE:
+					setRestrictedDeviceDpName($sDpName, exceptionInfo);
+					break;
+				case fwDevice_LOGICAL:
+					setRestrictedDeviceDpAlias($sDpName, exceptionInfo);
+					break;
+				default:				
+					break;
+			}
+		}
+		else
+		{
+			// if no hierarchy type specified consider it to be hardware
+			setRestrictedDeviceDpName($sDpName);
+		}
+	}
+
+  showInitialSetup();
+  initTables();
+}
+
+
+setRestrictedDeviceDpName(string name, dyn_string &amp;exceptionInfo)
+{
+	string dpType, shownType;
+	dyn_string dsDeviceTpesFromCombo;
+
+	if(name != &quot;&quot;)
+	{
+		dpType = dpTypeName(name);
+		fwDevice_getType(dpType, shownType, exceptionInfo);
+   
+		// select device type type in combo box
+		dsDeviceTpesFromCombo = deviceTypesCombo.items();
+		for(int i = 1; i &lt;= deviceTypesCombo.itemCount; i++)
+			if(dsDeviceTpesFromCombo[i] == shownType)
+				deviceTypesCombo.selectedPos(i);
+
+		// set datapoint type in global variable
+		for(int i = 1; i &lt;= dynlen(g_dsDpTypes); i++)
+			if(g_dsDpTypes[i] = dpType)
+				g_sSelectedDpType = g_dsDpTypes[1];
+
+		deviceNameText.text = name + &quot;*&quot;;
+		restrictedLabel.text = &quot;Restricted to hardware subtree.&quot;;
+		restrictedLabel.visible = TRUE;
+	}
+}
+
+
+setRestrictedDeviceDpAlias(string alias, dyn_string &amp;exceptionInfo)
+{
+	string 	dpType, 
+				shownType, 
+				name;
+	dyn_string dsDeviceTpesFromCombo;
+  
+	if(alias != &quot;&quot;)
+	{
+		name = dpAliasToName(alias);
+		dpType = dpTypeName(name);
+		fwDevice_getType(dpType, shownType, exceptionInfo);
+   
+		// select datapoint type in combo box
+		dsDeviceTpesFromCombo = deviceTypesCombo.items();
+		for(int i = 1; i &lt;= deviceTypesCombo.itemCount; i++)
+			if(dsDeviceTpesFromCombo[i] == shownType)
+				deviceTypesCombo.selectedPos(i);
+
+		// set datapoint type in global variable
+		for(int i = 1; i &lt;= dynlen(g_dsDpTypes); i++)
+			if(g_dsDpTypes[i] = dpType)
+				g_sSelectedDpType = g_dsDpTypes[1];
+
+		fwGeneral_getNameWithoutSN(alias, deviceDpAliasRestricted, exceptionInfo);
+		deviceAliasText.text = deviceDpAliasRestricted + &quot;*&quot;;		
+		restrictedLabel.text = &quot;Restricted to logical subtree.&quot;;
+		restrictedLabel.visible = TRUE;
+	}
+}
+
+initTables()
+{
+  devicePropertiesTable.columnEditable(devicePropertiesTable.columnCount-1, TRUE);
+  searchResultTable.columnEditable(searchResultTable.columnCount-1, TRUE);
+}
+
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">192</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">125</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">3.790697674418605 0 0 1 -76.81395348837209 -531</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 530</prop>
+    <prop name="Size">302 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="Text1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 3</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Mass Configuration</prop>
+     <prop name="en_US.iso88591">Mass Configuration</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="restrictedLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">131</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">230 803</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">45</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">232 804</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Restricted to</prop>
+     <prop name="en_US.iso88591">Restricted to</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">45</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">915 800</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">915 800</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">680 30</prop>
+    <prop name="Geometry">1 0 0 1 284 -28</prop>
+    <prop name="TabOrder">46</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwDevice/fwDeviceMassConfiguration</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="deviceNameLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">18.99999999999989 88.00000000000006</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Datapoint name</prop>
+     <prop name="en_US.iso88591">Datapoint name</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">20.99999999999989 89.00000000000006</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Device name:</prop>
+     <prop name="en_US.iso88591">Device name:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="deviceAliasLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">87</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">18.99999999999989 118.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Datapoint alias</prop>
+     <prop name="en_US.iso88591">Datapoint alias</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">20.99999999999989 119.0000000000001</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Device alias:</prop>
+     <prop name="en_US.iso88591">Device alias:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="deviceTypeLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">18.99999999999989 58.00000000000006</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Datapoint type</prop>
+     <prop name="en_US.iso88591">Datapoint type</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">20.99999999999989 59.00000000000006</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Device type:</prop>
+     <prop name="en_US.iso88591">Device type:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="deviceCommentLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">18.99999999999989 148.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">36</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Datapoint comment</prop>
+     <prop name="en_US.iso88591">Datapoint comment</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">20.99999999999989 149.0000000000001</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Device comment:</prop>
+     <prop name="en_US.iso88591">Device comment:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="deviceTypesCombo" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">113</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">125.9999999999999 55.00000000000006</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">126 55</prop>
+    <prop name="Size">450 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  g_sSelectedDpType = g_dsDpTypes[deviceTypesCombo.selectedPos()];
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  	dyn_string 	items,
+					exceptionInfo;
+	dyn_dyn_string types;
+
+	fwDevice_getAllTypes(types, exceptionInfo);
+	
+	// Initialize the Device Type Combo
+	items = makeDynString(&quot;Any&quot;);
+	dynAppend(items, types[1]);
+	deviceTypesCombo.deleteAllItems();
+	deviceTypesCombo.items = items;
+	
+	// Initialize variable that &quot;shadows&quot; the Device Type Combo with the Dp Types
+	items = makeDynString(&quot;*&quot;);
+	dynAppend(items, types[2]);
+	g_dsDpTypes = items;
+
+	deviceTypesCombo.selectedPos(1);
+	g_sSelectedDpType = g_dsDpTypes[1];
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deviceAliasText" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">88</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">125.9999999999999 115.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">126 115</prop>
+    <prop name="Size">450 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	deviceAliasText.text = &quot;*&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deviceCommentText" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">125.9999999999999 145.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">126 145</prop>
+    <prop name="Size">450 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	deviceCommentText.text = &quot;*&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deviceNameText" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">126 85.00000000000006</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">126 85</prop>
+    <prop name="Size">450 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	deviceNameText.text = &quot;*&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="selectButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">126</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">766 286.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">926 117</prop>
+    <prop name="Size">53 53</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Search</prop>
+     <prop name="en_US.iso88591">Search</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	bool 	bShowOnlyFunctionalProperties, 
+			bShowOnlyFunctionalConfigs;
+	int 	i, 
+			count = 1;
+	string 	deviceDpType, 
+				deviceModel, 
+				deviceDpNamePattern, 
+				deviceModelResult = &quot;&quot;;
+	dyn_bool dbInclude;
+	dyn_int diNumbers;
+	dyn_string	exceptionInfo,
+					dsDeviceTypes,
+					dsDeviceModels,
+					dsHwConfigDetails,
+					dsAlarmConfigDetails,
+					dsArchiveConfigDetails,
+					dsDpFunctionConfigDetails;
+	dyn_dyn_anytype listOfDevices;
+
+
+	enableSelectionControls(FALSE);  	
+	fwProgressBar_ShowEmbeddedProgressBar(10, 805);
+	searchResultTable.deleteAllLines();
+
+	// ============= POPULATE searchResultsTable ================= 	
+
+	deviceDpNamePattern = deviceNameText.text;
+	
+	// check that the dp name scope of the search has not changed
+	if(deviceDpNameRestricted != &quot;&quot;)
+	{
+		if(strpos(deviceDpNamePattern, deviceDpNameRestricted) != 0)
+		{
+			fwException_raise(exceptionInfo, 
+									&quot;ERROR&quot;,
+									&quot;You cannot change the scope of the search. The dp name has to start with: &quot; + deviceDpNameRestricted,
+									&quot;&quot;);
+			fwExceptionHandling_display(exceptionInfo);
+			deviceNameText.text	= deviceDpNameRestricted + &quot;*&quot;;
+			return;
+		}
+	}
+	
+	// check that the dp alias scope of the search has not changed
+	if(deviceDpAliasRestricted != &quot;&quot;)
+	{
+		if(strpos(deviceAliasText.text, deviceDpAliasRestricted) != 0)
+		{
+			fwException_raise(exceptionInfo, 
+									&quot;ERROR&quot;,
+									&quot;You cannot change the scope of the search. The dp name has to start with: &quot; + deviceDpAliasRestricted,
+									&quot;&quot;);
+			fwExceptionHandling_display(exceptionInfo);
+			deviceAliasText.text = deviceDpAliasRestricted + &quot;*&quot;;
+			return;
+		}
+	}
+
+	fwDeviceMassConfiguration_getListOfDevices(	listOfDevices, deviceDpNamePattern, deviceAliasText.text, 
+																g_sSelectedDpType, deviceCommentText.text, exceptionInfo);
+	DebugFTN(&quot;FW_INFO&quot;, &quot;listOfdevices len: &quot; + dynlen(listOfDevices));
+	dynDynTurn(listOfDevices);
+	DebugFTN(&quot;FW_INFO&quot;, deviceDpNamePattern, deviceAliasText.text, g_sSelectedDpType, deviceCommentText.text);
+	DebugFTN(&quot;FW_INFO&quot;, &quot;listOfdevices len after turn: &quot; + dynlen(listOfDevices));
+	
+	// if the search didn't return any device, we should not continue
+	if(dynlen(listOfDevices) == 0)
+	{
+		fwProgressBar_HideEmbeddedProgressBar();
+		enableSelectionControls(TRUE);
+		wizardStartText.text(&quot;No Devices Found&quot;);
+		return;
+	}
+	
+	// If a specific type was chosen, we can display information about the elements (e.g. address, archive, etc) 
+	// Otherwise, we just display the type column
+	if(deviceTypesCombo.selectedText != &quot;Any&quot;)
+	{       
+		sumSettings.enabled(TRUE);
+		// Load config detail information (adresses, alarms, archive and dpFunction)
+		dsHwConfigDetails 			= _fwDeviceMassConfiguration_getConfigsForDevices(listOfDevices[fwDevice_DP_NAME], fwDevice_ADDRESS_INDEX, exceptionInfo);
+		dsAlarmConfigDetails 		= _fwDeviceMassConfiguration_getConfigsForDevices(listOfDevices[fwDevice_DP_NAME], fwDevice_ALERT_INDEX, exceptionInfo);    
+		dsArchiveConfigDetails 		= _fwDeviceMassConfiguration_getConfigsForDevices(listOfDevices[fwDevice_DP_NAME], fwDevice_ARCHIVE_INDEX, exceptionInfo);              
+		dsDpFunctionConfigDetails 	= _fwDeviceMassConfiguration_getConfigsForDevices(listOfDevices[fwDevice_DP_NAME], fwDevice_DPFUNCTION_INDEX, exceptionInfo); 
+
+		searchResultTable.namedColumnVisibility(&quot;deviceType&quot;, FALSE);
+		searchResultTable.namedColumnWidth(&quot;deviceName&quot;, 200 + 120);
+		g_bMultipleTypesShown = FALSE;	
+	}
+	else        
+	{
+		sumSettings.enabled(FALSE);
+    
+		searchResultTable.namedColumnVisibility(&quot;deviceType&quot;, TRUE);
+		searchResultTable.namedColumnWidth(&quot;deviceName&quot;, 200);
+		g_bMultipleTypesShown = TRUE;
+	}
+
+	// hide config detail columns &amp; resize some columns
+	searchResultTable.namedColumnVisibility(&quot;hardwareConConf&quot;, FALSE);   
+	searchResultTable.namedColumnVisibility(&quot;alarmConf&quot;, FALSE); 
+	searchResultTable.namedColumnVisibility(&quot;archiveConf&quot;, FALSE);  
+	searchResultTable.namedColumnVisibility(&quot;dpFunctionConf&quot;, FALSE);  
+	searchResultTable.namedColumnWidth(&quot;deviceAlias&quot;, 200);
+	searchResultTable.namedColumnWidth(&quot;deviceComment&quot;, 242);    
+
+	// generate columns with row count and selection (checkbox)
+	for(int i = 1; i &lt;= dynlen(listOfDevices[fwDevice_DP_NAME]) ; i++)
+	{
+		dynAppend(diNumbers, count++);
+		dynAppend(dbInclude, TRUE);														
+	}
+	
+	searchResultTable.appendLines(dynlen(listOfDevices[fwDevice_DP_NAME]),
+											&quot;num&quot;, 					diNumbers,
+											&quot;deviceName&quot;, 			listOfDevices[fwDevice_DP_NAME],
+											&quot;deviceAlias&quot;, 		listOfDevices[fwDevice_DP_ALIAS], 
+											&quot;deviceComment&quot;, 		listOfDevices[fwDevice_COMMENT],
+											&quot;deviceType&quot;, 			listOfDevices[fwDevice_TYPE],
+											&quot;deviceModel&quot;, 		listOfDevices[fwDevice_MODEL],
+											&quot;hardwareConConf&quot;,	dsHwConfigDetails,
+											&quot;alarmConf&quot;, 			dsAlarmConfigDetails,
+											&quot;archiveConf&quot;, 		dsArchiveConfigDetails,  
+											&quot;dpFunctionConf&quot;, 	dsDpFunctionConfigDetails,          
+											&quot;selected&quot;, 			dbInclude);
+  
+	for(int row = 0; row &lt; searchResultTable.lineCount; row++)
+		setLineSelection(&quot;searchResultTable&quot;, row);
+  
+	deviceNumber.text = dynlen(dbInclude) + &quot;/&quot; + dynlen(listOfDevices[fwDevice_DP_NAME]) + &quot; selected&quot;;
+	
+	       
+	// ============= POPULATE settingsOverviewTable ================= 
+	
+	// Initially graphical objects
+	settingsOverviewTable.deleteAllLines();
+	enableConfigTabControls(FALSE);
+	resetDevicePropertiesTab(); 
+	showInitialWizardStep();
+	
+	// check if all devices are of the same model
+	dsDeviceModels = listOfDevices[fwDevice_MODEL];
+	dynUnique(dsDeviceModels);
+	if(dynlen(dsDeviceModels) == 1)
+		deviceModelResult = dsDeviceModels[1];
+	    
+	// check if all devices are of the same type  
+	// if they are of same type, enable controls on individual dpes depending on device definition
+	dsDeviceTypes = listOfDevices[fwDevice_TYPE];
+	dynUnique(dsDeviceTypes);
+	if(dynlen(dsDeviceTypes) == 1)
+	{
+
+		dyn_dyn_string elements;
+		dyn_dyn_string dpElements;
+          
+		fwDevice_getDpType(dsDeviceTypes[1], dpType, exceptionInfo);
+		getDpeAddresses(dpType, dpElements);
+
+		fwDevice_getConfigElements(dpType, fwDevice_ALL, elements, exceptionInfo, deviceModelResult);
+
+		for(int i = 1; i &lt;= dynlen(dpElements); i++)
+		{
+ 
+			fwConfigs_getDataTypeText(dpElements[i][2], dpElements[i][2], exceptionInfo);
+
+			g_allDpElements[i][1] = dpElements[i][1];
+			g_allDpElements[i][2] = &quot;&quot;;
+			g_allDpElements[i][3] = dpElements[i][2];
+                     
+   for(int j = 1; j &lt;= dynlen(elements[1]); j++) {
+				if(dpElements[i][1] == elements[1][j]) {
+					g_allDpElements[i][2] = elements[2][j];
+				}  
+   }    
+		}		
+
+		bShowOnlyFunctionalProperties = deviceDefCheckBox.state(0); // The 1st checkbox
+		updateDpElementTable(bShowOnlyFunctionalProperties); 
+	}
+
+	fwProgressBar_HideEmbeddedProgressBar();
+	enableSelectionControls(TRUE);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="selectionFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">205</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">17 690</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">135</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">4.40990990990991 0 0 0.8579881656804728 -64.96846846846847 -411.1538461538459</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Device selection</prop>
+     <prop name="en_US.iso88591">Device selection</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">17 520</prop>
+    <prop name="Size">223 170</prop>
+   </properties>
+  </shape>
+  <shape Name="resultTextArrow" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">221</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">_3DText</prop>
+    <prop name="TabOrder">149</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.7259259259259259 0 0 0.6825000000000002 212.7407407407407 279.4749999999998</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+     <prop name="Location">20 780</prop>
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="progressBar" shapeType="PROGRESS_BAR" layerId="0">
+   <properties>
+    <prop name="serialId">223</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 805</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">151</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 805</prop>
+    <prop name="Size">200 14</prop>
+    <extended>
+     <prop type="ENUM" name="layoutDirection">0</prop>
+     <prop type="ENUM" name="textDirection">0</prop>
+     <prop type="ENUM" name="alignment">1</prop>
+     <prop type="ENUM" name="contextMenuPolicy">1</prop>
+     <prop type="ENUM" name="inputMethodHints">0</prop>
+     <prop type="ENUM" name="orientation">0</prop>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="wizardStartBg" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">224</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 48</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">152</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 191</prop>
+    <prop name="Size">980 54</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="wizardStartText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">225</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">498 205</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">153</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">500 207</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,14,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Please select devices to configure.</prop>
+     <prop name="en_US.iso88591">Please select devices to configure.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="contentTab" shapeType="TAB" layerId="1">
+   <properties>
+    <prop name="serialId">213</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">18.65603644646923 176.6952789699571</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">142</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 190</prop>
+    <prop name="Size">980 589</prop>
+    <prop name="TabBarAutoHide">False</prop>
+    <prop name="Page">
+     <prop name="Name">devices</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Devices</prop>
+      <prop name="en_US.iso88591">Devices</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">dpes</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device properties</prop>
+      <prop name="en_US.iso88591">Device properties</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+    <prop name="Page">
+     <prop name="Name">config</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Configs</prop>
+      <prop name="en_US.iso88591">Configs</prop>
+     </prop>
+     <prop name="Panel"></prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="SelectionChanged" isEscaped="1"><![CDATA[main()
+{
+  bool bShowOnlyFunctionalConfigs;
+  
+  switch(this.activeRegister())
+  {
+    case 0:
+      backButton.enabled(FALSE);
+      nextButton.enabled(TRUE);
+      deviceTypeInfo.visible(FALSE);
+      LayerOn(3);
+      LayerOff(4);
+      LayerOff(5);
+      break;
+    case 1:
+      backButton.enabled(TRUE);
+      nextButton.enabled(TRUE);
+      LayerOff(3);
+      if(g_bMultipleTypesShown)
+      {
+        deviceTypeInfo.visible(TRUE);
+      }
+      else
+      {
+        LayerOn(4);
+        deviceTypeInfo.visible(FALSE);
+      }
+      LayerOff(5);
+      break;
+    case 2:
+      backButton.enabled(TRUE);
+      nextButton.enabled(FALSE);
+      LayerOff(3);
+      LayerOff(4);
+      if(g_bMultipleTypesShown)
+      {
+        deviceTypeInfo.visible(TRUE);
+      }
+      else
+      {
+        bShowOnlyFunctionalConfigs = showFunctionalConfigsCheckbox.state(0);
+      	displayAllRelevantConfigs(bShowOnlyFunctionalConfigs);
+        updateMassConfigSelection();
+        LayerOn(5);
+        deviceTypeInfo.visible(FALSE);       
+      }
+      break;
+    default:
+      LayerOff(3);
+      LayerOff(4);
+      LayerOff(5);
+      break;
+  }
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="backButton" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">202</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">822 743</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">133</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Hotkey">Left</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">822 743</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Back</prop>
+     <prop name="en_US.iso88591">Back</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  if(!wizardStartBg.visible)
+  {  
+    switch(contentTab.activeRegister())
+    {
+      case 1:
+        contentTab.activeRegister(0);
+        break;
+      case 2:
+        contentTab.activeRegister(1);
+        break;
+      default:
+        break;
+    }
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="nextButton" shapeType="PUSH_BUTTON" layerId="1">
+   <properties>
+    <prop name="serialId">203</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">904 743</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">134</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Hotkey">Right</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">904 743</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Next</prop>
+     <prop name="en_US.iso88591">Next</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  if(!wizardStartBg.visible)
+  {
+    switch(contentTab.activeRegister())
+    {
+      case 0:
+        contentTab.activeRegister(1);
+        break;
+      case 1:
+        contentTab.activeRegister(2);
+        break;
+      case 2:
+        break;
+      default:
+        break;
+    }
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="searchResultTable" shapeType="TABLE" layerId="2">
+   <properties>
+    <prop name="serialId">169</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">31 213.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">87</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 252</prop>
+    <prop name="Size">958 471</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">num</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#</prop>
+      <prop name="en_US.iso88591">#</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+     <prop name="ColumnFormat">[0d,False,False,AlignHCenter,False]</prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">deviceName</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device name</prop>
+      <prop name="en_US.iso88591">Device name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">DP name</prop>
+      <prop name="en_US.iso88591">DP name</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">deviceAlias</prop>
+     <prop name="Width">200</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device alias</prop>
+      <prop name="en_US.iso88591">Device alias</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">DP alias</prop>
+      <prop name="en_US.iso88591">DP alias</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">deviceType</prop>
+     <prop name="Width">120</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device type</prop>
+      <prop name="en_US.iso88591">Device type</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">deviceModel</prop>
+     <prop name="Width">120</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device model</prop>
+      <prop name="en_US.iso88591">Device model</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">deviceComment</prop>
+     <prop name="Width">242</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device comment</prop>
+      <prop name="en_US.iso88591">Device comment</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">hardwareConConf</prop>
+     <prop name="Width">0</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Add</prop>
+      <prop name="en_US.iso88591">Add</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Adress configured</prop>
+      <prop name="en_US.iso88591">Adress configured</prop>
+     </prop>
+     <prop name="ColumnFormat">[0s,,,AlignHCenter]</prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">alarmConf</prop>
+     <prop name="Width">0</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8"> Al</prop>
+      <prop name="en_US.iso88591"> Al</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Alarms configured</prop>
+      <prop name="en_US.iso88591">Alarms configured</prop>
+     </prop>
+     <prop name="ColumnFormat">[0s,,,AlignHCenter]</prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">archiveConf</prop>
+     <prop name="Width">0</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8"> Arc</prop>
+      <prop name="en_US.iso88591"> Arc</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Archive configured</prop>
+      <prop name="en_US.iso88591">Archive configured</prop>
+     </prop>
+     <prop name="ColumnFormat">[0s,,,AlignHCenter]</prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">dpFunctionConf</prop>
+     <prop name="Width">0</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">DpF</prop>
+      <prop name="en_US.iso88591">DpF</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">DP functions configured</prop>
+      <prop name="en_US.iso88591">DP functions configured</prop>
+     </prop>
+     <prop name="ColumnFormat">[0s,,,AlignHCenter]</prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">selected</prop>
+     <prop name="Width">25</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Select DPs that you want to configure</prop>
+      <prop name="en_US.iso88591">Select DPs that you want to configure</prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{  
+  bool isSelected;
+
+  if(column != &quot;selected&quot;)
+  {  
+    isSelected = this.cellValueRC(row, &quot;selected&quot;);
+    this.cellValueRC(row, &quot;selected&quot;, !isSelected);
+  }
+  
+  setLineSelection(&quot;searchResultTable&quot;, row);
+  
+  updateDeviceSelectionInfo();
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  this.deleteSelection();
+}]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  dyn_float df;
+  dyn_string ds;
+  string deviceName;
+  
+  deviceName = this.cellValueRC(row,&quot;deviceName&quot;);
+      
+  ChildPanelOnCentralReturn(&quot;fwDevice/fwDeviceExpertConfiguration.pnl&quot;,
+                            &quot;expertConf&quot;,
+                            makeDynString(&quot;$sDpName:&quot;+deviceName),
+                            df,ds); 
+
+  setInputFocus(myModuleName(), myPanelName(), &quot;searchResultTable&quot;);      
+  setInputFocus(myModuleName(), myPanelName(), &quot;deviceNameText&quot;);  
+  setInputFocus(myModuleName(), myPanelName(), &quot;searchResultTable&quot;);  
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="selAll" shapeType="PUSH_BUTTON" layerId="2">
+   <properties>
+    <prop name="serialId">142</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">806 202.0769230769231</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">53</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">796 224</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select all</prop>
+     <prop name="en_US.iso88591">Select all</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  for(int row = 0; row &lt; searchResultTable.lineCount; row++)
+  {
+	  searchResultTable.cellValueRC(row, &quot;selected&quot;, TRUE); 
+    setLineSelection(&quot;searchResultTable&quot;, row);  
+  }
+  
+  updateDeviceSelectionInfo();
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="deSelAll" shapeType="PUSH_BUTTON" layerId="2">
+   <properties>
+    <prop name="serialId">141</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">899 202.0769230769231</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">889 224</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Deselect all</prop>
+     <prop name="en_US.iso88591">Deselect all</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  for(int row = 0; row &lt; searchResultTable.lineCount; row++)
+  {
+		searchResultTable.cellValueRC(row, &quot;selected&quot;, FALSE);
+    setLineSelection(&quot;searchResultTable&quot;, row);
+  }
+  
+  updateDeviceSelectionInfo();
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="deviceNumber" shapeType="TEXT_FIELD" layerId="2">
+   <properties>
+    <prop name="serialId">215</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">197 -214.9999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">144</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 225</prop>
+    <prop name="Size">180 22</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;0/0 selected&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="sumSettings" shapeType="CHECK_BOX" layerId="2">
+   <properties>
+    <prop name="serialId">233</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">634 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">160</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">631 226</prop>
+    <prop name="Size">155 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Display config details</prop>
+       <prop name="en_US.iso88591">Display config details</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  if(state)
+  {
+    // display columns
+    for(int j=6; j&lt;=9; j++)
+    {
+      searchResultTable.columnVisibility(j, true);
+      searchResultTable.columnWidth(j, 40);
+    }
+                
+    // resize columns    
+    if(deviceTypesCombo.selectedText == &quot;Any&quot;)
+    { 
+      searchResultTable.columnWidth(1, 160);
+    }
+    else
+    {
+      searchResultTable.columnWidth(1, 280);
+    }
+    searchResultTable.columnWidth(2, 160);
+    searchResultTable.columnWidth(5, 162);
+  }
+  else
+  {
+    // display columns
+    for(int j=6; j&lt;=9; j++)
+    {
+      searchResultTable.columnVisibility(j, false);
+    }      
+                
+    // resize columns 
+    if(deviceTypesCombo.selectedText == &quot;Any&quot;)
+    { 
+      searchResultTable.columnWidth(1, 200);
+    }
+    else
+    {
+      searchResultTable.columnWidth(1, 320);
+    }
+    searchResultTable.columnWidth(2, 200);
+    searchResultTable.columnWidth(5, 242);
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deviceActionDropdown" shapeType="COMBO_BOX" layerId="2">
+   <properties>
+    <prop name="serialId">240</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-519 751</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">166</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 744</prop>
+    <prop name="Size">100 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.appendItem(fwConfigs_FW_ADDRESS);
+  this.appendItem(fwConfigs_FW_ALERT_HDL);
+  this.appendItem(fwConfigs_FW_DP_FUNCT);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="defaultConfigButton" shapeType="PUSH_BUTTON" layerId="2">
+   <properties>
+    <prop name="serialId">239</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-62 641.076923076923</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">165</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Set config to default for selected devices</prop>
+     <prop name="en_US.iso88591">Set config to default for selected devices</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">128 743</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Default ...</prop>
+     <prop name="en_US.iso88591">Default ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{  
+  bool ok;
+	dyn_string exceptionInfo;
+
+  switch(deviceActionDropdown.selectedText())
+  {
+    case fwConfigs_FW_ADDRESS:
+    	fwGeneral_openMessagePanel(&quot;Do you want to set the default address for all selected devices?&quot;,
+    				   ok, exceptionInfo, &quot;Set default hardware connection&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_ADDRESS_INDEX, fwDevice_ADDRESS_SET, exceptionInfo);
+    	}
+      break;
+    case fwConfigs_FW_ALERT_HDL:
+      fwGeneral_openMessagePanel(	&quot;Do you want to set the default alarms for all selected devices?&quot;,
+										ok, exceptionInfo, &quot;Set default alarms&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_ALERT_INDEX, fwDevice_ALERT_SET, exceptionInfo);	
+    	}
+      break;
+    case fwConfigs_FW_ARCHIVE:
+      // not yet implemented
+      break;
+    case fwConfigs_FW_DP_FUNCT:
+      fwGeneral_openMessagePanel(	&quot;Do you want to set the default datapoint functions for all selected devices?&quot;,
+										ok, exceptionInfo, &quot;Set default dp functions&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_DPFUNCTION_INDEX, fwDevice_DPFUNCTION_SET, exceptionInfo);	
+    	}
+      break;
+    default:
+      break;
+  }
+}	
+]]></script>
+   </events>
+  </shape>
+  <shape Name="clearConfigButton" shapeType="PUSH_BUTTON" layerId="2">
+   <properties>
+    <prop name="serialId">241</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">714 580.076923076923</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">167</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Clear config for selected devices</prop>
+     <prop name="en_US.iso88591">Clear config for selected devices</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">225 743</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Clear ...</prop>
+     <prop name="en_US.iso88591">Clear ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{  
+  bool ok;
+	dyn_string exceptionInfo;
+
+  switch(deviceActionDropdown.selectedText())
+  {
+    case fwConfigs_FW_ADDRESS:
+    	fwGeneral_openMessagePanel(	&quot;Do you want to clear the address config for all selected devices?&quot;,
+										ok, exceptionInfo, &quot;Clear hardware connection&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_ADDRESS_INDEX, fwDevice_ADDRESS_UNSET, exceptionInfo);
+    	}
+      break;
+    case fwConfigs_FW_ALERT_HDL:
+      fwGeneral_openMessagePanel(	&quot;Do you want to clear the default alarms for all selected devices?&quot;,
+										ok, exceptionInfo, &quot;Clear default alarms&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_ALERT_INDEX, fwDevice_ALERT_UNSET, exceptionInfo);	
+    	}
+      break;
+    case fwConfigs_FW_ARCHIVE:
+      // not yet implemented
+      break;
+    case fwConfigs_FW_DP_FUNCT:
+      fwGeneral_openMessagePanel(	&quot;Do you want to clear the default dp functions for all selected devices?&quot;,
+										ok, exceptionInfo, &quot;Clear default dp functions&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_DPFUNCTION_INDEX, fwDevice_DPFUNCTION_UNSET, exceptionInfo);	
+    	}
+      break;
+    default:
+      break;
+  }
+}	
+]]></script>
+   </events>
+  </shape>
+  <shape Name="deviceDefCheckBox" shapeType="CHECK_BOX" layerId="3">
+   <properties>
+    <prop name="serialId">165</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">578 226</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">82</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">574 226</prop>
+    <prop name="Size">200 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show only functional properties</prop>
+       <prop name="en_US.iso88591">Show only functional properties</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+   updateDpElementTable(state);
+   //updateMassConfigSelection();         
+}
+
+
+
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	deviceDefCheckBox.state(0,TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="devicePropertiesTable" shapeType="TABLE" layerId="3">
+   <properties>
+    <prop name="serialId">149</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 239</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">61</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 252</prop>
+    <prop name="Size">958 471</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">10</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">elements</prop>
+     <prop name="Width">320</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device property</prop>
+      <prop name="en_US.iso88591">Device property</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">DPE</prop>
+      <prop name="en_US.iso88591">DPE</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">properties</prop>
+     <prop name="Width">412</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Property description</prop>
+      <prop name="en_US.iso88591">Property description</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">types</prop>
+     <prop name="Width">180</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Type</prop>
+      <prop name="en_US.iso88591">Type</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">selected</prop>
+     <prop name="Width">25</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  bool isSelected;
+
+  if(column != &quot;selected&quot;)
+  {  
+    isSelected = this.cellValueRC(row, &quot;selected&quot;);
+    this.cellValueRC(row, &quot;selected&quot;, !isSelected);
+  }
+  
+  setLineSelection(&quot;devicePropertiesTable&quot;, row);
+  
+  updateDPESelectionInfo();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="selectAllDPEButton" shapeType="PUSH_BUTTON" layerId="3">
+   <properties>
+    <prop name="serialId">208</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">806 202.076923076923</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">138</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">796 224</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select all</prop>
+     <prop name="en_US.iso88591">Select all</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  for(int row = 0; row &lt; devicePropertiesTable.lineCount; row++)
+  {
+	  devicePropertiesTable.cellValueRC(row, &quot;selected&quot;, TRUE);
+    setLineSelection(&quot;devicePropertiesTable&quot;, row);
+  }
+
+  updateDPESelectionInfo();
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="selectNoneDPEButton" shapeType="PUSH_BUTTON" layerId="3">
+   <properties>
+    <prop name="serialId">209</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">899 202.076923076923</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">139</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">889 224</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Deselect all</prop>
+     <prop name="en_US.iso88591">Deselect all</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  for(int row = 0; row &lt; devicePropertiesTable.lineCount; row++)
+  {
+		devicePropertiesTable.cellValueRC(row, &quot;selected&quot;, FALSE); 
+    setLineSelection(&quot;devicePropertiesTable&quot;, row);
+  }
+    
+  updateDPESelectionInfo();
+}
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="elementNumber" shapeType="TEXT_FIELD" layerId="3">
+   <properties>
+    <prop name="serialId">219</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">197 -215</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">148</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 225</prop>
+    <prop name="Size">180 22</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;0/0 selected&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="setSettings" shapeType="PUSH_BUTTON" layerId="4">
+   <properties>
+    <prop name="serialId">146</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">714 570.076923076923</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">57</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Set new setting for the selected dpes.</prop>
+     <prop name="en_US.iso88591">Set new setting for the selected dpes.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">904 672</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply ...</prop>
+     <prop name="en_US.iso88591">Apply ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{  
+  switch(configActionDropdown.selectedText)
+  {
+    case CONFIG_ACTION_SET:
+      triggerSetAction();
+      break;
+    case CONFIG_ACTION_DEFAULT:
+      triggerSetDefaultAction();
+      break;
+    case CONFIG_ACTION_CLEAR:
+      triggerClearAction();
+      break;
+    default:
+      break;
+  }
+}	
+
+// ------------------------------------------------------------------------------------------------
+
+triggerSetAction()
+{
+  dyn_string exceptionInfo;
+	
+  switch(chooseConfigDropdown.selectedText) 
+  { 
+    case fwConfigs_FW_ORIGINAL:
+      openConfigPanel(&quot;fwConfigs/fwOriginalConfigPopup.pnl&quot;, makeDynString(), exceptionInfo); 
+      break; 
+    case fwConfigs_FW_ADDRESS:  
+      openConfigPanel(&quot;fwConfigs/fwPeriphAddressPopup.pnl&quot;, makeDynString(), exceptionInfo); 
+      break; 
+    case fwConfigs_FW_DP_FUNCT:
+      openConfigPanel(&quot;fwConfigs/fwDpFunctionConfigPopup.pnl&quot;, makeDynString(), exceptionInfo);
+      break;
+    case fwConfigs_FW_ARCHIVE:
+      openConfigPanel(&quot;fwConfigs/fwArchiveConfigPopup.pnl&quot;, makeDynString(), exceptionInfo);
+      break;
+    case fwConfigs_FW_ALERT_HDL:
+      openConfigPanel(&quot;fwConfigs/fwAlertConfigPopup.pnl&quot;, makeDynString(&quot;$sSummaryDpe:.&quot;), exceptionInfo);
+      break;
+    case fwConfigs_FW_SMOOTH:
+      openConfigPanel(&quot;fwConfigs/fwSmoothingConfigPopup.pnl&quot;, makeDynString(), exceptionInfo);
+      break;
+    case fwConfigs_FW_CMD_CONV:
+      openConfigPanel(&quot;fwConfigs/fwConversionConfigPopup.pnl&quot;, makeDynString(&quot;$configType:CMD&quot;), exceptionInfo);
+      break;
+    case fwConfigs_FW_MSG_CONV:
+      openConfigPanel(&quot;fwConfigs/fwConversionConfigPopup.pnl&quot;, makeDynString(&quot;$configType:MSG&quot;), exceptionInfo);
+      break;        
+    case fwConfigs_FW_PV_RANGE:
+      openConfigPanel(&quot;fwConfigs/fwPvRangeConfigPopup.pnl&quot;, makeDynString(), exceptionInfo);
+      break;
+    case fwConfigs_FW_UNIT:
+      openConfigPanel(&quot;fwConfigs/fwUnitConfigPopup.pnl&quot;, makeDynString(), exceptionInfo);
+      break;
+    case fwConfigs_FW_FORMAT:
+      openConfigPanel(&quot;fwConfigs/fwFormatConfigPopup.pnl&quot;, makeDynString(), exceptionInfo);
+      break;                                    
+  }  
+  
+  updateMassConfigSelection();
+}
+
+// ------------------------------------------------------------------------------------------------
+
+triggerSetDefaultAction()
+{
+  bool ok;
+	dyn_string exceptionInfo;
+  dyn_string dpeList = getSelectedDpeList();
+
+  switch(chooseConfigDropdown.selectedText())
+  {
+    case fwConfigs_FW_ADDRESS:
+    	fwGeneral_openMessagePanel(&quot;Do you want to set the default address for all selected devices?&quot;,
+    				   ok, exceptionInfo, &quot;Set default hardware connection&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_ADDRESS_INDEX, fwDevice_ADDRESS_SET, exceptionInfo, false);
+    	}
+      break;
+    case fwConfigs_FW_ALERT_HDL:
+      fwGeneral_openMessagePanel(	&quot;Do you want to set the default alarms for all selected devices?&quot;,
+										ok, exceptionInfo, &quot;Set default alarms&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_ALERT_INDEX, fwDevice_ALERT_SET, exceptionInfo, false);	
+    	}
+      break;
+    case fwConfigs_FW_ARCHIVE:
+      // not yet implemented
+      break;
+    case fwConfigs_FW_DP_FUNCT:
+      fwGeneral_openMessagePanel(	&quot;Do you want to set the default datapoint functions for all selected devices?&quot;,
+										ok, exceptionInfo, &quot;Set default dp functions&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_DPFUNCTION_INDEX, fwDevice_DPFUNCTION_SET, exceptionInfo, false);	
+    	}
+      break;
+    default:
+      break;
+  }
+  updateMassConfigSelection();  
+}
+
+// ------------------------------------------------------------------------------------------------
+
+triggerClearAction()
+{
+  bool ok;
+	dyn_string exceptionInfo;
+
+  switch(chooseConfigDropdown.selectedText())
+  {
+    case fwConfigs_FW_ADDRESS:
+    	fwGeneral_openMessagePanel(	&quot;Do you want to clear the address config for all selected devices?&quot;,
+										ok, exceptionInfo, &quot;Clear hardware connection&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_ADDRESS_INDEX, fwDevice_ADDRESS_UNSET, exceptionInfo, false);
+    	}
+      break;
+    case fwConfigs_FW_ALERT_HDL:
+      fwGeneral_openMessagePanel(	&quot;Do you want to clear the default alarms for all selected devices?&quot;,
+										ok, exceptionInfo, &quot;Clear default alarms&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_ALERT_INDEX, fwDevice_ALERT_UNSET, exceptionInfo, false);	
+    	}
+      break;
+    case fwConfigs_FW_ARCHIVE:
+      // not yet implemented
+      break;
+    case fwConfigs_FW_DP_FUNCT:
+      fwGeneral_openMessagePanel(	&quot;Do you want to clear the default dp functions for all selected devices?&quot;,
+										ok, exceptionInfo, &quot;Clear default dp functions&quot;);
+
+    	if(ok)
+    	{
+    		configureDefault(fwDevice_DPFUNCTION_INDEX, fwDevice_DPFUNCTION_UNSET, exceptionInfo, false);	
+    	}
+      break;
+    default:
+      break;
+  }
+  updateMassConfigSelection();
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="settingsOverviewTable" shapeType="TABLE" layerId="4">
+   <properties>
+    <prop name="serialId">199</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 245</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">131</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 252</prop>
+    <prop name="Size">958 409</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">number</prop>
+     <prop name="Width">30</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#</prop>
+      <prop name="en_US.iso88591">#</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+     <prop name="ColumnFormat">[0d,False,False,AlignHCenter,False]</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="chooseConfigDropdown" shapeType="COMBO_BOX" layerId="4">
+   <properties>
+    <prop name="serialId">145</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">634 543</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">55</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Choose which setting to view or set</prop>
+     <prop name="en_US.iso88591">Choose which setting to view or set</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">630 673</prop>
+    <prop name="Size">160 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{  
+  updateMassConfigSelection();  
+  enableConfigDefaultActions();
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="summaryLabel" shapeType="TEXT_FIELD" layerId="4">
+   <properties>
+    <prop name="serialId">216</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">197 -215</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">145</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">18 225</prop>
+    <prop name="Size">180 22</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;0 selected DPEs&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="chooseConfigLabel" shapeType="TEXT_FIELD" layerId="4">
+   <properties>
+    <prop name="serialId">218</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-13 -31</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">lightgrey</prop>
+    <prop name="TabOrder">147</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">510 673</prop>
+    <prop name="Size">120 22</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Choose config:&quot;;
+  this.backCol = &quot;_Transparent&quot;;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="configActionDropdown" shapeType="COMBO_BOX" layerId="4">
+   <properties>
+    <prop name="serialId">238</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">257 680</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">164</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">797 673</prop>
+    <prop name="Size">100 23</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Set</prop>
+       <prop name="en_US.iso88591">Set</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+  </shape>
+  <shape Name="showFunctionalConfigsCheckbox" shapeType="CHECK_BOX" layerId="4">
+   <properties>
+    <prop name="serialId">243</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">634 703</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">168</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">630 703</prop>
+    <prop name="Size">200 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Allow only functional configs</prop>
+       <prop name="en_US.iso88591">Allow only functional configs</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+   displayAllRelevantConfigs(state); 
+   updateMassConfigSelection(); // because the selected config might have changed and 
+                                // each config has different info displayed in the massConfigurationSelection table
+
+}
+
+
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	showFunctionalConfigsCheckbox.state(0,TRUE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="onlyConfElements" shapeType="CHECK_BOX" layerId="4">
+   <properties>
+    <prop name="serialId">161</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">810 226</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">78</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">791 226</prop>
+    <prop name="Size">200 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show only configured configs</prop>
+       <prop name="en_US.iso88591">Show only configured configs</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  updateMassConfigSelection();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="deviceTypeInfo" shapeType="TEXT_FIELD" layerId="7">
+   <properties>
+    <prop name="serialId">230</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">60 146</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">158</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,14,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 226</prop>
+    <prop name="Size">958 54</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Please select a single device type for mass configuration.&quot;;
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

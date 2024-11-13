@@ -1,0 +1,265 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8"/>
+  </prop>
+  <prop name="Size">179 325</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">130 100</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[void modRefreshInformation()
+{
+  int i;
+  dyn_string dsOpcGroups;
+  
+  for (i = 0; i &lt; tabOpcGroups.lineCount; i++)
+    tabOpcGroups.cellBackColRC(i, &quot;opcGroup&quot;, &quot;yellow&quot;);
+  dsOpcGroups = dpNames(getSystemName() + &quot;*&quot;, &quot;_OPCGroup&quot;);
+  for (i = 1; i &lt;= dynlen(dsOpcGroups); i++)
+    dpSet(dsOpcGroups[i] + &quot;.GetIds&quot;, true);
+  tabOpcGroups.deleteSelection();
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="cmdRefreshInformation" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">30 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 10</prop>
+    <prop name="Size">121 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Refresh Information</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  modRefreshInformation();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tabOpcGroups" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">161 211</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">14</prop>
+    <prop name="RowHeaderWidth">10</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">opcGroup</prop>
+     <prop name="Width">100</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">OPC Group</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">items</prop>
+     <prop name="Width">50</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">True</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Items</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int i;
+  dyn_string dsOpcGroups;
+  dyn_string dsDpIds;
+  dyn_string dsItemIds;
+  
+  tabOpcGroups.tableMode = TABLE_SELECT_MULTIPLE;
+  tabOpcGroups.selectByClick = TABLE_SELECT_LINE;
+  for (i = 0; i &lt; tabOpcGroups.columnCount; i++)
+    tabOpcGroups.columnEditable(i, false);
+  
+  dsOpcGroups = dpNames(getSystemName() + &quot;*&quot;, &quot;_OPCGroup&quot;);
+  for (i = 1; i &lt;= dynlen(dsOpcGroups); i++)
+    dpConnect(&quot;cbkUpdateLine&quot;, dsOpcGroups[i] + &quot;.DpIds&quot;);
+  tabOpcGroups.deleteSelection();
+}
+
+void cbkUpdateLine(string sDpe, dyn_string dsValues)
+{
+  string sBackCol;
+  sDpe = dpSubStr(sDpe, DPSUB_DP);
+  tabOpcGroups.updateLine(1, &quot;opcGroup&quot;, sDpe, &quot;items&quot;, dynlen(dsValues));
+  if (dynlen(dsValues) == 0)
+    sBackCol = &quot;red&quot;;
+  else
+    sBackCol = &quot;white&quot;;
+  tabOpcGroups.lineParam(1, &quot;opcGroup&quot;, sDpe,
+                         &quot;backCol&quot;, makeDynString(&quot;items&quot;), makeDynString(sBackCol),
+                         &quot;backCol&quot;, makeDynString(&quot;opcGroup&quot;), makeDynString(&quot;white&quot;));
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdSelectEmpty" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">50 260</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 260</prop>
+    <prop name="Size">121 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Select Empty Groups</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int i;
+  int iItemsCol;
+  dyn_int iEmptyLines;
+  dyn_anytype daLine;
+  tabOpcGroups.deleteSelection();
+  iItemsCol = tabOpcGroups.nameToColumn(&quot;items&quot;);
+  iItemsCol++;
+  for (i = 0; i &lt; tabOpcGroups.lineCount; i++) {
+    daLine = tabOpcGroups.getLineN(i);
+    if (daLine[iItemsCol] == 0)
+      dynAppend(iEmptyLines, i);
+  }
+  for (i = 1; i &lt;= dynlen(iEmptyLines); i++)
+    tabOpcGroups.selectLineN(iEmptyLines[i]);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdDeleteSelected" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">50 290</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 290</prop>
+    <prop name="Size">121 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Delete Selected Groups</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int i;
+  int iGroupCol;
+  dyn_int diLines;
+  dyn_string dsGroups;
+  dyn_string dsOpcGroups;
+  dyn_string dsGroupLinesToDelete;
+  dyn_anytype daLine;
+  iGroupCol = tabOpcGroups.nameToColumn(&quot;opcGroup&quot;);
+  iGroupCol++;
+  diLines = tabOpcGroups.getSelectedLines;
+  for (i = 1; i &lt;= dynlen(diLines); i++) {
+    daLine = tabOpcGroups.getLineN(diLines[i]);
+    dynAppend(dsGroups, daLine[iGroupCol]);
+  }
+  for (i = 1; i &lt;= dynlen(dsGroups); i++) {
+    dpSetWait(dsGroups[i] + &quot;.DeleteGroup&quot;, true);
+    dpDelete(dsGroups[i]);
+  }
+  delay(0,500);
+  
+  // Now need to delete the lines of any removed OPC groups
+  dsOpcGroups = dpNames(getSystemName() + &quot;*&quot;, &quot;_OPCGroup&quot;);
+  for (i = 1; i &lt;= dynlen(dsOpcGroups); i++)
+    dsOpcGroups[i] = dpSubStr(dsOpcGroups[i], DPSUB_DP);
+  dynClear(dsGroups);
+  for (i = 0; i &lt; tabOpcGroups.lineCount; i++) {
+    daLine = tabOpcGroups.getLineN(i);
+    dynAppend(dsGroups, daLine[iGroupCol]);
+  }
+  // Check if any groups have actually been deleted
+  if (dynlen(dsOpcGroups) != dynlen(dsGroups)) {
+    for (i = 1; i &lt;= dynlen(dsGroups); i++) {
+      if (dynContains(dsOpcGroups, dsGroups[i]) == 0)
+        dynAppend(dsGroupLinesToDelete, dsGroups[i]);
+    }
+    tabOpcGroups.deleteLines(1, &quot;opcGroup&quot;, dsGroupLinesToDelete);
+  }
+  modRefreshInformation();
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

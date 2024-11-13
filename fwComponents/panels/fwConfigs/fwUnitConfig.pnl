@@ -1,0 +1,1598 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   <prop name="en_US.iso88591"></prop>
+  </prop>
+  <prop name="Size">641 391</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">-1 40</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[dyn_string DPE_LIST;
+int DPE_TYPE;
+bool DPES_OK;
+
+// mode in which the panel is used
+int panelMode;
+const int OBJECT	= 1;
+const int SINGLE_DPE		= 2;
+const int MULTIPLE_DPES	= 3;
+
+dyn_dyn_anytype dpeConfigObject;
+
+_fwToggleUnitItems(bool shouldShow)
+{
+	unitButton.visible = shouldShow;
+	unitTextField.visible = shouldShow;
+}
+
+saveSettings(dyn_string &amp;exceptionInfo)
+{	
+ 	if(!DPES_OK)
+	{
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_MIXEDORBADDPETYPES&quot;), &quot;&quot;);
+		return;		
+	}
+	
+	okButton.enabled = FALSE;
+	applyButton.enabled = FALSE;
+	closeButton.enabled = FALSE;
+	if(panelMode == MULTIPLE_DPES)
+		fwOpenProgressBar(&quot;Configuration panel&quot;, &quot;Saving configuration...&quot;, 1);
+	
+	if(unitOnOff.state(0) == TRUE)
+	{
+		if(panelMode != OBJECT)
+		{
+			fwUnit_setMultiple(DPE_LIST, unitTextField.text, exceptionInfo);
+		}
+		else
+		{
+			dpeConfigObject[fwUnit_DPE_OBJECT_UNIT][1] = unitTextField.text;
+			fwGeneral_setGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+//			DebugN(&quot;Modified &quot;, dpeConfigObject);
+		}
+	}
+	else
+	{	
+		unitTextField.text = &quot;&quot;;
+		if(panelMode != OBJECT)
+		{
+			fwUnit_deleteMultiple(DPE_LIST, exceptionInfo);
+		}
+		else
+		{
+			dpeConfigObject[fwUnit_DPE_OBJECT_UNIT][1] = unitTextField.text;
+			fwGeneral_setGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+//			DebugN(&quot;Modified &quot;, dpeConfigObject);
+		}
+	}
+	
+	okButton.enabled = TRUE;
+	applyButton.enabled = TRUE;
+	closeButton.enabled = TRUE;
+	if(panelMode == MULTIPLE_DPES)
+		fwCloseProgressBar(&quot;Configuration complete&quot;);
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	bool doesExist;
+	string dpe, sUnit, errorString;
+	dyn_string systems, exceptionInfo;
+			
+	if(isDollarDefined(&quot;$sDpe&quot;))
+	{
+		dpe = $sDpe;
+		strreplace(dpe, &quot; &quot;, &quot;&quot;);
+	    DPE_LIST = strsplit(dpe, &quot;|&quot;);
+	}
+	
+	switch(dynlen(DPE_LIST))
+	{
+			case 0:
+				if(isDollarDefined(&quot;$sDpeConfigObjectVarName&quot;))	// object passed to the panel
+				{
+					if(getGlobalType($sDpeConfigObjectVarName) != DYN_DYN_ANYTYPE_VAR)
+					{
+						elementNameField.text(&quot;Wrong config object name&quot;);
+						unitOnOff.enabled = FALSE;
+						applyButton.enabled = FALSE;
+						okButton.enabled = FALSE;
+						fwException_raise(exceptionInfo, 
+															&quot;WARNING&quot;, &quot;The config object &quot; + $sDpeConfigObjectVarName + 
+															&quot; doesn't exists or hasn't got the proper format.&quot;, 
+															&quot;&quot;);
+						fwExceptionHandling_display(exceptionInfo);					
+						return;
+					}					
+					
+					panelMode = OBJECT;					
+					fwGeneral_getGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+					//DebugN(\&quot;fwAlertConfigPanel: \&quot;, dpeAlertConfigObject);
+					
+					// read from config object
+					DPE_LIST[1] = dpeConfigObject[fwConfigs_DPE_OBJECT_DPE_NAME][1];						
+					DPE_TYPE		= dpeConfigObject[fwConfigs_DPE_OBJECT_DPE_TYPE][1];
+					sUnit				= dpeConfigObject[fwUnit_DPE_OBJECT_UNIT][1];
+					
+					if(sUnit == &quot;&quot;)
+						doesExist = FALSE;
+					else
+						doesExist = TRUE;
+					
+					elementNameField.text(DPE_LIST[1]);
+					DPES_OK = TRUE;
+				}
+				else // neither dpes nor object passed, nothing to do in the panel
+				{
+					elementNameField.text(&quot;No Data Point Elements&quot;);
+					unitOnOff.enabled = FALSE;
+					applyButton.enabled = FALSE;
+					okButton.enabled = FALSE;
+					fwException_raise(exceptionInfo, &quot;WARNING&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_NODATAPOINTSTOCONFIG&quot;), &quot;&quot;);
+					fwExceptionHandling_display(exceptionInfo);					
+					return;
+				}
+				break;
+			case 1:	// single dpe passed to the panel
+				panelMode = SINGLE_DPE;
+				dpe = DPE_LIST[1];
+				elementNameField.text(dpe);
+				DPES_OK = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_UNIT, DPE_TYPE, exceptionInfo, errorString);
+				if(!DPES_OK)
+					fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+				else
+					fwUnit_get(DPE_LIST[1], doesExist, sUnit, exceptionInfo);
+				break;
+			default: // multiple dpes passed to the panel
+				panelMode = MULTIPLE_DPES;
+				dpe = DPE_LIST[1];
+
+				_fwConfigs_getSystemsInDpeList(DPE_LIST, systems, exceptionInfo);
+				
+				if(dynlen(systems) == 1)
+					elementNameField.text(&quot;Multiple Data Point Elements (from &quot; + systems[1] + &quot;)&quot;);
+				else
+					elementNameField.text(&quot;Multiple Data Point Elements (from multiple systems)&quot;);
+
+				DPES_OK = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_UNIT, DPE_TYPE, exceptionInfo, errorString);
+				if(!DPES_OK)
+					fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+
+				dpeDetails.visible = TRUE;
+				doesExist = FALSE;
+				break;
+	}
+
+	okButton.enabled = DPES_OK;
+	applyButton.enabled = DPES_OK;
+
+	if(dynlen(exceptionInfo) &gt; 0)
+	{
+		fwExceptionHandling_display(exceptionInfo);
+		return;
+	}
+		
+	if(doesExist)
+	{
+		_fwToggleUnitItems(TRUE);
+		unitOnOff.state(0, TRUE);
+		unitTextField.text = sUnit;	
+	}
+	else
+	{
+		_fwToggleUnitItems(FALSE);
+		unitOnOff.state(0, FALSE);
+		unitTextField.text = &quot;&quot;;	
+	}
+
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);	
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="Text3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Unit Configuration</prop>
+     <prop name="en_US.iso88591">Unit Configuration</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text4" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">255 131</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 55</prop>
+    <prop name="Size">117 23</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">DP Element:</prop>
+     <prop name="en_US.iso88591">DP Element:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="applyButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">460 350</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+     <prop name="en_US.iso88591">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+
+	saveSettings(exceptionInfo);
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	int x, y;
+
+	if(isDollarDefined(&quot;$bHierarchyBrowser&quot;))
+	{
+		if(!$bHierarchyBrowser)
+			closeButton.visible = TRUE;
+		else
+		{
+			getValue(&quot;&quot;, &quot;position&quot;, x, y);
+			this.position(x + 90,y);	
+		}
+	}
+	else
+		closeButton.visible = TRUE;
+		
+	this.visible = TRUE;	
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1492 929</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">550 350</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="elementNameField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">347 103</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 50</prop>
+    <prop name="Size">541 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="dpeDetails" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">460 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">460 10</prop>
+    <prop name="Size">121 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select Elements</prop>
+     <prop name="en_US.iso88591">Select Elements</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string errorString;
+	dyn_string returnedDpeList, systems, exceptionInfo;
+	dyn_float cancelOrOk;
+
+	ChildPanelOnCentralModalReturn(&quot;fwConfigs/fwDpeSelector.pnl&quot;, &quot;Choose Data Point Elements&quot;,
+									makeDynString(&quot;$dsAllDpes:&quot;+$sDpe, &quot;$dsIncludedDpes:&quot;+DPE_LIST, &quot;$sConfigType:&quot;+fwConfigs_PVSS_UNIT),
+									cancelOrOk, returnedDpeList);
+	if(cancelOrOk[1] &gt; 0.5)
+	{
+		if(DPE_LIST != returnedDpeList)
+		{
+			DPE_LIST = returnedDpeList;
+			DPES_OK = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_UNIT, DPE_TYPE, exceptionInfo, errorString);
+			if(!DPES_OK)
+				fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+
+			_fwConfigs_getSystemsInDpeList(DPE_LIST, systems, exceptionInfo);
+
+			if(dynlen(DPE_LIST)== 1)
+				elementNameField.text(DPE_LIST[1]);
+			else
+			{
+				if(dynlen(systems) == 1)
+					elementNameField.text(&quot;Multiple Data Point Elements (from &quot; + systems[1] + &quot;)&quot;);
+				else
+					elementNameField.text(&quot;Multiple Data Point Elements (from multiple systems)&quot;);
+			}
+
+			okButton.enabled = DPES_OK;
+			applyButton.enabled = DPES_OK;
+
+			unitOnOff.state(0) = FALSE;
+			_fwToggleUnitItems(FALSE);
+		}
+	}	
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="unitOnOff" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 90</prop>
+    <prop name="Size">156 26</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Unit ON/OFF</prop>
+       <prop name="en_US.iso88591">Unit ON/OFF</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	bool status;
+	dyn_string exceptionInfo;
+	
+    status = this.state(0);
+	
+	if(!DPES_OK)
+	{
+		this.state(0) = FALSE;
+		
+		fwException_raise(exceptionInfo, &quot;ERROR&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_MIXEDORBADDPETYPES&quot;), &quot;&quot;);
+		if(dynlen(exceptionInfo)&gt;0)
+			fwExceptionHandling_display(exceptionInfo);
+		return;
+	}
+
+	if(status==TRUE)
+	{
+		_fwToggleUnitItems(TRUE);
+	}
+	else
+	{	
+		_fwToggleUnitItems(FALSE);
+	}
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="okButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">370 350</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_string exceptionInfo;
+
+	saveSettings(exceptionInfo);
+	if(dynlen(exceptionInfo) &gt; 0)
+		fwExceptionHandling_display(exceptionInfo);
+	else
+		PanelOff();
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	if(isDollarDefined(&quot;$bHierarchyBrowser&quot;))
+	{
+		if(!$bHierarchyBrowser)
+			this.visible = TRUE;
+	}
+	else
+		this.visible = TRUE;	
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="unitTextField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">89 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,500,0,0,0,0,0,0,0,16,arial</prop>
+    </prop>
+    <prop name="Location">90 141</prop>
+    <prop name="Size">111 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="Group2" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">604 10</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwConfigs/fwUnitConfig</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="unitButton" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">210 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.utf8"></prop>
+     <prop name="ru_RU.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="ru_RU.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">210 140</prop>
+    <prop name="Size">71 25</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">SI units</prop>
+     <prop name="en_US.iso88591">SI units</prop>
+     <prop name="de_AT.utf8">SI-Einheiten</prop>
+     <prop name="ru_RU.utf8">Ед.изм.СИ</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">0</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Space and time</prop>
+       <prop name="en_US.iso88591">Space and time</prop>
+       <prop name="de_AT.utf8">Raum und Zeit</prop>
+       <prop name="ru_RU.utf8">пространство и время</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">1</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">mm (millimeters) length</prop>
+         <prop name="en_US.iso88591">mm (millimeters) length</prop>
+         <prop name="de_AT.utf8">mm (Millimeter) Länge</prop>
+         <prop name="ru_RU.utf8">мм (миллиметр) длина</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">2</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">µm (micrometers) length</prop>
+         <prop name="en_US.iso88591">µm (micrometers) length</prop>
+         <prop name="de_AT.utf8">µm (Mikrometer) Länge</prop>
+         <prop name="ru_RU.utf8">мкм (микрометр) длина</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">3</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">m (meters) length</prop>
+         <prop name="en_US.iso88591">m (meters) length</prop>
+         <prop name="de_AT.utf8">m (Meter) Länge</prop>
+         <prop name="ru_RU.utf8">м (метр), длина</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">4</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">km (kilometers) length</prop>
+         <prop name="en_US.iso88591">km (kilometers) length</prop>
+         <prop name="de_AT.utf8">km (Kilometer) Länge</prop>
+         <prop name="ru_RU.utf8">км (километр), расстояние</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">5</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">m² (square meters) area</prop>
+         <prop name="en_US.iso88591">m² (square meters) area</prop>
+         <prop name="de_AT.utf8">m² (Quadratmeter) Fläche</prop>
+         <prop name="ru_RU.utf8">м² (квадратный метр) площадь</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">6</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">m³ (cubic meters) volume</prop>
+         <prop name="en_US.iso88591">m³ (cubic meters) volume</prop>
+         <prop name="de_AT.utf8">m³ (Kubikmeter) Volumen</prop>
+         <prop name="ru_RU.utf8">м³ (кубический метр) объем</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">7</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">l (liters) volume</prop>
+         <prop name="en_US.iso88591">l (liters) volume</prop>
+         <prop name="de_AT.utf8">l (Liter) Volumen</prop>
+         <prop name="ru_RU.utf8">л (литр) объем</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">8</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">hl (hectoliters) volume</prop>
+         <prop name="en_US.iso88591">hl (hectoliters) volume</prop>
+         <prop name="de_AT.utf8">hl (Hektoliter) Volumen</prop>
+         <prop name="ru_RU.utf8">гл (гектолитр) объем</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">9</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">rad (radiant) plane angle</prop>
+         <prop name="en_US.iso88591">rad (radiant) plane angle</prop>
+         <prop name="de_AT.utf8">rad (Radiant) Ebener Winkel</prop>
+         <prop name="ru_RU.utf8">рад (радиан) угловая мера</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">10</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">° (degrees) plane angle</prop>
+         <prop name="en_US.iso88591">° (degrees) plane angle</prop>
+         <prop name="de_AT.utf8">° (Grad) Ebener Winkel</prop>
+         <prop name="ru_RU.utf8">° (градус) плоский угол</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">11</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">sr (steradian) solid angle</prop>
+         <prop name="en_US.iso88591">sr (steradian) solid angle</prop>
+         <prop name="de_AT.utf8">sr (Steradiant) Raumwinkel</prop>
+         <prop name="ru_RU.utf8">ср (стерадиан) телесный угол</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">12</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">s (seconds) time</prop>
+         <prop name="en_US.iso88591">s (seconds) time</prop>
+         <prop name="de_AT.utf8">s (Sekunde) Zeit</prop>
+         <prop name="ru_RU.utf8">с (секунда) время</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">13</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">ms (milliseconds) time</prop>
+         <prop name="en_US.iso88591">ms (milliseconds) time</prop>
+         <prop name="de_AT.utf8">ms (Millisekunde) Zeit</prop>
+         <prop name="ru_RU.utf8">мс (миллисекунда) время</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">14</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">min (minutes) time</prop>
+         <prop name="en_US.iso88591">min (minutes) time</prop>
+         <prop name="de_AT.utf8">min (Minute) Zeit</prop>
+         <prop name="ru_RU.utf8">мин (минута) время</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">15</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">h (hours) time</prop>
+         <prop name="en_US.iso88591">h (hours) time</prop>
+         <prop name="de_AT.utf8">h (Stunde) Zeit</prop>
+         <prop name="ru_RU.utf8">ч (час) время</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">16</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">d (days) time</prop>
+         <prop name="en_US.iso88591">d (days) time</prop>
+         <prop name="de_AT.utf8">d (Tag) Zeit</prop>
+         <prop name="ru_RU.utf8">сут (сутки) время</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">17</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">a (years) time</prop>
+         <prop name="en_US.iso88591">a (years) time</prop>
+         <prop name="de_AT.utf8">a (Jahr) Zeit</prop>
+         <prop name="ru_RU.utf8">г. (год) время</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">18</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">m/s speed</prop>
+         <prop name="en_US.iso88591">m/s speed</prop>
+         <prop name="de_AT.utf8">m/s Geschwindigkeit</prop>
+         <prop name="ru_RU.utf8">м/с скорость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">19</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">km/h speed</prop>
+         <prop name="en_US.iso88591">km/h speed</prop>
+         <prop name="de_AT.utf8">km/h Geschwindigkeit</prop>
+         <prop name="ru_RU.utf8">км/ч, скорость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">20</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">m/s² acceleration</prop>
+         <prop name="en_US.iso88591">m/s² acceleration</prop>
+         <prop name="de_AT.utf8">m/s² Beschleunigung</prop>
+         <prop name="ru_RU.utf8">м/с² ускорение</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">21</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Hz (hertz) frequency</prop>
+         <prop name="en_US.iso88591">Hz (hertz) frequency</prop>
+         <prop name="de_AT.utf8">Hz (Hertz) Frequenz</prop>
+         <prop name="ru_RU.utf8">Гц (герц) частота</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">22</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">1/s rotational speed</prop>
+         <prop name="en_US.iso88591">1/s rotational speed</prop>
+         <prop name="de_AT.utf8">1/s Drehzahl</prop>
+         <prop name="ru_RU.utf8">скорость вращения 1/сек.</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">23</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">1/min rotational speed</prop>
+         <prop name="en_US.iso88591">1/min rotational speed</prop>
+         <prop name="de_AT.utf8">1/min Drehzahl</prop>
+         <prop name="ru_RU.utf8">скорость вращения 1/мин.</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">24</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Mechanics and acoustics</prop>
+       <prop name="en_US.iso88591">Mechanics and acoustics</prop>
+       <prop name="de_AT.utf8">Mechanik und Akustik</prop>
+       <prop name="ru_RU.utf8">механика и акустика</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">25</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">g (grams) mass</prop>
+         <prop name="en_US.iso88591">g (grams) mass</prop>
+         <prop name="de_AT.utf8">g (gramm) Masse</prop>
+         <prop name="ru_RU.utf8">г (грамм) масса</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">26</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kg (kilograms) mass</prop>
+         <prop name="en_US.iso88591">kg (kilograms) mass</prop>
+         <prop name="de_AT.utf8">kg (Kilogramm) Masse</prop>
+         <prop name="ru_RU.utf8">кг (килограмм), масса</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">27</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">t (tons) mass</prop>
+         <prop name="en_US.iso88591">t (tons) mass</prop>
+         <prop name="de_AT.utf8">t (tonne) Masse</prop>
+         <prop name="ru_RU.utf8">т (тонна) масса</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">28</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">u/h (units/h) throughput, performance</prop>
+         <prop name="en_US.iso88591">u/h (units/h) throughput, performance</prop>
+         <prop name="de_AT.utf8">Stk/h (Stück/h) Durchsatzleistung</prop>
+         <prop name="ru_RU.utf8">(шт./ч.) пропускная способность</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">29</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kg/m lengthwise mass</prop>
+         <prop name="en_US.iso88591">kg/m lengthwise mass</prop>
+         <prop name="de_AT.utf8">kg/m Längenbezogene Masse</prop>
+         <prop name="ru_RU.utf8">кг/м линейная плотность</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">30</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kg/m³ density</prop>
+         <prop name="en_US.iso88591">kg/m³ density</prop>
+         <prop name="de_AT.utf8">kg/m³ Dichte</prop>
+         <prop name="ru_RU.utf8">кг/м³ плотность</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">31</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kg·m/s pulse</prop>
+         <prop name="en_US.iso88591">kg·m/s pulse</prop>
+         <prop name="de_AT.utf8">kg·m/s Impuls</prop>
+         <prop name="ru_RU.utf8">кг·м/с, импульс</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">32</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kg·m² mass moment of inertia</prop>
+         <prop name="en_US.iso88591">kg·m² mass moment of inertia</prop>
+         <prop name="de_AT.utf8">kg·m² Massenträgheitsmoment</prop>
+         <prop name="ru_RU.utf8">кг·м² момент инерции</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">33</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">N (newtons) force</prop>
+         <prop name="en_US.iso88591">N (newtons) force</prop>
+         <prop name="de_AT.utf8">N (Newton) Kraft</prop>
+         <prop name="ru_RU.utf8">Н (ньютон) сила</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">34</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Nm torque</prop>
+         <prop name="en_US.iso88591">Nm torque</prop>
+         <prop name="de_AT.utf8">Nm Drehmoment</prop>
+         <prop name="ru_RU.utf8">Н·м вращательный момент</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">35</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">N/m² mech. tension</prop>
+         <prop name="en_US.iso88591">N/m² mech. tension</prop>
+         <prop name="de_AT.utf8">N/m² Mech.Spannung</prop>
+         <prop name="ru_RU.utf8">Па механическое напряжение</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">36</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Pa (pascals) pressure</prop>
+         <prop name="en_US.iso88591">Pa (pascals) pressure</prop>
+         <prop name="de_AT.utf8">Pa (Pascal) Druck</prop>
+         <prop name="ru_RU.utf8">Па (паскаль) давление</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">84</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">KPa (kilopascal) pressure</prop>
+         <prop name="en_US.iso88591">KPa (kilopascal) pressure</prop>
+         <prop name="de_AT.utf8">KPa (Kilopascal) Druck</prop>
+         <prop name="ru_RU.utf8">кПа (килопаскаль) давление</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">37</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">hPa (Hectopascal) pressure</prop>
+         <prop name="en_US.iso88591">hPa (Hectopascal) pressure</prop>
+         <prop name="de_AT.utf8">hPa (Hectopascal) Druck</prop>
+         <prop name="ru_RU.utf8">гПа (гектопаскаль) давление</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">38</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">J (joule) energy,work</prop>
+         <prop name="en_US.iso88591">J (joule) energy,work</prop>
+         <prop name="de_AT.utf8">J (Joule) Energie,Arbeit,Wärmemenge</prop>
+         <prop name="ru_RU.utf8">Дж (джоуль) работа, энергия</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">39</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kWh (kilowatt hours) energy,work</prop>
+         <prop name="en_US.iso88591">kWh (kilowatt hours) energy,work</prop>
+         <prop name="de_AT.utf8">kWh (Kilowattstunde) Energie,Arbeit,Wärmemenge</prop>
+         <prop name="ru_RU.utf8">кВт⋅ч (киловатт-час) энергия, работа</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">40</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">eV (electron volt) energy, work</prop>
+         <prop name="en_US.iso88591">eV (electron volt) energy, work</prop>
+         <prop name="de_AT.utf8">eV (Elektronenvolt) Energie,Arbeit,Wärmemenge</prop>
+         <prop name="ru_RU.utf8">эВ (электроновольт) энергия </prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">41</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">W (watts) power</prop>
+         <prop name="en_US.iso88591">W (watts) power</prop>
+         <prop name="de_AT.utf8">W (Watt) Leistung</prop>
+         <prop name="ru_RU.utf8">Вт (ватт) мощность</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">42</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kW (kilowatts) power</prop>
+         <prop name="en_US.iso88591">kW (kilowatts) power</prop>
+         <prop name="de_AT.utf8">kW (Kilowatt) Leistung</prop>
+         <prop name="ru_RU.utf8">кВт (киловатт) мощность</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">43</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Pa·s dynamic viscosity</prop>
+         <prop name="en_US.iso88591">Pa·s dynamic viscosity</prop>
+         <prop name="de_AT.utf8">Pa·s Dynamische Viskosität</prop>
+         <prop name="ru_RU.utf8">Па·с динамическая вязкость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">44</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">m²/s kinematic viscosity</prop>
+         <prop name="en_US.iso88591">m²/s kinematic viscosity</prop>
+         <prop name="de_AT.utf8">m²/s Kinematische Viskosität</prop>
+         <prop name="ru_RU.utf8">м²/с вязкость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">81</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">m³/s (cubic meters per second) volume flow</prop>
+         <prop name="en_US.iso88591">m³/s (cubic meters per second) volume flow</prop>
+         <prop name="de_AT.utf8">m³/s (Kubikmeter pro Sekunde) Volumenstrom</prop>
+         <prop name="ru_RU.utf8">м³/с (кубический метр в секунду) объемный расход</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">82</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">m³/h (cubic meters per hour) volume flow</prop>
+         <prop name="en_US.iso88591">m³/h (cubic meters per hour) volume flow</prop>
+         <prop name="de_AT.utf8">m³/h (Kubikmeter pro Stunde) Volumenstrom</prop>
+         <prop name="ru_RU.utf8">м³/ч (кубический метр в час) объемный расход</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">83</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kg·m²/s angular momentum</prop>
+         <prop name="en_US.iso88591">kg·m²/s angular momentum</prop>
+         <prop name="de_AT.utf8">kg·m²/s Drehimpuls</prop>
+         <prop name="ru_RU.utf8">кг·м²/с момент количества дви­жения</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">85</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">rad/s angle speed</prop>
+         <prop name="en_US.iso88591">rad/s angle speed</prop>
+         <prop name="de_AT.utf8">rad/s Winkelgeschwindigkeit</prop>
+         <prop name="ru_RU.utf8">рад/с угловая скорость</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">45</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Temperature and heat</prop>
+       <prop name="en_US.iso88591">Temperature and heat</prop>
+       <prop name="de_AT.utf8">Temperatur und Wärme</prop>
+       <prop name="ru_RU.utf8">температура и тепло</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">46</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">K (kelvins) temperature</prop>
+         <prop name="en_US.iso88591">K (kelvins) temperature</prop>
+         <prop name="de_AT.utf8">K (Kelvin) Temperatur</prop>
+         <prop name="ru_RU.utf8">К (кельвин), температура </prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">47</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">°C (centigrade) temperature</prop>
+         <prop name="en_US.iso88591">°C (centigrade) temperature</prop>
+         <prop name="de_AT.utf8">°C (Celsius) Temperatur</prop>
+         <prop name="ru_RU.utf8">°C (градус цельсия) температура</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">48</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">J/K heat capacity entropy</prop>
+         <prop name="en_US.iso88591">J/K heat capacity entropy</prop>
+         <prop name="de_AT.utf8">J/K Wärmekapazität Entropie</prop>
+         <prop name="ru_RU.utf8">Дж/К теплоемкость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">49</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">J/(kg·K) specific thermal capacity</prop>
+         <prop name="en_US.iso88591">J/(kg·K) specific thermal capacity</prop>
+         <prop name="de_AT.utf8">J/(kg·K) Spez.Wärmekapazität</prop>
+         <prop name="ru_RU.utf8">Дж/(кг·К) удельная теплоёмкость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">50</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">J/kg specific inner energy</prop>
+         <prop name="en_US.iso88591">J/kg specific inner energy</prop>
+         <prop name="de_AT.utf8">J/kg Spez.innere Energie</prop>
+         <prop name="ru_RU.utf8">Дж/кг количество теплоты</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">51</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">W/(m·K) thermal conductivity</prop>
+         <prop name="en_US.iso88591">W/(m·K) thermal conductivity</prop>
+         <prop name="de_AT.utf8">W/(m·K) Wärmeleitfähigkeit</prop>
+         <prop name="ru_RU.utf8">Вт/(м·K) теплопроводность</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">52</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">W/(m²·K) heat transfer coeff.</prop>
+         <prop name="en_US.iso88591">W/(m²·K) heat transfer coeff.</prop>
+         <prop name="de_AT.utf8">W/(m²·K) Wärmeübergangskoeff.</prop>
+         <prop name="ru_RU.utf8">Вт/(м²·K) коэффициент теплопередачи </prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">96</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">J/mol·K molar heat capacity</prop>
+         <prop name="en_US.iso88591">J/mol·K molar heat capacity</prop>
+         <prop name="de_AT.utf8">J/mol·K Molare Wärmekapazität</prop>
+         <prop name="ru_RU.utf8">Дж/(моль·К) молярная теплоемкость </prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">97</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">J Heat quantity</prop>
+         <prop name="en_US.iso88591">J Heat quantity</prop>
+         <prop name="de_AT.utf8">J Wärmemenge</prop>
+         <prop name="ru_RU.utf8">Дж (джоуль) количество теплоты</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">53</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Electricity, magnetism and light</prop>
+       <prop name="en_US.iso88591">Electricity, magnetism and light</prop>
+       <prop name="de_AT.utf8">Elektrizität, Magnetismus und Licht</prop>
+       <prop name="ru_RU.utf8">электричество, магнетизм и свет</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">54</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">mA (milliamps) elec. current</prop>
+         <prop name="en_US.iso88591">mA (milliamps) elec. current</prop>
+         <prop name="de_AT.utf8">mA (Milliampere) El.Stromstärke</prop>
+         <prop name="ru_RU.utf8">мА (миллиампер) сила тока</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">55</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">A (amperes) elec. current</prop>
+         <prop name="en_US.iso88591">A (amperes) elec. current</prop>
+         <prop name="de_AT.utf8">A (Ampere) El.Stromstärke</prop>
+         <prop name="ru_RU.utf8">А (амперы) сила тока</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">56</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kA (kiloamps) elec. current</prop>
+         <prop name="en_US.iso88591">kA (kiloamps) elec. current</prop>
+         <prop name="de_AT.utf8">kA (Kiloampere) El.Stromstärke</prop>
+         <prop name="ru_RU.utf8">кА (килоампер), сила тока</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">57</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">C (Coulomb) elec. charge</prop>
+         <prop name="en_US.iso88591">C (Coulomb) elec. charge</prop>
+         <prop name="de_AT.utf8">C (Coulomb) El.Ladung</prop>
+         <prop name="ru_RU.utf8">Кл (кулон) электрический заряд</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">58</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">mV (millivolts) elec. voltage</prop>
+         <prop name="en_US.iso88591">mV (millivolts) elec. voltage</prop>
+         <prop name="de_AT.utf8">mV (Millivolt) El.Spannung</prop>
+         <prop name="ru_RU.utf8">мВ (милливольт) электр.напряжение</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">59</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">V (volts) elec. voltage</prop>
+         <prop name="en_US.iso88591">V (volts) elec. voltage</prop>
+         <prop name="de_AT.utf8">V (Volt) El.Spannung</prop>
+         <prop name="ru_RU.utf8">В (вольт) электр.нарпряжение</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">60</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kV (kilovolts) elec. voltage</prop>
+         <prop name="en_US.iso88591">kV (kilovolts) elec. voltage</prop>
+         <prop name="de_AT.utf8">kV (Kilovolt) El.Spannung</prop>
+         <prop name="ru_RU.utf8">кВ (киловольт) электр. напряжение</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">61</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Ω elec. resistance</prop>
+         <prop name="en_US.iso88591">? elec. resistance</prop>
+         <prop name="de_AT.utf8">Ω El.Widerstand</prop>
+         <prop name="ru_RU.utf8">Ом электр.сопротивление</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">62</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kΩ elec. resistance</prop>
+         <prop name="en_US.iso88591">k? elec. resistance</prop>
+         <prop name="de_AT.utf8">kΩ El.Widerstand</prop>
+         <prop name="ru_RU.utf8">кОм (килоом) электр. сопротивление</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">63</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">MΩ elec. resistance</prop>
+         <prop name="en_US.iso88591">M? elec. resistance</prop>
+         <prop name="de_AT.utf8">MΩ El.Widerstand</prop>
+         <prop name="ru_RU.utf8">МОм, электр.сопротивление</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">64</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">S (siemens) elec. conductance</prop>
+         <prop name="en_US.iso88591">S (siemens) elec. conductance</prop>
+         <prop name="de_AT.utf8">S (Siemens) El.Leitwert</prop>
+         <prop name="ru_RU.utf8">См (Сименс) электр.проводимость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">65</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">F (farad) elec. capacity</prop>
+         <prop name="en_US.iso88591">F (farad) elec. capacity</prop>
+         <prop name="de_AT.utf8">F (Farad) El.Kapazität</prop>
+         <prop name="ru_RU.utf8">Ф (фарад) электрическая ёмкость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">87</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">pF (picofarad) elec. capacity</prop>
+         <prop name="en_US.iso88591">pF (picofarad) elec. capacity</prop>
+         <prop name="de_AT.utf8">pF (Picofarad) El.Kapazität</prop>
+         <prop name="ru_RU.utf8">пФ (пикофарад) электрическая емкость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">88</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">mF (microfarad) elec. capacity</prop>
+         <prop name="en_US.iso88591">mF (microfarad) elec. capacity</prop>
+         <prop name="de_AT.utf8">mF (Microfarad) El.Kapazität</prop>
+         <prop name="ru_RU.utf8">мкФ (микрофарад) электрическая емкость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">89</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">V/m elec. field strength</prop>
+         <prop name="en_US.iso88591">V/m elec. field strength</prop>
+         <prop name="de_AT.utf8">V/m El.Feldstärke</prop>
+         <prop name="ru_RU.utf8">В/м напряженность электрического поля</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">66</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Wb (webers) magn. flux</prop>
+         <prop name="en_US.iso88591">Wb (webers) magn. flux</prop>
+         <prop name="de_AT.utf8">Wb (Weber) Magn.Fluss</prop>
+         <prop name="ru_RU.utf8">Вб (вебер) магнитный поток</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">67</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">T (teslas) magn. flux density</prop>
+         <prop name="en_US.iso88591">T (teslas) magn. flux density</prop>
+         <prop name="de_AT.utf8">T (Tesla) Magn.Flussdichte</prop>
+         <prop name="ru_RU.utf8">Тл (тесла) индукция магнитного поля</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">68</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">H (henry) inductance</prop>
+         <prop name="en_US.iso88591">H (henry) inductance</prop>
+         <prop name="de_AT.utf8">H (Henry) Induktivität</prop>
+         <prop name="ru_RU.utf8">Гн (генри) индуктивность</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">69</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">A/m magn. field intensity</prop>
+         <prop name="en_US.iso88591">A/m magn. field intensity</prop>
+         <prop name="de_AT.utf8">A/m Magn.Feldstärke</prop>
+         <prop name="ru_RU.utf8">А/м (амперы на метр) напряжённость магнитного поля </prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">70</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">cd (candelas) light intensity</prop>
+         <prop name="en_US.iso88591">cd (candelas) light intensity</prop>
+         <prop name="de_AT.utf8">cd (Candela) Lichtstärke</prop>
+         <prop name="ru_RU.utf8">кд (кандела) сила света</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">71</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">cd/m² luminance</prop>
+         <prop name="en_US.iso88591">cd/m² luminance</prop>
+         <prop name="de_AT.utf8">cd/m² Leuchtdichte</prop>
+         <prop name="ru_RU.utf8">кд/м² яркость</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">72</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">lm (lumens) light current</prop>
+         <prop name="en_US.iso88591">lm (lumens) light current</prop>
+         <prop name="de_AT.utf8">lm (Lumen) Lichtstrom</prop>
+         <prop name="ru_RU.utf8">лм (люмен) световой поток</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">73</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">lx (lux) luminous intensity</prop>
+         <prop name="en_US.iso88591">lx (lux) luminous intensity</prop>
+         <prop name="de_AT.utf8">lx (Lux) Beleuchtungsstärke</prop>
+         <prop name="ru_RU.utf8">лк (люкс) освещенность</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">90</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Ωm resistivity</prop>
+         <prop name="en_US.iso88591">?m resistivity</prop>
+         <prop name="de_AT.utf8">Ωm Spezifischer Wiederstand</prop>
+         <prop name="ru_RU.utf8">Ом·м удельное электрическое сопротивление</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">91</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">A/m² current density</prop>
+         <prop name="en_US.iso88591">A/m² current density</prop>
+         <prop name="de_AT.utf8">A/m² Stromdichte</prop>
+         <prop name="ru_RU.utf8">А/м² плотность тока</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">92</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">C/m² dislocation density</prop>
+         <prop name="en_US.iso88591">C/m² dislocation density</prop>
+         <prop name="de_AT.utf8">C/m² Verschiebungsdichte</prop>
+         <prop name="ru_RU.utf8">Кл/м2 электрическое смещение</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">93</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">m³/mol molar volume</prop>
+         <prop name="en_US.iso88591">m³/mol molar volume</prop>
+         <prop name="de_AT.utf8">m³/mol Molares Volumen</prop>
+         <prop name="ru_RU.utf8">м³/моль молярный объем</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">94</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">J/mol·K molar heat capacity</prop>
+         <prop name="en_US.iso88591">J/mol·K molar heat capacity</prop>
+         <prop name="de_AT.utf8">J/mol·K Molare Wärmekapazität</prop>
+         <prop name="ru_RU.utf8">Дж/(моль·К) молярная теплоемкость </prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">95</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">H/m permeability</prop>
+         <prop name="en_US.iso88591">H/m permeability</prop>
+         <prop name="de_AT.utf8">H/m Permeabilität</prop>
+         <prop name="ru_RU.utf8">Гн/м магнитная проницаемость</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">74</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Radioactivity, ionizing rays, molecular ...</prop>
+       <prop name="en_US.iso88591">Radioactivity, ionizing rays, molecular ...</prop>
+       <prop name="de_AT.utf8">Radioaktivität, Ionisierende Strahlung,Molekular...</prop>
+       <prop name="ru_RU.utf8">радиоактивность, ионизация, молекулы</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">75</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Bq (becquerels) radioactivity</prop>
+         <prop name="en_US.iso88591">Bq (becquerels) radioactivity</prop>
+         <prop name="de_AT.utf8">Bq (Becquerel) Radioaktivität</prop>
+         <prop name="ru_RU.utf8">Бк (беккерель) радиоактивность</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">76</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Gy (Gray) absorbed dose</prop>
+         <prop name="en_US.iso88591">Gy (Gray) absorbed dose</prop>
+         <prop name="de_AT.utf8">Gy (Gray) Energiedosis</prop>
+         <prop name="ru_RU.utf8">Гр (грей) поглощенная доза</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">77</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Sv (sieverts) dose equivalent</prop>
+         <prop name="en_US.iso88591">Sv (sieverts) dose equivalent</prop>
+         <prop name="de_AT.utf8">Sv (Sievert) Äquivalentdosis</prop>
+         <prop name="ru_RU.utf8">Зв (зиверт) эквивалентная доза</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">78</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">C/kg ion dose</prop>
+         <prop name="en_US.iso88591">C/kg ion dose</prop>
+         <prop name="de_AT.utf8">C/kg Ionendosis</prop>
+         <prop name="ru_RU.utf8">Кл/кг (кулон на килограмм) экспозиционная доза</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">79</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">mol (mol) amount of substance</prop>
+         <prop name="en_US.iso88591">mol (mol) amount of substance</prop>
+         <prop name="de_AT.utf8">mol (Mol) Stoffmenge</prop>
+         <prop name="ru_RU.utf8">моль (моль) количество вещества</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">80</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">kg/mol mass ref. to amount of substance</prop>
+         <prop name="en_US.iso88591">kg/mol mass ref. to amount of substance</prop>
+         <prop name="de_AT.utf8">kg/mol Stoffmengenbezogene Masse</prop>
+         <prop name="ru_RU.utf8">кг/моль молярная масса</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+  string text = this.textItemId(id);
+  string sTemp;
+  dyn_string dsTemp = strsplit(text, &quot; &quot;);
+ 
+  sTemp += dsTemp[1];
+  
+  setValue(&quot;unitTextField&quot;, &quot;text&quot;, sTemp); 
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

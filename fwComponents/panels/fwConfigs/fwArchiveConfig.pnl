@@ -1,0 +1,2956 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">661 426</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">11 51</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[const int RELATIVE_DEADBAND = 10;
+const string NONE_DEFINED_STR = &quot;&lt;NONE DEFINED&gt;&quot;;
+const string ARCHIVECLASSTYPEDIVIDER = &quot;-----------&quot;;
+
+const int OBJECT         = 1;
+const int SINGLE_DPE    = 2;
+const int MULTIPLE_DPES = 3;
+int panelMode;
+
+dyn_string DPE_LIST, SYSTEMS;
+int DPE_TYPE;
+bool DPES_OK;
+bool MIXED_ARCHIVING;
+bool NGA_MODE;
+bool canHaveSmoothing;
+string PREVIOUS_CLASS;
+mapping DIGITAL_OPTIONS;
+mapping ANALOG_OPTIONS;
+mapping DIGITAL_PROCEDURES;
+mapping ANALOG_PROCEDURES;
+
+dyn_string ngaArchClasses, ngaArchClassDps;
+dyn_string rdbValarchArchClasses, rdbValarchArchClassDps;
+
+dyn_dyn_anytype dpeConfigObject;
+
+int tempCurrentIdx = -1;
+dyn_string tempArchiveClasses;
+dyn_int tempSmoothTypes;
+dyn_int tempSmoothProcedures;
+dyn_float tempDeadbands;
+dyn_float tempTimes;
+
+void setTemporaryParams(int archClassIdx, const string &amp;archClass, int smoothType, int smoothProcedure,
+                        float deadband, float timeInterval)
+{
+    tempArchiveClasses[archClassIdx] = archClass;
+    tempSmoothTypes[archClassIdx] = smoothType;
+    tempSmoothProcedures[archClassIdx] = smoothProcedure;
+    tempDeadbands[archClassIdx] = deadband;
+    tempTimes[archClassIdx] = timeInterval;
+}
+
+void getTemporaryParams(int archClassIdx, string &amp;archClass, int &amp;smoothType, int &amp;smoothProcedure,
+                        float &amp;deadband, float &amp;timeInterval)
+{
+    archClass = tempArchiveClasses[archClassIdx];
+    smoothType = tempSmoothTypes[archClassIdx];
+    smoothProcedure = tempSmoothProcedures[archClassIdx];
+    deadband = tempDeadbands[archClassIdx];
+    timeInterval = tempTimes[archClassIdx];
+}
+
+fwFillArchiveClassList(dyn_string systems, dyn_string &amp;exceptionInfo)
+{
+    dynClear(ngaArchClasses);
+    dynClear(ngaArchClassDps);
+    dynClear(rdbValarchArchClasses);
+    dynClear(rdbValarchArchClassDps);
+
+    dyn_string rdbArchClasses, rdbArchClassDps;
+
+    fwArchive_getAllValueArchiveClasses(systems, rdbValarchArchClasses, rdbValarchArchClassDps, exceptionInfo);
+    fwArchive_getAllRDBArchiveClasses(systems, rdbArchClasses, rdbArchClassDps, exceptionInfo);
+    fwArchive_getAllNGAArchiveClasses(systems, ngaArchClasses, ngaArchClassDps, exceptionInfo);
+
+    if (dynlen(rdbArchClasses) &gt; 0) {
+        dynAppend(rdbValarchArchClasses, ARCHIVECLASSTYPEDIVIDER);
+        dynAppend(rdbValarchArchClassDps, ARCHIVECLASSTYPEDIVIDER);
+        dynAppend(rdbValarchArchClasses, rdbArchClasses);
+        dynAppend(rdbValarchArchClassDps, rdbArchClassDps);
+    }
+
+    if (rdbValarchArchClasses[1] == ARCHIVECLASSTYPEDIVIDER) {
+        dynRemove(rdbValarchArchClasses, 1);
+        dynRemove(rdbValarchArchClassDps, 1);
+    }
+
+    switchDisplayedArchiveClasses(NGA_MODE);
+}
+
+void switchDisplayedArchiveClasses(bool nga)
+{
+    archiveClassList.items(nga ? ngaArchClasses : rdbValarchArchClasses);
+    archiveClassDp.items(nga ? ngaArchClassDps : rdbValarchArchClassDps);
+    archiveClassList.selectedPos(1);
+    archiveClassDp.selectedPos(1);
+}
+
+void setNgaWidgetsVisible(bool visible)
+{
+    archiveProcedureText.visible = visible;
+    dpeArchClassesComboBox.visible = visible;
+    archProcedureDelete.visible = visible;
+    archProcedureSave.visible = visible;
+    archProcedureAppend.visible = visible;
+    archProcedureInsertEmpty.visible = visible;
+}
+
+fwUpdateArchiveStatistics(string archiveClassDp, dyn_string &amp;exceptionInfo)
+{
+    archiveManagementButton.enabled = FALSE;
+
+    if (!dpExists(archiveClassDp)) {
+        return;
+    }
+
+    int pos, result;
+    dyn_string ds;
+
+    refresh.enabled = FALSE;
+    //gt the local dp (if redundant system, might be dp or dp_2)
+    archiveClassDp = fwInstallationRedu_getLocalDp(archiveClassDp);
+
+    if (dpTypeName(archiveClassDp) == fwArchive_RDB_CLASS_DPTYPE) {
+        //is ORACLE archive class
+        archiveManagementButton.enabled = true;
+        parametrize.enabled = false;
+        archiveLoad.text = &quot;Not available&quot;;
+        classState.text = &quot;Not available&quot;;
+    } else if (dpTypeName(archiveClassDp) == fwArchive_NGA_CLASS_DPTYPE) {
+        archiveManagementButton.enabled = true;
+        parametrize.enabled = false;
+        archiveLoad.text = &quot;Not available&quot;;
+        classState.text = &quot;Not available&quot;;
+    } else if (dpTypeName(archiveClassDp) == fwArchive_VALARCH_CLASS_DPTYPE) {
+        //is PVSS valarch archive class
+        archiveManagementButton.enabled = FALSE;
+        pos = dynContains(SYSTEMS, getSystemName());
+        parametrize.enabled = (dynlen(SYSTEMS) == 1) &amp;&amp; (pos &gt; 0);
+        archiveLoad.text = &quot;Refreshing...&quot;;
+        dpConnect(&quot;work_getClassDpeLoad&quot;, FALSE, archiveClassDp + &quot;.statistics.dpElements:_online.._stime&quot;);
+        dpConnect(&quot;work_getClassState&quot;, TRUE, archiveClassDp + &quot;.state:_online.._stime&quot;);
+
+        //trigger refresh of class shown
+        dpGet(archiveClassDp+&quot;.files.fileName:_online.._value&quot;, ds);
+        dpSet(archiveClassDp+&quot;.statistics.index:_original.._value&quot;, dynlen(ds));
+    } else {
+        archiveManagementButton.enabled = FALSE;
+        parametrize.enabled = FALSE;
+        archiveLoad.text = &quot;Not available&quot;;
+        classState.text = &quot;Not available&quot;;
+    }
+}
+
+configureOrSmoothingCheckBoxClicked()
+{
+    int elementType;
+    shape optionsList;
+    dyn_string exceptionInfo;
+
+    if (!DPES_OK || MIXED_ARCHIVING) {
+        configureCheckBox.state(0) = FALSE;
+        smoothingCheckBox.state(0) = FALSE;
+
+        if (!DPES_OK) {
+            fwException_raise(exceptionInfo, &quot;ERROR&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_MIXEDORBADDPETYPES&quot;), &quot;&quot;);
+        }
+        if (MIXED_ARCHIVING) {
+            fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Selected systems use different types of archiving (NGA and RDB/VALARCH) - cannot edit the _archive configs&quot;, &quot;&quot;);
+        }
+        if (dynlen(exceptionInfo)&gt;0)
+            fwExceptionHandling_display(exceptionInfo);
+        return;
+    }
+
+    bool archiveState = configureCheckBox.state(0);
+    bool withSmooth = smoothingCheckBox.state(0);
+
+    if (withSmooth) {
+        if (!canHaveSmoothing) {
+            smoothingCheckBox.state(0) = FALSE;
+            return;
+        }
+    }
+
+    _fwConfigs_getConfigOptionsForDpeType(DPE_TYPE, fwConfigs_PVSS_ARCHIVE, elementType, exceptionInfo);
+    switch (elementType) {
+        case fwConfigs_ANALOG_OPTIONS:
+            optionsList = getShape(&quot;smoothingOptions&quot;);
+            break;
+        default:
+            optionsList = getShape(&quot;digitalSmoothingOptions&quot;);
+            break;
+    }
+
+    if (!(archiveState)&amp;&amp;(!withSmooth)) {
+        _fwHideSmoothingItems();
+        _fwToggleBasicArchiveItems(FALSE);
+    }
+    if (archiveState&amp;&amp;(!withSmooth)) {
+        _fwHideSmoothingItems();
+        _fwToggleBasicArchiveItems(TRUE);
+    }
+    if (archiveState&amp;&amp;withSmooth) {
+        _fwShowSmoothingItems(optionsList.number);
+        optionsList.visible(TRUE);
+        _fwToggleBasicArchiveItems(TRUE);
+    }
+    if ((!archiveState)&amp;&amp;withSmooth) {
+        if (optionsList.visible()) {
+            smoothingCheckBox.state(0, FALSE);
+            _fwHideSmoothingItems();
+            _fwToggleBasicArchiveItems(FALSE);
+        } else {
+            configureCheckBox.state(0, TRUE);
+            _fwShowSmoothingItems(optionsList.number);
+            optionsList.visible(TRUE);
+            _fwToggleBasicArchiveItems(TRUE);
+        }
+    }
+}
+
+fwSetTimeFieldsFormat(dyn_string &amp;exceptionInfo)
+{
+    string formatString;
+
+    fwConfigs_getBestFormatForDpeType(DPEL_INT, formatString, exceptionInfo);
+    fwConfigs_setTextFieldsFormat(makeDynString(&quot;day&quot;, &quot;hour&quot;, &quot;minute&quot;, &quot;second&quot;, &quot;milli&quot;), formatString,
+                                  makeDynBool(FALSE), exceptionInfo);
+}
+
+fwSetDeadbandFieldFormat(bool isRelative, dyn_string &amp;exceptionInfo)
+{
+    string formatString;
+
+    if (isRelative) {
+        fwConfigs_getBestFormatForDpeType(DPEL_FLOAT, formatString, exceptionInfo);
+    } else if (panelMode == OBJECT) {
+        fwConfigs_getBestFormatForDpeType(DPE_TYPE, formatString, exceptionInfo);
+    } else {
+        fwConfigs_getBestFormatForDpeList(DPE_LIST, formatString, exceptionInfo);
+    }
+
+    fwConfigs_setTextFieldsFormat(makeDynString(&quot;deadbandValue&quot;), formatString,
+                                  makeDynBool(FALSE), exceptionInfo);
+}
+
+work_getClassDpeLoad(string dpe, anytype value)
+{
+    string dpName;
+    dyn_string exceptionInfo;
+    int iMaxDp, iElements, iNewElements;
+
+    dpName = dpSubStr(dpe, DPSUB_SYS_DP);
+
+    if (dpName == archiveClassDp.text) {
+        fwArchive_getClassStatistics(dpName, iElements, iNewElements, iMaxDp, exceptionInfo, FALSE);
+
+        archiveLoad.text() = iElements + &quot; (&quot; + iNewElements + &quot;) / &quot;+iMaxDp;
+        refresh.enabled = TRUE;
+    }
+}
+
+work_getClassState(string dpe, anytype value)
+{
+    string dpName, stateText;
+    dyn_string exceptionInfo;
+    int state;
+
+    dpName = dpSubStr(dpe, DPSUB_SYS_DP);
+
+    if (dpName == archiveClassDp.text) {
+        fwArchive_getClassState(dpName, state, stateText, exceptionInfo);
+        classState.text = stateText;
+    }
+}
+
+_fwInitOptionsMapping()
+{
+    DIGITAL_OPTIONS[DPATTR_TIME_SMOOTH] = 0;
+    DIGITAL_OPTIONS[DPATTR_COMPARE_OLD_NEW] = 1;
+    DIGITAL_OPTIONS[DPATTR_OLD_NEW_AND_TIME_SMOOTH] = 2;
+    DIGITAL_OPTIONS[DPATTR_OLD_NEW_OR_TIME_SMOOTH] = 3;
+
+    ANALOG_OPTIONS[DPATTR_VALUE_SMOOTH] = 0;
+    ANALOG_OPTIONS[DPATTR_VALUE_REL_SMOOTH] = 0;
+    ANALOG_OPTIONS[DPATTR_TIME_SMOOTH] = 1;
+    ANALOG_OPTIONS[DPATTR_TIME_AND_VALUE_SMOOTH] = 2;
+    ANALOG_OPTIONS[DPATTR_TIME_AND_VALUE_REL_SMOOTH] = 2;
+    ANALOG_OPTIONS[DPATTR_TIME_OR_VALUE_SMOOTH] = 3;
+    ANALOG_OPTIONS[DPATTR_TIME_OR_VALUE_REL_SMOOTH] = 3;
+    ANALOG_OPTIONS[DPATTR_COMPARE_OLD_NEW] = 4;
+    ANALOG_OPTIONS[DPATTR_OLD_NEW_AND_TIME_SMOOTH] = 5;
+    ANALOG_OPTIONS[DPATTR_OLD_NEW_OR_TIME_SMOOTH] = 6;
+
+    DIGITAL_PROCEDURES[0] = DPATTR_TIME_SMOOTH;
+    DIGITAL_PROCEDURES[1] = DPATTR_COMPARE_OLD_NEW;
+    DIGITAL_PROCEDURES[2] = DPATTR_OLD_NEW_AND_TIME_SMOOTH;
+    DIGITAL_PROCEDURES[3] = DPATTR_OLD_NEW_OR_TIME_SMOOTH;
+
+    ANALOG_PROCEDURES[0] = DPATTR_VALUE_SMOOTH;
+    ANALOG_PROCEDURES[0 + RELATIVE_DEADBAND] = DPATTR_VALUE_REL_SMOOTH;
+    ANALOG_PROCEDURES[1] = DPATTR_TIME_SMOOTH;
+    ANALOG_PROCEDURES[1 + RELATIVE_DEADBAND] = DPATTR_TIME_SMOOTH;
+    ANALOG_PROCEDURES[2] = DPATTR_TIME_AND_VALUE_SMOOTH;
+    ANALOG_PROCEDURES[2 + RELATIVE_DEADBAND] = DPATTR_TIME_AND_VALUE_REL_SMOOTH;
+    ANALOG_PROCEDURES[3] = DPATTR_TIME_OR_VALUE_SMOOTH;
+    ANALOG_PROCEDURES[3 + RELATIVE_DEADBAND] = DPATTR_TIME_OR_VALUE_REL_SMOOTH;
+    ANALOG_PROCEDURES[4] = DPATTR_COMPARE_OLD_NEW;
+    ANALOG_PROCEDURES[4 + RELATIVE_DEADBAND] = DPATTR_COMPARE_OLD_NEW;
+    ANALOG_PROCEDURES[5] = DPATTR_OLD_NEW_AND_TIME_SMOOTH;
+    ANALOG_PROCEDURES[5 + RELATIVE_DEADBAND] = DPATTR_OLD_NEW_AND_TIME_SMOOTH;
+    ANALOG_PROCEDURES[6] = DPATTR_OLD_NEW_OR_TIME_SMOOTH;
+    ANALOG_PROCEDURES[6 + RELATIVE_DEADBAND] = DPATTR_OLD_NEW_OR_TIME_SMOOTH;
+}
+
+_fwToggleBasicArchiveItems(bool shouldShow)
+{
+    archiveClassText.visible(shouldShow);
+    archiveClassList.visible(shouldShow);
+    archiveLoad.visible(shouldShow);
+    archiveLoadText.visible(shouldShow);
+    parametrize.visible(shouldShow);
+    refresh.visible(shouldShow);
+    startArchiving.visible(shouldShow);
+    archiveDetailsBox.visible(shouldShow);
+    classState.visible(shouldShow);
+    classStateTitle.visible(shouldShow);
+    classStatisticsTitle.visible(shouldShow);
+    smoothingCheckBox.visible(shouldShow);
+    archiveProcedureText.visible(shouldShow);
+    dpeArchClassesComboBox.visible(shouldShow);
+    archProcedureDelete.visible(shouldShow);
+    archProcedureSave.visible(shouldShow);
+    archProcedureAppend.visible(shouldShow);
+    setNgaWidgetsVisible(shouldShow &amp;&amp; NGA_MODE);
+}
+
+_fwHideSmoothingItems()
+{
+    timeText.visible(FALSE);
+    day.visible(FALSE);
+    hour.visible(FALSE);
+    minute.visible(FALSE);
+    second.visible(FALSE);
+    milli.visible(FALSE);
+    dayTitle.visible(FALSE);
+    hourTitle.visible(FALSE);
+    minuteTitle.visible(FALSE);
+    secondTitle.visible(FALSE);
+    milliTitle.visible(FALSE);
+    secondsOnly.visible(FALSE);
+
+    deadbandText.visible(FALSE);
+    deadbandValue.visible(FALSE);
+    relativeUnit.visible(FALSE);
+    relativeSelector.visible(FALSE);
+
+    smoothingOptions.visible(FALSE);
+    digitalSmoothingOptions.visible(FALSE);
+}
+
+_fwShowSmoothingItems(int selectedOption)
+{
+    bool timeInSecondsOnly, relativeDeadband, timeIntervalStatus, deadbandStatus, canShowDeadband;
+    int elementType, smoothProcedure;
+    dyn_string exceptionInfo;
+
+    timeInSecondsOnly = secondsOnly.state(0);
+    relativeDeadband = relativeSelector.state(0);
+
+    if (relativeDeadband)
+        selectedOption += RELATIVE_DEADBAND;
+
+    _fwConfigs_getConfigOptionsForDpeType(DPE_TYPE, fwConfigs_PVSS_ARCHIVE, elementType, exceptionInfo);
+    switch (elementType) {
+        case fwConfigs_ANALOG_OPTIONS:
+            canShowDeadband = TRUE;
+            if (mappingHasKey(ANALOG_PROCEDURES, selectedOption))
+                smoothProcedure = ANALOG_PROCEDURES[selectedOption];
+            else
+                smoothProcedure = -1;
+            break;
+        default:
+            canShowDeadband = FALSE;
+            if (mappingHasKey(DIGITAL_PROCEDURES, selectedOption))
+                smoothProcedure = DIGITAL_PROCEDURES[selectedOption];
+            else
+                smoothProcedure = -1;
+            break;
+    }
+
+    switch (smoothProcedure) {
+        case DPATTR_VALUE_SMOOTH:
+        case DPATTR_VALUE_REL_SMOOTH:
+            deadbandStatus=canShowDeadband;
+            timeIntervalStatus=FALSE;
+            break;
+        case DPATTR_TIME_SMOOTH:
+            deadbandStatus=FALSE;
+            timeIntervalStatus=TRUE;
+            break;
+        case DPATTR_TIME_AND_VALUE_SMOOTH:
+        case DPATTR_TIME_AND_VALUE_REL_SMOOTH:
+        case DPATTR_TIME_OR_VALUE_SMOOTH:
+        case DPATTR_TIME_OR_VALUE_REL_SMOOTH:
+            deadbandStatus=canShowDeadband;
+            timeIntervalStatus=TRUE;
+            break;
+        case DPATTR_COMPARE_OLD_NEW:
+            deadbandStatus=FALSE;
+            timeIntervalStatus=FALSE;
+            break;
+        case DPATTR_OLD_NEW_AND_TIME_SMOOTH:
+        case DPATTR_OLD_NEW_OR_TIME_SMOOTH:
+            deadbandStatus=FALSE;
+            timeIntervalStatus=TRUE;
+            break;
+        default:
+            deadbandStatus=FALSE;
+            timeIntervalStatus=FALSE;
+            break;
+    }
+
+    timeText.visible(timeIntervalStatus);
+    day.visible(timeIntervalStatus &amp;! timeInSecondsOnly);
+    hour.visible(timeIntervalStatus &amp;! timeInSecondsOnly);
+    minute.visible(timeIntervalStatus &amp;! timeInSecondsOnly);
+    second.visible(timeIntervalStatus);
+    milli.visible(timeIntervalStatus);
+    dayTitle.visible(timeIntervalStatus &amp;! timeInSecondsOnly);
+    hourTitle.visible(timeIntervalStatus &amp;! timeInSecondsOnly);
+    minuteTitle.visible(timeIntervalStatus &amp;! timeInSecondsOnly);
+    secondTitle.visible(timeIntervalStatus);
+    milliTitle.visible(timeIntervalStatus);
+    secondsOnly.visible(timeIntervalStatus);
+
+    relativeUnit.visible(deadbandStatus &amp;&amp; relativeDeadband);
+    relativeSelector.visible(deadbandStatus);
+    deadbandText.visible(deadbandStatus);
+    deadbandValue.visible(deadbandStatus);
+}
+
+temporaryDeleteSettingsForIndex(int archClassIdx)
+{
+    dynRemove(tempArchiveClasses, archClassIdx);
+    dynRemove(tempSmoothTypes, archClassIdx);
+    dynRemove(tempSmoothProcedures, archClassIdx);
+    dynRemove(tempDeadbands, archClassIdx);
+    dynRemove(tempTimes, archClassIdx);
+}
+
+temporarySaveSettingsForIndex(int archClassIdx, dyn_string &amp;exceptionInfo)
+{
+    bool withSmooth, relativeDeadband, isGood;
+    int newDay = 0, newHour = 0, newMinute = 0, newSecond = 0, newMilli = 0;
+    int smoothProcedure, smoothType, pos, elementType;
+    float newTime, deadband;
+    string archiveClass, temp;
+    time interval;
+    dyn_string archiveClasses;
+    shape optionsList;
+
+    withSmooth = smoothingCheckBox.state(0);
+    archiveClasses = archiveClassList.items();
+    pos = archiveClassList.selectedPos();
+    archiveClass = archiveClasses[pos];
+
+    if (withSmooth) {
+        smoothType = DPATTR_ARCH_PROC_SIMPLESM;
+        relativeDeadband = relativeSelector.state(0);
+
+        _fwConfigs_getConfigOptionsForDpeType(DPE_TYPE, fwConfigs_PVSS_ARCHIVE, elementType, exceptionInfo);
+        switch (elementType) {
+            case fwConfigs_ANALOG_OPTIONS:
+                optionsList = getShape(&quot;smoothingOptions&quot;);
+                smoothProcedure = optionsList.number();
+
+                if (relativeDeadband)
+                    smoothProcedure += RELATIVE_DEADBAND;
+
+                if (mappingHasKey(ANALOG_PROCEDURES, smoothProcedure))
+                    smoothProcedure = ANALOG_PROCEDURES[smoothProcedure];
+                else
+                    smoothProcedure = -1;
+                break;
+            default:
+                optionsList = getShape(&quot;digitalSmoothingOptions&quot;);
+                smoothProcedure = optionsList.number();
+
+                if (relativeDeadband)
+                    smoothProcedure += RELATIVE_DEADBAND;
+
+                if (mappingHasKey(DIGITAL_PROCEDURES, smoothProcedure))
+                    smoothProcedure = DIGITAL_PROCEDURES[smoothProcedure];
+                else
+                    smoothProcedure = -1;
+                break;
+        }
+
+        if (day.visible) {
+            temp = day.text();
+            fwConfigs_checkStringFormat(temp, DPEL_INT, isGood, exceptionInfo);
+            if (isGood)
+                newDay = temp;
+            else
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Day value of time interval is not valid&quot;, &quot;&quot;);
+
+            temp = hour.text();
+            fwConfigs_checkStringFormat(temp, DPEL_INT, isGood, exceptionInfo);
+            if (isGood)
+                newHour = temp;
+            else
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Hour value of time interval is not valid&quot;, &quot;&quot;);
+
+            temp = minute.text();
+            fwConfigs_checkStringFormat(temp, DPEL_INT, isGood, exceptionInfo);
+            if (isGood)
+                newMinute = temp;
+            else
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Minute value of time interval is not valid&quot;, &quot;&quot;);
+        }
+
+        if (second.visible) {
+            temp = second.text();
+            fwConfigs_checkStringFormat(temp, DPEL_INT, isGood, exceptionInfo);
+            if (isGood)
+                newSecond = temp;
+            else
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Second value of time interval is not valid&quot;, &quot;&quot;);
+
+            temp = milli.text();
+            fwConfigs_checkStringFormat(temp, DPEL_INT, isGood, exceptionInfo);
+            if (isGood)
+                newMilli = temp;
+            else
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Millisecond value of time interval is not valid&quot;, &quot;&quot;);
+
+            newSecond = newDay*86400 + newHour*3600 + newMinute*60 + newSecond;
+
+            setPeriod(interval, newSecond, newMilli);
+            newTime = interval;
+        }
+
+        if (deadbandValue.visible) {
+            temp = deadbandValue.text();
+            if (relativeDeadband)
+                fwConfigs_checkStringFormat(temp, DPEL_FLOAT, isGood, exceptionInfo);
+            else
+                fwConfigs_checkStringFormat(temp, DPE_TYPE, isGood, exceptionInfo);
+            if (isGood)
+                deadband = temp;
+            else
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Deadband value is not valid&quot;, &quot;&quot;);
+        }
+
+        if (dynlen(exceptionInfo) &gt; 0) {
+            okButton.enabled = TRUE;
+            applyButton.enabled = TRUE;
+            closeButton.enabled = TRUE;
+            if (panelMode == MULTIPLE_DPES)
+                fwCloseProgressBar(&quot;Configuration failed&quot;);
+            return;
+        }
+    } else
+        smoothType = DPATTR_ARCH_PROC_VALARCH;
+
+    tempArchiveClasses[archClassIdx] = archiveClass;
+    tempSmoothTypes[archClassIdx] = smoothType;
+    tempSmoothProcedures[archClassIdx] = smoothProcedure;
+    tempDeadbands[archClassIdx] = deadband;
+    tempTimes[archClassIdx] = newTime;
+}
+
+bool checkForDuplicateArchClasses(dyn_string archClasses)
+{
+    const int len = dynlen(archClasses);
+    return (len != dynUnique(archClasses));
+}
+
+saveSettings(dyn_string &amp;exceptionInfo)
+{
+    if (!DPES_OK) {
+        fwException_raise(exceptionInfo, &quot;ERROR&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_MIXEDORBADDPETYPES&quot;), &quot;&quot;);
+        return;
+    }
+
+    if (NGA_MODE) {
+        if (checkForDuplicateArchClasses(tempArchiveClasses)) {
+            fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Cannot save the archive settings - some archive classes are used multiple times in different archiving procedures&quot;, &quot;&quot;);
+            return;
+        }
+    }
+
+    okButton.enabled = FALSE;
+    applyButton.enabled = FALSE;
+    closeButton.enabled = FALSE;
+    if (panelMode == MULTIPLE_DPES) {
+        fwOpenProgressBar(&quot;Configuration panel&quot;, &quot;Saving configuration...&quot;, 1);
+    }
+
+    if (configureCheckBox.state(0)) {
+        if (panelMode != OBJECT) {
+
+            bool bCheckClass=TRUE;
+            bool bStartArchiving=startArchiving.state(0);
+            if (NGA_MODE) {
+                fwArchive_replaceManyArchivingProcedures(DPE_LIST, makeDynAnytype(tempArchiveClasses), makeDynAnytype(tempSmoothTypes),
+                                                         makeDynAnytype(tempSmoothProcedures), makeDynAnytype(tempDeadbands),
+                                                         makeDynAnytype(tempTimes), makeDynBool(bStartArchiving), exceptionInfo,
+                                                         bCheckClass, true);
+            } else {
+                fwArchive_setMultiple(DPE_LIST, tempArchiveClasses[1], tempSmoothTypes[1], tempSmoothProcedures[1], tempDeadbands[1], tempTimes[1],
+                                      exceptionInfo, bCheckClass, bStartArchiving);
+            }
+        } else {
+            for (int procIdx = 1; procIdx &lt;= dynlen(tempArchiveClasses); procIdx++) {
+                dpeConfigObject[fwConfigs_DPE_OBJECT_TYPE][procIdx] = tempSmoothTypes[procIdx];
+                dpeConfigObject[fwConfigs_DPE_OBJECT_ACTIVE][procIdx] = startArchiving.state(0);
+                dpeConfigObject[fwArchive_DPE_OBJECT_PROCEDURE][procIdx] = tempSmoothProcedures[procIdx];
+                dpeConfigObject[fwArchive_DPE_OBJECT_DEADBAND][procIdx] = tempDeadbands[procIdx];
+                dpeConfigObject[fwArchive_DPE_OBJECT_TIME_INTERVAL][procIdx] = tempTimes[procIdx];
+                dpeConfigObject[fwArchive_DPE_OBJECT_CLASS_NAME][procIdx] = tempArchiveClasses[procIdx];
+            }
+
+            fwGeneral_setGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+        }
+    } else {
+        if (panelMode != OBJECT) {
+            fwArchive_deleteMultiple(DPE_LIST, exceptionInfo);
+        } else {
+            dpeConfigObject[fwConfigs_DPE_OBJECT_TYPE][1] = DPCONFIG_NONE;
+            dpeConfigObject[fwConfigs_DPE_OBJECT_ACTIVE][1] = FALSE;
+            dpeConfigObject[fwArchive_DPE_OBJECT_PROCEDURE][1] = 0;
+            dpeConfigObject[fwArchive_DPE_OBJECT_DEADBAND][1] = 0;
+            dpeConfigObject[fwArchive_DPE_OBJECT_TIME_INTERVAL][1] = 0;
+            dpeConfigObject[fwArchive_DPE_OBJECT_CLASS_NAME][1] = &quot;&quot;;
+
+            fwGeneral_setGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+        }
+    }
+
+    okButton.enabled = TRUE;
+    applyButton.enabled = TRUE;
+    closeButton.enabled = TRUE;
+    if (panelMode == MULTIPLE_DPES) {
+        fwCloseProgressBar(&quot;Configuration complete&quot;);
+    }
+}
+
+_fwDisplayDeadband(int smoothProcedure, float deadband)
+{
+    switch (smoothProcedure) {
+        case DPATTR_VALUE_REL_SMOOTH:
+        case DPATTR_TIME_AND_VALUE_REL_SMOOTH:
+        case DPATTR_TIME_OR_VALUE_REL_SMOOTH:
+            relativeSelector.state(0) = TRUE;
+            break;
+        default:
+            relativeSelector.state(0) = FALSE;
+            break;
+    }
+
+    deadbandValue.text(deadband);
+}
+
+_fwDisplayTime(float timeInterval)
+{
+    int actualHour, actualMinute, actualSecond, actualMilli;
+    long actualDay, timeInSeconds;
+    time interval;
+
+    interval = timeInterval;
+    timeInSeconds = period(interval);
+    actualMilli = milliSecond(interval);
+
+    actualDay=timeInSeconds/86400;
+    timeInSeconds=timeInSeconds-(actualDay*86400);
+
+    actualHour=timeInSeconds/3600;
+    timeInSeconds=timeInSeconds-(actualHour*3600);
+
+    actualMinute=timeInSeconds/60;
+    timeInSeconds=timeInSeconds-(actualMinute*60);
+
+    actualSecond=timeInSeconds;
+
+    day.text(actualDay);
+    hour.text(actualHour);
+    minute.text(actualMinute);
+    second.text(actualSecond);
+    milli.text(actualMilli);
+
+    secondsOnly.state(0, FALSE);
+}
+
+reloadPanel(int archClassIdx = 1)
+{
+    bool singleDpe;
+    int length, i;
+    string dpe, name;
+    dyn_string exceptionInfo;
+
+    bool isArchived, isConfigured;
+    int smoothType, smoothProcedure, typeCorrection, pos, archiveClassType;
+    float deadband, timeInterval;
+    string archiveClass, errorString, archiveClassName;
+    dyn_string archiveClassDpList, archiveClasses, rdbArchiveClasses, archiveClassDpName, rdbArchiveClassDpName, ds;
+    string sArchiveClassDpName;
+    dyn_int di;
+
+    if (isDollarDefined(&quot;$sDpe&quot;)) {
+        dpe = $sDpe;
+        strreplace(dpe, &quot; &quot;, &quot;&quot;);
+        DPE_LIST = strsplit(dpe, &quot;|&quot;);
+    }
+
+    elementNameField.editable(FALSE);
+
+    length = dynlen(DPE_LIST);
+    switch (length) {
+        case 0:
+            if (isDollarDefined(&quot;$sDpeConfigObjectVarName&quot;)) { // object passed to the panel
+                if (getGlobalType($sDpeConfigObjectVarName) != DYN_DYN_ANYTYPE_VAR) {
+                    elementNameField.text(&quot;Wrong config object name&quot;);
+                    configureCheckBox.enabled = FALSE;
+                    smoothingCheckBox.enabled = false;
+                    applyButton.enabled = FALSE;
+                    okButton.enabled = FALSE;
+                    fwException_raise(exceptionInfo,
+                                      &quot;WARNING&quot;, &quot;The config object &quot; + $sDpeConfigObjectVarName +
+                                      &quot; doesn't exists or hasn't got the proper format.&quot;,
+                                      &quot;&quot;);
+                    fwExceptionHandling_display(exceptionInfo);
+                    return;
+                }
+
+                panelMode = OBJECT;
+                fwGeneral_getGlobalValue($sDpeConfigObjectVarName, dpeConfigObject, exceptionInfo);
+
+                DPE_LIST[1] = dpeConfigObject[fwConfigs_DPE_OBJECT_DPE_NAME][1];
+                DPE_TYPE    = dpeConfigObject[fwConfigs_DPE_OBJECT_DPE_TYPE][1];
+                smoothType  = dpeConfigObject[fwConfigs_DPE_OBJECT_TYPE][1];
+                isArchived  = dpeConfigObject[fwConfigs_DPE_OBJECT_ACTIVE][1];
+
+                smoothProcedure = dpeConfigObject[fwArchive_DPE_OBJECT_PROCEDURE][1];
+                deadband        = dpeConfigObject[fwArchive_DPE_OBJECT_DEADBAND][1];
+                timeInterval        = dpeConfigObject[fwArchive_DPE_OBJECT_TIME_INTERVAL][1];
+                archiveClass        = dpeConfigObject[fwArchive_DPE_OBJECT_CLASS_NAME][1];
+
+                canHaveSmoothing = TRUE;
+                if (smoothType == DPCONFIG_NONE)
+                    isConfigured = FALSE;
+                else
+                    isConfigured = TRUE;
+
+                _fwConfigs_getSystemsInDpeList(DPE_LIST, SYSTEMS, exceptionInfo);
+                elementNameField.text(DPE_LIST[1]);
+            } else { // neither dpes nor object passed, nothing to do in the panel
+                elementNameField.text(&quot;No Data Point Elements&quot;);
+                configureCheckBox.enabled = FALSE;
+                smoothingCheckBox.enabled = false;
+                applyButton.enabled = FALSE;
+                okButton.enabled = FALSE;
+                fwException_raise(exceptionInfo, &quot;WARNING&quot;, getCatStr(&quot;fwConfigs&quot;, &quot;PANEL_NODATAPOINTSTOCONFIG&quot;), &quot;&quot;);
+                fwExceptionHandling_display(exceptionInfo);
+                return;
+            }
+            break;
+        case 1:     // single dpe passed to the panel
+            panelMode = SINGLE_DPE;
+            dpe = DPE_LIST[1];
+            elementNameField.text(dpe);
+            canHaveSmoothing = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_ARCHIVE, DPE_TYPE, exceptionInfo, errorString);
+            if (errorString != &quot;&quot;)
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+
+            if (strpos(errorString, getCatStr(&quot;fwConfigs&quot;, &quot;ERROR_DPESNOTEXISTING&quot;)) == 0) {
+                fwExceptionHandling_display(exceptionInfo);
+                applyButton.enabled = FALSE;
+                okButton.enabled = FALSE;
+                return;
+            }
+
+            _fwConfigs_getSystemsInDpeList(DPE_LIST, SYSTEMS, exceptionInfo);
+            checkArchivingTypesAndSetElementNameField();
+            dyn_int archClassCounts;
+            if (!NGA_MODE) {
+                archClassCounts[1] = 1;
+            } else {
+                dyn_int configExists;
+                dyn_bool configActive;
+                _fwArchive_getDpeArchivingConfiguredActiveProcedureNumbers(DPE_LIST, configExists, configActive,
+                                                                           archClassCounts, false, true, exceptionInfo);
+            }
+
+            for (int archClassIdx = 1; archClassIdx &lt;= archClassCounts[1]; archClassIdx++) {
+                fwArchive_get(DPE_LIST[1], isConfigured, archiveClass, smoothType,
+                              smoothProcedure, deadband, timeInterval, isArchived, exceptionInfo, archClassIdx);
+
+                setTemporaryParams(archClassIdx, archiveClass, smoothType, smoothProcedure, deadband, timeInterval);
+            }
+
+            break;
+        default:    // multiple dpes passed to the panel
+            panelMode = MULTIPLE_DPES;
+            dpe = DPE_LIST[1];
+
+            _fwConfigs_getSystemsInDpeList(DPE_LIST, SYSTEMS, exceptionInfo);
+            checkArchivingTypesAndSetElementNameField();
+
+            canHaveSmoothing = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_ARCHIVE, DPE_TYPE, exceptionInfo, errorString);
+            if (errorString != &quot;&quot;)
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+
+            dpeDetails.visible = TRUE;
+
+            isConfigured = FALSE;
+            isArchived = FALSE;
+            break;
+    }
+
+    fwSetTimeFieldsFormat(exceptionInfo);
+    exceptionInfo = makeDynString();
+
+    fwFillArchiveClassList(SYSTEMS, exceptionInfo);
+
+    sArchiveClassDpName = archiveClassDp.text();
+    PREVIOUS_CLASS = sArchiveClassDpName;
+
+    DPES_OK = TRUE;
+
+    _fwInitOptionsMapping();
+
+    startArchiving.state(0) = isArchived;
+    configureCheckBox.state(0) = isConfigured;
+
+    if (isArchived || isConfigured) {
+        setWidgetsToTemporaryParameters(1, exceptionInfo);
+    } else {
+        _fwDisplayTime(timeInterval);
+        _fwDisplayDeadband(DPCONFIG_NONE, deadband);
+        _fwToggleBasicArchiveItems(FALSE);
+        _fwHideSmoothingItems();
+    }
+
+    sArchiveClassDpName = archiveClassDp.text();
+    PREVIOUS_CLASS = &quot;&quot;;
+    fwUpdateArchiveStatistics(sArchiveClassDpName, exceptionInfo);
+
+    fwSetDeadbandFieldFormat(relativeSelector.state(0), exceptionInfo);
+
+    configureCheckBox.visible(TRUE);
+
+    refreshArchProceduresComboBox(archClassIdx);
+    configureOrSmoothingCheckBoxClicked();
+}
+
+void checkArchivingTypesAndSetElementNameField()
+{
+    dyn_string exceptionInfo;
+    dyn_bool sysUsesNga;
+    bool sameArchInSystems = _fwArchive_checkIfSameArchivingIsUsed(SYSTEMS, sysUsesNga, exceptionInfo);
+    if (dynlen(exceptionInfo) &gt; 0) {
+        fwExceptionHandling_display(exceptionInfo);
+    }
+
+    bool allSystemsUseRdbOrValarch = allDynElementsEqualTo(sysUsesNga, false);
+    bool allSystemsUseNga = allDynElementsEqualTo(sysUsesNga, true);
+
+    string archTypePart;
+    if (sameArchInSystems) {
+        MIXED_ARCHIVING = false;
+        if (allSystemsUseNga) {
+            archTypePart = &quot;using NGA archiving&quot;;
+            NGA_MODE = true;
+        } else {
+            archTypePart = &quot;using RDB/Value archiving&quot;;
+            NGA_MODE = false;
+        }
+    } else {
+        archTypePart = &quot;using mixed RDB/Value and NGA archiving - editing disabled&quot;;
+        MIXED_ARCHIVING = true;
+        NGA_MODE = false;
+    }
+
+    if (dynlen(DPE_LIST) == 1) {
+        elementNameField.text(DPE_LIST[1] + &quot; (&quot; + archTypePart + &quot;)&quot;);
+        return;
+    }
+
+    if (dynlen(SYSTEMS) == 1) {
+        elementNameField.text(&quot;Multiple Data Point Elements (from &quot; + SYSTEMS[1] + &quot; &quot; + archTypePart + &quot;)&quot;);
+    } else {
+        elementNameField.text(&quot;Multiple Data Point Elements (from multiple systems &quot; + archTypePart + &quot;)&quot;);
+    }
+}
+
+bool allDynElementsEqualTo(const dyn_anytype &amp;dyn, const anytype &amp;val)
+{
+    const int dynLen = dynlen(dyn);
+    for (int i = 1; i &lt;= dynLen; i++) {
+        if (dyn[i] != val) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void setWidgetsToTemporaryParameters(int archClassIdx, dyn_string &amp;exceptionInfo)
+{
+    if (archClassIdx &gt; dynlen(tempArchiveClasses)) {
+        return;
+    }
+
+    string archiveClass;
+    int smoothType, smoothProcedure;
+    float deadband, timeInterval;
+    getTemporaryParams(archClassIdx, archiveClass, smoothType, smoothProcedure, deadband, timeInterval);
+
+    _fwToggleBasicArchiveItems(TRUE);
+    dyn_string archiveClasses = archiveClassList.items();
+    int pos = dynContains(archiveClasses, archiveClass);
+    if (pos &gt; 0) {
+        archiveClassList.selectedPos(pos);
+        archiveClassDp.selectedPos(pos);
+    }
+
+    if (smoothType==DPATTR_ARCH_PROC_SIMPLESM) {
+        smoothingCheckBox.state(0, true);
+
+        int elementType;
+        if (panelMode != OBJECT) {
+            _fwConfigs_getConfigOptionsForDpeType(DPE_TYPE, fwConfigs_PVSS_ARCHIVE, elementType, exceptionInfo);
+        }
+
+        shape optionsList;
+        switch (elementType) {
+            case fwConfigs_ANALOG_OPTIONS:
+                optionsList = getShape(&quot;smoothingOptions&quot;);
+                if (mappingHasKey(ANALOG_OPTIONS, smoothProcedure))
+                    optionsList.number = ANALOG_OPTIONS[smoothProcedure];
+                else
+                    optionsList.number = 0;
+                break;
+            default:
+                optionsList = getShape(&quot;digitalSmoothingOptions&quot;);
+                if (mappingHasKey(DIGITAL_OPTIONS, smoothProcedure))
+                    optionsList.number = DIGITAL_OPTIONS[smoothProcedure];
+                else
+                    optionsList.number = 0;
+                break;
+        }
+
+        _fwDisplayTime(timeInterval);
+        _fwDisplayDeadband(smoothProcedure, deadband);
+        _fwShowSmoothingItems(optionsList.number);
+        optionsList.visible(TRUE);
+    } else {
+        _fwDisplayTime(timeInterval);
+        _fwDisplayDeadband(smoothProcedure, deadband);
+        smoothingOptions.number = 0;
+        digitalSmoothingOptions.number = 0;
+        smoothingCheckBox.state(0, false);
+        _fwHideSmoothingItems();
+    }
+}
+
+void refreshArchProceduresComboBox(int displayedIdx)
+{
+    dpeArchClassesComboBox.deleteAllItems();
+    if (dynlen(tempArchiveClasses) == 0) {
+        dpeArchClassesComboBox.appendItem(NONE_DEFINED_STR);
+        dpeArchClassesComboBox.selectedPos = 1;
+        return;
+    }
+    for (int i = 1; i &lt;= dynlen(tempArchiveClasses); i++) {
+        dpeArchClassesComboBox.appendItem((string)i + &quot;: &quot; + tempArchiveClasses[i]);
+    }
+    bool refreshRequired = tempCurrentIdx != displayedIdx;
+    tempCurrentIdx = displayedIdx;
+    dpeArchClassesComboBox.selectedPos = tempCurrentIdx;
+
+    if (refreshRequired) {
+        dyn_string exceptionInfo;
+        setWidgetsToTemporaryParameters(tempCurrentIdx, exceptionInfo);
+    }
+}
+
+bool checkIfHasArchiveProceduresDefined()
+{
+    dyn_string archProcs = dpeArchClassesComboBox.items();
+    if (dynlen(archProcs) == 0) {
+        return false;
+    } if (dynlen(archProcs) == 1) {
+        return (archProcs[1] != NONE_DEFINED_STR);
+    } else {
+        return true;
+    }
+}
+
+void saveCurrentlyEditedProcedure()
+{
+    dyn_string exceptionInfo;
+    int procIdx = dpeArchClassesComboBox.selectedPos;
+    temporarySaveSettingsForIndex(procIdx, exceptionInfo);
+    if (dynlen(exceptionInfo) &gt; 0) {
+        fwExceptionHandling_display(exceptionInfo);
+    } else {
+        refreshArchProceduresComboBox(procIdx);
+    }
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    reloadPanel();
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">27 36</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Archive Configuration</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="dayTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">224 671</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">39 324</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Days</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="hourTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">390.5 671</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">106.5 324</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Hours</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="minuteTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">561 671</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">171 324</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Minutes</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="secondTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">714.5 671</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">238.5 324</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Seconds</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="milliTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">906 671</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">309 324</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Millisecs</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="archiveClassText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">42</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">504 926.25</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">200 104.25</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Archive Class:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">45</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">255 121</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 45</prop>
+    <prop name="Size">117 23</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">DP Element:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="archiveLoadText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">50</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">972 1132</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">532 228</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">DPEs / max</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">53</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">185 431</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">59 257</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Database
+Configuration</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="archiveDetailsBox" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">58</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">400 249</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1 40 39</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Archive Class Details</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">400 130</prop>
+    <prop name="Size">210 120</prop>
+   </properties>
+  </shape>
+  <shape Name="classStateTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">59</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">507 707</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">452 194</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">State:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="classStatisticsTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">61</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">515 741</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">36</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">452 228</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Statistics:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="deadbandText" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">63</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">480 345</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">2.007751937984496 0 0 0.6385542168674699 -573.7209302325581 143.3373493975904</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Deadband</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">480 261</prop>
+    <prop name="Size">130 84</prop>
+   </properties>
+  </shape>
+  <shape Name="timeText" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">64</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">110 345</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">38</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.9972375690607734 0 0 1 -95.69613259668508 49</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Time</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">110 261</prop>
+    <prop name="Size">363 84</prop>
+   </properties>
+  </shape>
+  <shape Name="relativeUnit" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">66</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">497 333</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">39</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">499 335</prop>
+    <prop name="Size">17 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">%</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="elementNameField" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">56</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">346 93</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 40</prop>
+    <prop name="Size">541 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="dpeDetails" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">57</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">460 4</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">460 4</prop>
+    <prop name="Size">121 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select Elements</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    string errorString, sArchiveClassDpName;
+    dyn_string returnedDpeList, exceptionInfo;
+    dyn_float cancelOrOk;
+
+    ChildPanelOnCentralModalReturn(&quot;fwConfigs/fwDpeSelector.pnl&quot;, &quot;Choose Data Point Elements&quot;,
+                                   makeDynString(&quot;$dsAllDpes:&quot;+$sDpe, &quot;$dsIncludedDpes:&quot;+DPE_LIST, &quot;$sConfigType:&quot;+fwConfigs_PVSS_ARCHIVE),
+                                   cancelOrOk, returnedDpeList);
+    if (cancelOrOk[1] &gt; 0.5) {
+        if (DPE_LIST != returnedDpeList) {
+            DPE_LIST = returnedDpeList;
+            DPES_OK = _fwConfigs_checkDpeList(DPE_LIST, fwConfigs_PVSS_ARCHIVE, DPE_TYPE, exceptionInfo, errorString);
+            if (!DPES_OK)
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, errorString, &quot;&quot;);
+            dynClear(SYSTEMS);
+            _fwConfigs_getSystemsInDpeList(DPE_LIST, SYSTEMS, exceptionInfo);
+            checkArchivingTypesAndSetElementNameField();
+            fwFillArchiveClassList(SYSTEMS, exceptionInfo);
+            sArchiveClassDpName = archiveClassDp.text();
+            fwUpdateArchiveStatistics(sArchiveClassDpName, exceptionInfo);
+
+
+            _fwHideSmoothingItems();
+            smoothingCheckBox.state(0) = FALSE;
+            fwSetDeadbandFieldFormat(relativeSelector.state(0), exceptionInfo);
+
+            okButton.enabled = TRUE;
+            applyButton.enabled = TRUE;
+
+            configureOrSmoothingCheckBoxClicked();
+        }
+    }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="configureCheckBox" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">41</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">15 72</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">15 72</prop>
+    <prop name="Size">141 32</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Configure</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    configureOrSmoothingCheckBoxClicked();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="startArchiving" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">55</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">340 437</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">15 100</prop>
+    <prop name="Size">121 31</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Archiving ON</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="archiveClassList" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">44</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">324 99.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">324 99.5</prop>
+    <prop name="Size">187 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+    int iPos;
+    string sArchiveClassDpName;
+    dyn_string exceptionInfo;
+
+    if (this.text == ARCHIVECLASSTYPEDIVIDER) {
+        this.selectedPos = archiveClassDp.selectedPos;
+        return;
+    }
+
+    iPos = this.selectedPos();
+
+    if (iPos &gt;= 0) {
+        if (PREVIOUS_CLASS != &quot;&quot; &amp;&amp; dpExists(PREVIOUS_CLASS)) {
+            if ((dpTypeName(PREVIOUS_CLASS) == fwArchive_VALARCH_CLASS_DPTYPE) &amp;&amp; (strpos(PREVIOUS_CLASS, &quot;:&quot;) &gt;= 0)) {
+                dpDisconnect(&quot;work_getClassDpeLoad&quot;, PREVIOUS_CLASS + &quot;.statistics.dpElements:_online.._stime&quot;);
+                dpDisconnect(&quot;work_getClassState&quot;, PREVIOUS_CLASS + &quot;.state:_online.._stime&quot;);
+            }
+        }
+
+        archiveClassDp.selectedPos = iPos;
+        sArchiveClassDpName = archiveClassDp.text();
+        PREVIOUS_CLASS = sArchiveClassDpName;
+        fwUpdateArchiveStatistics(sArchiveClassDpName, exceptionInfo);
+    }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="parametrize" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">47</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">670 339.5</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">530 99.5</prop>
+    <prop name="Size">121 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Parametrize...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    string sArchivDp;
+    dyn_string exceptionInfo;
+    string module = getCatStr(&quot;va&quot;, &quot;Hauptfenster&quot;);
+
+    initHosts();
+
+    sArchivDp = archiveClassDp.text();
+
+    if (!dpExists(sArchivDp)) {
+        fwException_raise(exceptionInfo, &quot;WARNING&quot;, &quot;getting archive: no archive of type: &quot;+sArchivDp, &quot;&quot;);
+        fwExceptionHandling_display(exceptionInfo);
+        return;
+    }
+
+    if (!isModuleOpen(module)) {
+        ModuleOn(module, 100, 100, 0, 0, 1, 1, &quot;&quot;);
+    }
+
+    if ((dpTypeName(sArchivDp) == fwArchive_RDB_CLASS_DPTYPE)) {
+        //string FileName = &quot;para/archive/RDB/RDB_groupConfig.pnl&quot;;
+        //RootPanelOnModule(FileName, &quot;&quot;, module, makeDynString(&quot;$s1:&quot;+sArchivDp));
+/*
+    } else if ((dpTypeName(sArchivDp) == fwArchive_NGA_CLASS_DPTYPE)) {
+        string FileName = &quot;para/archive/NGA/group.pnl&quot;;
+        RootPanelOnModule(FileName, &quot;&quot;, module, makeDynString(&quot;$groupName:&quot; + _fwArchive_convertNGAClassNameToInternalName(archiveClassList.text)));
+*/
+    } else if ((dpTypeName(sArchivDp) == fwArchive_VALARCH_CLASS_DPTYPE)) {
+        string FileName = &quot;para/archive/archive_para.pnl&quot;;
+
+        RootPanelOnModule(FileName, &quot;&quot;, module, makeDynString(&quot;$1:&quot;+sArchivDp));
+    }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="classState" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">60</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1263 699</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">500 189</prop>
+    <prop name="Size">111 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    this.text(0);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="refresh" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">51</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">908 403</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">450 248</prop>
+    <prop name="Size">71 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Refresh</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    dyn_string ds;
+    string sArchiveClassDpName;
+
+    sArchiveClassDpName = archiveClassDp.text();
+    archiveLoad.text = &quot;Refreshing...&quot;;
+    dpGet(sArchiveClassDpName+&quot;.files.fileName:_online.._value&quot;, ds);
+    dpSet(sArchiveClassDpName+&quot;.statistics.index:_original.._value&quot;, dynlen(ds));
+
+    this.enabled = FALSE;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="archiveLoad" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">49</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">525 251</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Number in brackets shows how many DPEs will be used after next file change</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">525 251</prop>
+    <prop name="Size">116 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="smoothingOptions" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">821 282</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 160</prop>
+    <prop name="Size">229 150</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Deadband</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Time</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Deadband AND Time</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Deadband OR Time</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Old-New Comparison</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Old-New Comparison AND Time</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Old-New Comparison OR Time</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    _fwShowSmoothingItems(this.number);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="digitalSmoothingOptions" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">585 299</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 160</prop>
+    <prop name="Size">229 95</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Time</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Old-New Comparison</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Old-New Comparison AND Time</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Old-New Comparison OR Time</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    _fwShowSmoothingItems(this.number);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="secondsOnly" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">567.2916666666667 624.5999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">245 366.9999999999999</prop>
+    <prop name="Size">120 24</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Time in Seconds</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    int actualDay, actualHour, actualMinute, actualSecond, actualMilli, timeInSeconds;
+    bool checkState;
+
+    checkState = this.state(0);
+
+    if (checkState) {
+        actualDay = day.text();
+        actualHour = hour.text();
+        actualMinute = minute.text();
+        actualSecond = second.text();
+
+        timeInSeconds=(actualDay*86400+actualHour*3600+actualMinute*60+actualSecond);
+
+        day.text(0);
+        hour.text(0);
+        minute.text(0);
+        second.text(timeInSeconds);
+
+        day.visible(FALSE);
+        hour.visible(FALSE);
+        minute.visible(FALSE);
+        dayTitle.visible(FALSE);
+        hourTitle.visible(FALSE);
+        minuteTitle.visible(FALSE);
+        second.scale(1.5, 1);
+    } else {
+        timeInSeconds = second.text();
+
+        actualDay=timeInSeconds/86400;
+        timeInSeconds=timeInSeconds-(actualDay*86400);
+
+        actualHour=timeInSeconds/3600;
+        timeInSeconds=timeInSeconds-(actualHour*3600);
+
+        actualMinute=timeInSeconds/60;
+        timeInSeconds=timeInSeconds-(actualMinute*60);
+
+        actualSecond=timeInSeconds;
+        day.text(actualDay);
+        hour.text(actualHour);
+        minute.text(actualMinute);
+        second.text(actualSecond);
+
+        day.visible(TRUE);
+        hour.visible(TRUE);
+        minute.visible(TRUE);
+        dayTitle.visible(TRUE);
+        hourTitle.visible(TRUE);
+        minuteTitle.visible(TRUE);
+        second.scale(1, 1);
+    }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="day" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">226 730</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">25 341</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    this.text(0);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="hour" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">420 730</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">95 341</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    this.text(0);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="minute" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">618 730</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">165 341</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    this.text(0);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="second" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">295 364</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">235 341</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    this.text(0);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="milli" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1010 730</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">305 341</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    this.text(0);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="relativeSelector" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">62</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">535 332</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">535 332</prop>
+    <prop name="Size">101 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Relative value</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+    dyn_string exceptionInfo;
+
+    fwSetDeadbandFieldFormat(relativeSelector.state(0), exceptionInfo);
+
+    if (button == 0) {
+        if (state)
+            relativeUnit.visible = TRUE;
+        else
+            relativeUnit.visible = FALSE;
+    }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="deadbandValue" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1026 841</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">401 331</prop>
+    <prop name="Size">91 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    this.text(0);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="archiveManagementButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">52</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">52 225</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">34 207</prop>
+    <prop name="Size">47 47</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">archiveConfiguration.bmp</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    if (useNGA()) {
+        wf_openWizard(&quot;_WF_ngaDatabase&quot;, 0, 0, 1, 1, &quot;None&quot;,false); // false means no duplicates of the window allowed
+    } else if (useRDBArchive()) {
+        ChildPanelOnCentral(&quot;para/archive/RDB/RDB_select.pnl&quot;, &quot;RDBArchiveConfiguration&quot;, makeDynString());
+    } else {
+        ChildPanelOnCentral(&quot;para/archive/archive_HDB_select.pnl&quot;, &quot;ValueArchiveConfiguration&quot;, makeDynString());
+    }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="applyButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">480 370</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    dyn_string exceptionInfo;
+    saveCurrentlyEditedProcedure();
+    saveSettings(exceptionInfo);
+    if (dynlen(exceptionInfo)) fwExceptionHandling_display(exceptionInfo);
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    int x, y;
+
+    if (isDollarDefined(&quot;$bHierarchyBrowser&quot;)) {
+        if (!$bHierarchyBrowser)
+            closeButton.visible = TRUE;
+        else {
+            getValue(&quot;&quot;, &quot;position&quot;, x, y);
+            this.position(x + 90, y);
+        }
+    } else
+        closeButton.visible = TRUE;
+
+    this.visible = TRUE;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">67</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1512 949</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">570 370</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    PanelOff();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="archiveClassDp" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">48</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">150 399</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">150 399</prop>
+    <prop name="Size">191 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+  </shape>
+  <shape Name="okButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">68</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">39</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">390 370</prop>
+    <prop name="Size">81 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    dyn_string exceptionInfo;
+    saveCurrentlyEditedProcedure();
+    saveSettings(exceptionInfo);
+    if (dynlen(exceptionInfo)) {
+        fwExceptionHandling_display(exceptionInfo);
+        return;
+    }
+    PanelOff();
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    if (isDollarDefined(&quot;$bHierarchyBrowser&quot;)) {
+        if (!$bHierarchyBrowser)
+            this.visible = TRUE;
+    } else
+        this.visible = TRUE;
+}
+]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="Group2" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">604 10</prop>
+    <prop name="TabOrder">39</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwConfigs/fwArchiveConfig</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="dpeArchClassesComboBox" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">72</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">240.3 89</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">41</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">324 70</prop>
+    <prop name="Size">187 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+    dyn_string exceptionInfo;
+    setWidgetsToTemporaryParameters(this.selectedPos, exceptionInfo);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="archiveProcedureText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">73</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">504 895.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">42</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">200 73.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Archiving Procedure:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="archProcedureDelete" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">74</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">560 78</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">43</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Delete the currently edited archive procedure</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">560 70</prop>
+    <prop name="Size">24 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">delete_24.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+    int deletedPos = dpeArchClassesComboBox.selectedPos;
+    temporaryDeleteSettingsForIndex(dpeArchClassesComboBox.selectedPos);
+    refreshArchProceduresComboBox(deletedPos &gt; 1 ? deletedPos - 1 : 1);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="archProcedureAppend" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">75</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">589 74</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">44</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Append current settings as a new archiving procedure</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">589 70</prop>
+    <prop name="Size">24 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">dpeMon_ins.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+    dyn_string exceptionInfo;
+    int newProcIdx = checkIfHasArchiveProceduresDefined() ? dpeArchClassesComboBox.itemCount + 1 : 1;
+    temporarySaveSettingsForIndex(newProcIdx, exceptionInfo);
+    if (dynlen(exceptionInfo) &gt; 0) {
+        fwExceptionHandling_display(exceptionInfo);
+        return;
+    }
+    refreshArchProceduresComboBox(newProcIdx);
+
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="archProcedureSave" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">78</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">530 74</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">45</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Save changes to the currently edited archiving procedure</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">530 70</prop>
+    <prop name="Size">24 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">apply_22.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+    saveCurrentlyEditedProcedure();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="smoothingCheckBox" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">86</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">200 129.75</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">51</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 129.75</prop>
+    <prop name="Size">141 27</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Enable Smoothing</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+    configureOrSmoothingCheckBoxClicked();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="archProcedureInsertEmpty" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">89</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">619 74</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Append new empty archiving procedure</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">619 70</prop>
+    <prop name="Size">24 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">new_24.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+    dyn_string exceptionInfo;
+    int newProcIdx = checkIfHasArchiveProceduresDefined() ? dpeArchClassesComboBox.itemCount + 1 : 1;
+    setTemporaryParams(newProcIdx, ngaArchClasses[1], DPATTR_ARCH_PROC_VALARCH, 0, 0, 0);
+    if (dynlen(exceptionInfo) &gt; 0) {
+        fwExceptionHandling_display(exceptionInfo);
+        return;
+    }
+    refreshArchProceduresComboBox(newProcIdx);
+    setWidgetsToTemporaryParameters(newProcIdx, exceptionInfo);
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+ <groups>
+  <group parentSerial="-1" Name="archClassDetailsGroup" serial="1">
+   <properties>
+    <prop name="shapeSerial">50</prop>
+    <prop name="shapeSerial">59</prop>
+    <prop name="shapeSerial">61</prop>
+    <prop name="shapeSerial">60</prop>
+    <prop name="shapeSerial">51</prop>
+    <prop name="shapeSerial">49</prop>
+    <prop name="shapeSerial">58</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+   </properties>
+  </group>
+ </groups>
+</panel>

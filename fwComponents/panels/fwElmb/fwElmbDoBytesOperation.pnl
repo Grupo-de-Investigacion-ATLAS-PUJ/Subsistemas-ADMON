@@ -1,0 +1,512 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8"/>
+  </prop>
+  <prop name="Size">357 220</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">50 60</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+#uses &quot;fwGeneral/fwExceptionHandling.ctl&quot;
+
+#uses &quot;fwDevice/fwDevice.ctl&quot;
+
+#uses &quot;fwElmb/fwElmbUser.ctl&quot;
+string g_sElmb = &quot;&quot;;]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  string sId;
+  string sParent;
+  dyn_string dsExceptionInfo;
+  fwDevice_getParent($sDpName, sParent, dsExceptionInfo);
+  fwDevice_getParent(sParent, g_sElmb, dsExceptionInfo);
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="cmdReadPortA" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">40 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">40 40</prop>
+    <prop name="Size">101 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Read Port A</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  unsigned uValue;
+  
+  dyn_string dsExceptionInfo;
+  uValue = fwElmbUser_getDoByte(g_sElmb, &quot;A&quot;, dsExceptionInfo); 
+  if (dynlen(dsExceptionInfo) &gt; 0) {
+    DebugN(dsExceptionInfo);
+    setValue(&quot;tglPortA.txtInputValue&quot;, &quot;text&quot;, &quot;Invalid&quot;);    
+  } else {
+    setValue(&quot;tglPortA.txtInputValue&quot;, &quot;text&quot;, uValue);    
+  }
+  
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdReadPortC" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">210 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">210 40</prop>
+    <prop name="Size">101 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Read Port C</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  unsigned uValue;
+  
+  dyn_string dsExceptionInfo;
+  uValue = fwElmbUser_getDoByte(g_sElmb, &quot;C&quot;, dsExceptionInfo); 
+  if (dynlen(dsExceptionInfo) &gt; 0) {
+    DebugN(dsExceptionInfo);
+    setValue(&quot;tglPortC.txtInputValue&quot;, &quot;text&quot;, &quot;Invalid&quot;);    
+  } else {
+    setValue(&quot;tglPortC.txtInputValue&quot;, &quot;text&quot;, uValue);    
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdReadBothPorts" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">120 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">120 10</prop>
+    <prop name="Size">111 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Read Both Ports</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+  unsigned uResult;
+  unsigned uPortA;
+  unsigned uPortC;
+  
+  dyn_string dsExceptionInfo;
+  
+// Executable Code
+// ---------------
+  // Call function to obtain values from ELMB
+  uResult = fwElmbUser_getDoBytes(g_sElmb, dsExceptionInfo); 
+  
+  // Check for errors
+  if (dynlen(dsExceptionInfo) &gt; 0) {
+    setValue(&quot;tglPortA.txtInputValue&quot;, &quot;text&quot;, &quot;Invalid&quot;);
+    setValue(&quot;tglPortC.txtInputValue&quot;, &quot;text&quot;, &quot;Invalid&quot;);
+    fwExceptionHandling_display(dsExceptionInfo);
+  } else {
+    // Extract the individual port values from the two byte result
+    uPortC = uResult &amp; 0xff;
+    uPortA = (uResult &amp; 0xff00) &gt;&gt; 8;
+    
+    // Display values found
+    setValue(&quot;tglPortA.txtInputValue&quot;, &quot;text&quot;, uPortA);    
+    setValue(&quot;tglPortC.txtInputValue&quot;, &quot;text&quot;, uPortC);    
+  }
+
+  // Return to calling routine
+  return;
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="tglPortA" referenceId="0">
+   <properties>
+    <prop name="FileName">fwElmb/objects/fwElmbToggleByteRef.pnl</prop>
+    <prop name="Location">12 120</prop>
+    <prop name="Geometry">1 0 0 1 8 -50</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$bShowOutput</prop>
+      <prop name="Value">true</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <reference parentSerial="-1" Name="tglPortC" referenceId="1">
+   <properties>
+    <prop name="FileName">fwElmb/objects/fwElmbToggleByteRef.pnl</prop>
+    <prop name="Location">12 120</prop>
+    <prop name="Geometry">1 0 0 1 178 -50</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$bShowOutput</prop>
+      <prop name="Value">true</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="LINE1" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">44</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">12 110</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">12 110</prop>
+    <prop name="End">12 120</prop>
+   </properties>
+  </shape>
+  <shape Name="LINE2" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">45</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">12 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">12 120</prop>
+    <prop name="End">172 120</prop>
+   </properties>
+  </shape>
+  <shape Name="LINE3" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">46</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">172 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">172 120</prop>
+    <prop name="End">172 110</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">47</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">12 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 120</prop>
+    <prop name="Size">161 21</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Port A</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="LINE4" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">48</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">182 110</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">182 110</prop>
+    <prop name="End">182 120</prop>
+   </properties>
+  </shape>
+  <shape Name="LINE5" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">49</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">182 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">182 120</prop>
+    <prop name="End">342 120</prop>
+   </properties>
+  </shape>
+  <shape Name="LINE6" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">50</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">342 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">342 120</prop>
+    <prop name="End">342 110</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">51</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">182 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">182 120</prop>
+    <prop name="Size">161 21</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Port C</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="PUSH_BUTTON1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">88</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">120 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">120 140</prop>
+    <prop name="Size">131 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Write to ELMB</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  bool bValid = false;
+  unsigned uResult;
+  unsigned uPortA;
+  unsigned uPortC;
+  string sTemp;
+  dyn_string dsExceptionInfo;
+  
+  setValue(&quot;tglPortA.txtInputValue&quot;, &quot;text&quot;, &quot;&quot;);
+  setValue(&quot;tglPortC.txtInputValue&quot;, &quot;text&quot;, &quot;&quot;);
+  getValue(&quot;tglPortA.txtOutputValue&quot;, &quot;text&quot;, sTemp);
+  if (sTemp != &quot;Invalid&quot;) {
+    uPortA = sTemp;  
+    bValid = true;
+  } else {
+    bValid = false;
+  }
+  
+  if (bValid) {
+    getValue(&quot;tglPortC.txtOutputValue&quot;, &quot;text&quot;, sTemp);
+    if (sTemp != &quot;Invalid&quot;) {
+      uPortC = sTemp;  
+    } else {
+      bValid = false;
+    }
+  }
+  
+  if (bValid)
+    fwElmbUser_setDoBytes(g_sElmb, (uPortA &lt;&lt; 8) | uPortC, dsExceptionInfo);
+  else
+    DebugN(&quot;Values are not valid for writing&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">126</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">250 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">250 180</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOff();
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

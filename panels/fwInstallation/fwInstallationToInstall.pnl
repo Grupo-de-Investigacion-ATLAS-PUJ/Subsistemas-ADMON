@@ -1,0 +1,500 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Install components ...</prop>
+  </prop>
+  <prop name="Size">345 470</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">40 20</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwInstallation/fwInstallation.ctl&quot;
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  int i; // Override 'Close' script to prevent panel from being closed by clicking 'X' button.
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[/**
+fwInstallationToInstall.pnl
+This panel displays the list of components to be installed. The user can confirm the component installation by pressing the OK button - in this case the return value is set to &quot;Install&quot;. If the user clicks on the Cancel button then the return value is &quot;DoNotInstall&quot;. The Main panel checks the return value and does the appropriate action.
+
+Required $-parameters:
+
+$componentsInfo - string - componentName=componentVersion|componentName=componentVersion ....
+$descFilesInfo - string - description files ( full path ) separated by &quot;|&quot;
+$sourceDir - string - the name of the source directory ( the directory with the downloaded components )
+
+Panels called from this panel: none
+
+*/
+
+main()
+{
+
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="installationPathLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 340</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 342</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Installation path:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">1</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btnOKtoInstall" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">183 405</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">183 405</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+    <prop name="IsDefault">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_float df = makeDynFloat(1);
+  dyn_string ds = makeDynString(&quot;Install&quot;);
+
+// return values to the parent panel
+  PanelOffReturn(df, ds);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">265 405</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Esc</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">265 405</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_float df = makeDynFloat(1);
+  dyn_string ds = makeDynString(&quot;DoNotInstall&quot;);
+
+// return values to the parent panel
+  PanelOffReturn(df, ds);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="tblComponentsToInstall" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-244 -221</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 30</prop>
+    <prop name="Size">330 302</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">componentName</prop>
+     <prop name="Width">240</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">componentVersion</prop>
+     <prop name="Width">70</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Version</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">descFile</prop>
+     <prop name="Width">70</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">descFile</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  shape shape_componentsToInstall = getShape(&quot;tblComponentsToInstall&quot;);
+  fwInstallation_ui_setTableAlternatingRowColors(shape_componentsToInstall);
+
+  string componentsInfo = $componentsInfo; // it contains the componentNames=componentVersion values separated by |
+  dyn_string dynComponents = strsplit(componentsInfo, &quot;|&quot;);
+
+  string descFilesInfo = $descFilesInfo; // it contains the names of .desc files separated by |
+  dyn_string dynDescFiles = strsplit(descFilesInfo, &quot;|&quot;);
+
+  dyn_string componentNames, componentVersions;
+  int dynComponentsLen = dynlen(dynComponents);
+  for(int i=1;i&lt;=dynComponentsLen;i++){
+    dyn_string dynComponentName_Version = strsplit(dynComponents[i], &quot;=&quot;);
+    dynAppend(componentNames, dynComponentName_Version[1]);
+    dynAppend(componentVersions, dynComponentName_Version[2]);
+  }
+  shape_componentsToInstall.deleteAllLines();
+  // filling the graphic table with component information
+  // descFile is a hidden column in the graphic table
+  shape_componentsToInstall.appendLines(dynComponentsLen, &quot;componentName&quot;, componentNames,
+                                        &quot;componentVersion&quot;, componentVersions, &quot;descFile&quot;, dynDescFiles);
+  shape_componentsToInstall.columnStretchable(1, true); // make componentVersion column (idx=1) stretchable
+}
+]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[main()
+{
+  const string typeOfDescription = &quot;xml&quot;;
+
+  shape tab = getShape(&quot;tblComponentsToInstall&quot;);
+
+  int row, column;
+  getValue(tab, &quot;currentCell&quot;, row, column);
+  string columnName = tab.currentColumn();
+
+  if(columnName == &quot;componentName&quot;){
+    string componentName = tab.cellValueRC(row, &quot;componentName&quot;);
+    string descFile = tab.cellValueRC(row, &quot;descFile&quot;);
+
+    ChildPanelOnCentral(&quot;fwInstallation/fwInstallationComponentDetails.pnl&quot;, &quot;fwInstallation_ComponentDetails&quot;,
+                        makeDynString(&quot;$componentName:&quot; + componentName, &quot;$descFile:&quot; + descFile,
+                                      &quot;$typeOfDescription:&quot; + typeOfDescription));
+  }
+}
+]]></script>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  fwInstallation_ui_componentsTableRightClickPopupMenu(getShape(&quot;&quot;), row, column);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtDestinationDir" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 385</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 362</prop>
+    <prop name="Size">330 22</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  string destinationDir;
+  int dpGetResult = dpGet(&quot;fwInstallationInfo.installationDirectoryPath:_original.._value&quot;, destinationDir);
+
+  txtDestinationDir.text = destinationDir;
+  txtDestinationDir.toolTipText = destinationDir;
+
+  dpConnect(&quot;fwInstallation_changeTxtDestinationDir&quot;, &quot;fwInstallationInfo.installationDirectoryPath:_original.._value&quot;);
+}
+
+fwInstallation_changeTxtDestinationDir(string dp1, string destinationDir)
+{
+  txtDestinationDir.text = destinationDir;
+  txtDestinationDir.toolTipText = destinationDir;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="installCompLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Components to be installed:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">1</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 410</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">20 410</prop>
+    <prop name="Size">141 21</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="iconResizeable" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">303.2596804880605 478.9315312476092</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{80,80,80,142}</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">15 15</prop>
+    <prop name="maximumSize">15 15</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignTrailing|AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">True</prop>
+    <prop name="LineType">[none,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">-0.1176527493693916 0.1773866839332782 -0.1656742797242453 -0.139488015248372 454.0259716589811 442.0135952736296</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">303.2502187589321 478.9382504465556</prop>
+     <prop name="Location">344 450</prop>
+     <prop name="Location">377.2849518548865 492.7581994829599</prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="1" Name="LAYOUT_GROUP1" serial="0">
+   <properties>
+    <prop idx="0" name="shapeSerial">10</prop>
+    <prop idx="1" name="shapeSerial">3</prop>
+    <prop idx="2" name="shapeSerial">2</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutLeftMargin">0</prop>
+    <prop name="layoutRightMargin">0</prop>
+    <prop name="layoutTopMargin">6</prop>
+    <prop name="layoutBottomMargin">0</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="2" Name="LAYOUT_GROUP2" serial="1">
+   <properties>
+    <prop idx="3" name="shapeSerial">7</prop>
+    <prop idx="2" name="shapeSerial">6</prop>
+    <prop idx="1" name="shapeSerial">1</prop>
+    <prop idx="0" name="shapeSerial">8</prop>
+    <prop idx="4" name="groupSerial">0</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">9</prop>
+    <prop name="layoutBottomMargin">0</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP3" serial="2">
+   <properties>
+    <prop idx="1" name="shapeSerial">12</prop>
+    <prop idx="0" name="groupSerial">1</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

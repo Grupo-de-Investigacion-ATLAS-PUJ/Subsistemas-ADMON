@@ -1,0 +1,738 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">350 550</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">280 60</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[bool g_bInit;
+
+enableControls(bool bState)
+{
+  tbHosts.enabled(bState);
+  tfPattern.enabled(bState);
+  cbManagerType.enabled(bState);
+  cbAction.enabled(bState);
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[/** fwInstallation_pmonCommands.pnl
+  *
+  * @deprecated 2018-06-21
+  */
+
+#uses &quot;fwInstallation/fwInstallation.ctl&quot;
+#uses &quot;fwInstallation/fwInstallationDB.ctl&quot;
+
+main()
+{
+  fwInstallation_flagDeprecated(&quot;PANEL_DEPRECATED&quot;);
+
+  tbHosts.tableMode(TABLE_SELECT_MULTIPLE); // Set the table mode TABLE_SELECT_MULTIPLE so that several lines can be selected simultaneously via selectByClick
+  tbHosts.selectByClick(TABLE_SELECT_LINE); // Selects lines
+
+  if(fwInstallationDB_connect())
+  {
+    ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;DB connection error&quot;, makeDynString(&quot;DB connection error.&quot;));
+    enableControls(FALSE);
+    return;
+  }
+
+  dyn_dyn_mixed hostsInfo;
+
+  if(fwInstallationDB_getHostsInfo(hostsInfo))
+  {
+    ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;DB access error&quot;, makeDynString(&quot;Could not retrieve the list of hosts from the DB.&quot;));
+    enableControls(FALSE);
+    return;
+  }
+
+  g_bInit = TRUE;
+
+  for(int i = 1; i &lt;= dynlen(hostsInfo); i++)
+  {
+    tbHosts.appendLine(&quot;host&quot;, hostsInfo[i][FW_INSTALLATION_DB_HOST_NAME_IDX]);
+  }
+
+  tbHosts.deleteSelection();
+
+  g_bInit = FALSE;
+}
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="tfPattern" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">104 412</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">104 412</prop>
+    <prop name="Size">236 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="cbManagerType" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">104 442</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">104 442</prop>
+    <prop name="Size">176 23</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">PVSS00ui</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">PVSS00Perf</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">PVSS00ctrl</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">PVSS00dist</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">PVSS00opc</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">PVSS00dim</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">PVSS00dip</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">PVSS00sim</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">PVSS00mod</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+  </shape>
+  <shape Name="managerTypeLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 446</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">10 446</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Manager type:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="commandLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 416</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">10 416</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Command line:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="cbAction" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">104 472</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">104 472</prop>
+    <prop name="Size">176 23</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Start</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Restart</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Stop</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+  </shape>
+  <shape Name="actionLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 476</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">10 476</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Action:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="sendButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">179 504</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">287 442</prop>
+    <prop name="Size">53 53</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Send</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string type = cbManagerType.selectedText;
+  string pattern = tfPattern.text;
+  string action = cbAction.selectedText;
+  string host;
+
+  dyn_int lines;
+
+  lines = tbHosts.getSelectedLines();
+
+  for(int i = 1; i &lt;= dynlen(lines); i++)
+  {
+    getValue(&quot;tbHosts&quot;, &quot;cellValueRC&quot;, lines[i], &quot;host&quot;, host);
+    DebugN(&quot;Sending action &quot; + action + &quot; onto &quot; + host + &quot; returns: &quot; + sendPmonCommand(host, action, type, pattern));
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+synchronized int sendPmonCommand(string host, string action, string manager, string commandLine)
+{
+  int pos = -1;
+  string startMode = &quot;&quot;;
+  dyn_string cmds;
+  string user, pwd;
+  int err = 0;
+  int port = 4999;
+
+  dynClear(cmds);
+  findManager(host, manager, commandLine, pos);
+
+  if(pos &lt; 0)
+  {
+    DebugN(&quot;ERROR: sendPmonCommand() -&gt; Manager not found: &quot;, manager, commandLine);
+    return -1;
+  }
+
+  switch(strtoupper(action))
+  {
+    case &quot;START&quot;: dynAppend(cmds, user + &quot;#&quot; + pwd + &quot;#SINGLE_MGR:PROP_PUT &quot; + pos + &quot; always 30 3 3 &quot; + commandLine);
+                  dynAppend(cmds, user + &quot;#&quot; + pwd + &quot;#SINGLE_MGR:START &quot; + pos);
+                  break;
+    case &quot;STOP&quot;: dynAppend(cmds, user + &quot;#&quot; + pwd + &quot;#SINGLE_MGR:PROP_PUT &quot; + pos + &quot; manual 30 3 3 &quot; + commandLine);
+                 dynAppend(cmds, user + &quot;#&quot; + pwd + &quot;#SINGLE_MGR:STOP &quot; + pos);
+                 break;
+    case &quot;RESTART&quot;:dynAppend(cmds, user + &quot;#&quot; + pwd + &quot;#SINGLE_MGR:START &quot; + pos);
+                   dynAppend(cmds, user + &quot;#&quot; + pwd + &quot;#SINGLE_MGR:PROP_PUT &quot; + pos + &quot; always 30 3 3 &quot; + commandLine);
+                   dynAppend(cmds, user + &quot;#&quot; + pwd + &quot;#SINGLE_MGR:STOP &quot; + pos);
+                   break;
+    default: DebugN(&quot;ERROR: sendPmonCommand() -&gt; Unknown action: &quot; + action + &quot;. Valid actions are: START, STOP, RESTART&quot;);
+      return -1;
+  }
+
+  for(int i = 1; i &lt;= dynlen(cmds); i++)
+  {
+    //DebugN(&quot;Seding pmon command: &quot; + cmds[i]);
+    if(pmon_command(cmds[i], host, port, false, true))
+    {
+      ++err;
+      DebugN(&quot;ERROR: fwInstallation_managerCommand() -&gt; Failed to execute command: &quot; + cmds[i] + &quot; on host &quot; + host);
+    }
+    if(i &lt; dynlen(cmds)) //wait only if necessary
+      delay(5);
+  }
+
+  if(err)
+    return -1;
+
+
+  return 0;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+synchronized int findManager(string host, string manager, string commandLine, int &amp;managerPos)
+{
+  dyn_int diManPos, diStartMode, diSecKill, diRestartCount, diResetMin;
+  dyn_string dsManager, dsCommandLine, dsProps;
+  string str;
+  int port = 4999;
+
+  managerPos = -1;
+
+  if(getManagers(host, diManPos, dsManager, diStartMode, diSecKill,
+                 diRestartCount, diResetMin, dsCommandLine))
+  return -1;
+
+  if(dynContains(dsManager, manager))
+  {
+  for(int i=1; i&lt;=dynlen(dsManager); i++)
+  {
+    if((dsManager[i] == manager) &amp;&amp; (dsCommandLine[i] == commandLine))
+    {
+                        managerPos = i-1;
+      return 0;
+    }
+    else if((dsManager[i] == manager) &amp;&amp; patternMatch(&quot;*&quot; + commandLine + &quot;*&quot;, dsCommandLine[i])) //allow also the case where the user does not specify the manager number
+    {
+                        managerPos = i-1;
+      return 0;
+    }
+  }
+  }
+
+  return 0;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+synchronized int  getManagers(string host,
+                        dyn_int &amp;manPos,
+                              dyn_string &amp;manager,
+                              dyn_int &amp;startMode,
+                        dyn_int &amp;secKill,
+                              dyn_int &amp;restartCount,
+                              dyn_int &amp;resetMin,
+                        dyn_string &amp;commandLine)
+{
+  string str;
+  int port = 4999;
+  dyn_dyn_string dsResult;
+        bool err = false;
+
+  dynClear(manPos);
+  dynClear(manager);
+  dynClear(startMode);
+  dynClear(secKill);
+  dynClear(restartCount);
+  dynClear(resetMin);
+  dynClear(commandLine);
+
+  str = &quot;##MGRLIST:LIST&quot;;
+
+  err = pmon_query(str, host, port, dsResult, FALSE, TRUE);
+
+        if(err)
+        {
+          DebugN(&quot;ERROR: Failed to execute the pmon commnad &quot; + str + &quot; on host:&quot; + host );
+          return -1;
+        }
+
+  if(dynlen(dsResult)&gt;0)
+    for(int i=1; i&lt;=dynlen(dsResult); i++)
+    {
+    dynAppend(manPos, i);
+    dynAppend(manager, dsResult[i][1]);
+    dynAppend(startMode, dsResult[i][2]);
+    dynAppend(secKill, dsResult[i][3]);
+    dynAppend(restartCount,  dsResult[i][4]);
+    dynAppend(resetMin, dsResult[i][5]);
+
+    if(dynlen(dsResult[i]) == 6)
+      dynAppend(commandLine,  dsResult[i][6]);
+    else
+      dynAppend(commandLine,  &quot;&quot;);
+          }
+
+       return err;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">265 515</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">265 515</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tbHosts" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 66</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 66</prop>
+    <prop name="Size">330 336</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">10</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">host</prop>
+     <prop name="Width">310</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Host</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="SelectionChanged" isEscaped="1"><![CDATA[synchronized main()
+{
+  if(!g_bInit)
+  {
+    sendButton.enabled(TRUE);
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">7.999999999999986 2</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">9.999999999999986 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">PMON Commands</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="warningBg" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 650</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{255,102,102}</prop>
+    <prop name="BackColor">{255,102,102}</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.2734436564223798 0 0 1 0.9999999999999627 -703</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">0 732</prop>
+    <prop name="Size">1270 23</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="warningText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">12 32</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 32</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Panel is deprecated</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

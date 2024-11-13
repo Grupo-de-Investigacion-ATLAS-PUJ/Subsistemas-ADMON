@@ -1,0 +1,1440 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"/>
+  </prop>
+  <prop name="Size">557 566</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">60 20</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwGeneral/fwExceptionHandling.ctl&quot;
+#uses &quot;fwElmb/fwElmbUser.ctl&quot;
+#uses &quot;fwConfigs/fwPeriphAddress.ctl&quot;
+#uses &quot;fwElmb/fwElmb.ctl&quot;
+
+string subCmdReadBackG;
+string subValue;
+string subAi;
+string subDi;
+
+bool setSubscriptionsOnTimeStamp()
+{
+  TEXT_STATE.text = &quot;Working&quot;;
+// TODO: in future consider moving it to some more library-like API
+  dyn_string subscriptions;
+  dyn_string ELMBsubs,ELMBservers;
+  dpGet(&quot;_OPCUA9.Config.Servers&quot;,ELMBservers);
+  for (int i=1; i&lt;=dynlen(ELMBservers); i++) {
+    dpGet(getSystemName()+&quot;_&quot;+ELMBservers[i]+&quot;.Config.Subscriptions&quot;,ELMBsubs);
+    dynAppend(subscriptions,ELMBsubs);
+  }
+  dynUnique(subscriptions);
+
+  bool failed = false;
+  for (int i=1; i&lt;=dynlen(subscriptions); i++)
+  {
+   if (!dpExists(subscriptions[i])) continue;
+    DebugN (&quot;subs :&quot; + subscriptions[i]);
+    if (dpSetWait (subscriptions[i]+&quot;.Config.MonitoredItems.DataChangeFilter.Trigger&quot;, 2) != 0)
+      failed = true;
+  }
+  if (failed)
+  {
+    TEXT_STATE.text = &quot;ERRORS&quot;;
+  }
+  else
+  {
+    TEXT_STATE.text = &quot;Finished without errors, now restart your OPC UA Client&quot;;
+  }
+  return !failed;
+}
+
+void configureHighFrequencyDigitalInputs()
+{
+
+  if (CHKBOX_EXPERTS.state(5)) return;
+
+  dyn_string subscriptions;
+  dyn_string ELMBsubs,ELMBservers;
+  dpGet(&quot;_OPCUA9.Config.Servers&quot;,ELMBservers);
+  for (int i=1; i&lt;=dynlen(ELMBservers); i++) {
+    dpGet(getSystemName()+&quot;_&quot;+ELMBservers[i]+&quot;.Config.Subscriptions&quot;,ELMBsubs);
+    dynAppend(subscriptions,ELMBsubs);
+  }
+  dynUnique(subscriptions);
+
+
+  dyn_string aux;
+  for (int i=1; i&lt;=dynlen(subscriptions); i++)
+  {
+    aux=strsplit(subscriptions[i],&quot;_&quot;);
+    if ((aux[dynlen(aux)]!=&quot;Di&quot;) &amp;&amp; (strpos(subscriptions[i],&quot;_Di_&quot;)&lt;0)) continue;
+
+    DebugTN (&quot;DI Subscription: &quot;+subscriptions[i]);
+    if (dpSetWait (subscriptions[i]+&quot;.Config.MonitoredItems.SamplingInterval&quot;, 0) != 0)
+    {
+      DebugTN (&quot;Failed to change sampling interval on subscription &quot;+subscriptions[i]);
+    }
+    if (dpSetWait (subscriptions[i]+&quot;.Config.MonitoredItems.QueueSize&quot;, 1000) != 0)
+    {
+      DebugTN (&quot;Failed to change queue size on subscription &quot;+subscriptions[i]);
+    }
+
+  }
+}
+
+]]></script>
+ </events>
+ <shapes>
+  <shape layerId="0" Name="RECTANGLE2" shapeType="RECTANGLE">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">40 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">STD_value_ok</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 1 0 20</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">40 190</prop>
+    <prop name="Size">171 51</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">70 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">70 10</prop>
+    <prop name="Size">396 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Framework ELMB - UA address setup</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="cAd" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">230 210</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">230 210</prop>
+    <prop name="Size">71 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0d,False,False,AlignHCenter,False]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = 0;
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="cSub" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">230 230</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">230 230</prop>
+    <prop name="Size">71 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0d,False,False,AlignHCenter,False]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    this.text = 0;
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="convertButton" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">50 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 220</prop>
+    <prop name="Size">151 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Setup Addresses</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[//Upgrade fwElmb address config from OPC DA to OPC UA
+// All address configs will be done using subscriptions unless there is a calculation (polling)
+//No low level filtering will be applied
+
+
+
+
+
+// wrapper_setOPCUA adds to fwPeriphAddress_setOPCUA skipping existing addres configs and keeping &quot;active&quot; flag of address
+void wrapper_setOPCUA(	string dpe,
+                          string opcServerName,
+                          int driverNum,
+                          string opcItemName,
+                          string opcSubscription,
+                          string opcKind,
+                          string opcVariant,
+                          int datatype,
+                          int mode,
+                          string pollGroup,
+                          dyn_string &amp;exceptionInfo,
+                          bool skipIfExists,
+                          bool keepAddressActive)
+{
+
+
+  bool bConfigExists;
+  bool bIsActive;
+  if (skipIfExists || keepAddressActive)
+  {
+    dyn_anytype daConfig;
+    fwPeriphAddress_get(dpe, bConfigExists, daConfig, bIsActive, exceptionInfo);
+    if (dynlen(exceptionInfo)&gt;0)
+    {
+      // no point in setting this address config if we can't even read its address config
+      return;
+    }
+    if (skipIfExists &amp;&amp; bConfigExists)
+    {
+      DebugN (&quot;Skipping because config already exists: &quot;+dpe);
+      return;
+    }
+  }
+  fwPeriphAddress_setOPCUA (dpe, opcServerName, driverNum, opcItemName, opcSubscription, opcKind, opcVariant, datatype, mode, pollGroup, exceptionInfo);
+  if (keepAddressActive)
+  {
+    // Restore Active Flag to previous value
+    dpSetWait (dpe+&quot;:_address.._active&quot;, bIsActive);
+  }
+}
+
+
+void wrapper_fwElmbUser_createUASubscription(string dp, bool setCAENWIENERvalues=FALSE)
+{
+  DebugN(&quot;fwElmb - Subscription &quot; + dp + &quot; does not exists - creating it&quot;);
+
+  dpCreate(dp,&quot;_OPCUASubscription&quot;);
+  dpCreate(dp+&quot;_2&quot;,&quot;_OPCUASubscription&quot;);
+  dpSetWait(dp + &quot;.Config.RequestedLifetimeCount&quot;,100);
+  dpSetWait(dp + &quot;.Config.RequestedMaxKeepAliveCount&quot;,10);
+  dpSetWait(dp + &quot;.Config.PublishingEnabled&quot;,TRUE);
+  dpSetWait(dp + &quot;.Config.Priority&quot;,0);
+  dpSetWait(dp + &quot;.Config.SubscriptionType&quot;,1);
+  dpSetWait(dp + &quot;.Config.MonitoredItems.TimestampsToReturn&quot;,1);
+  if (setCAENWIENERvalues)   dpSetWait(dp + &quot;.Config.MonitoredItems.QueueSize&quot;,1);
+  else dpSetWait(dp + &quot;.Config.MonitoredItems.QueueSize&quot;,20);
+  dpSetWait(dp + &quot;.Config.MonitoredItems.DiscardOldest&quot;,TRUE);
+  if (setCAENWIENERvalues) dpSetWait(dp + &quot;.Config.MonitoredItems.SamplingInterval&quot;,0);
+  else dpSetWait(dp + &quot;.Config.MonitoredItems.SamplingInterval&quot;,2000);
+  dpSetWait(dp + &quot;.Config.MonitoredItems.DataChangeFilter.Trigger&quot;,1);
+  dpSetWait(dp + &quot;.Config.MonitoredItems.DataChangeFilter.DeadbandType&quot;,0);
+  dpSetWait(dp + &quot;.Config.MonitoredItems.DataChangeFilter.DeadbandValue&quot;,0.000);
+  dpSetWait(dp + &quot;.Config.RequestedPublishingInterval&quot;,500);
+
+  //Add it to OPC UA config
+  dyn_anytype subscriptions;
+  dpGet(&quot;_OPCUACANOPENSERVER.Config.Subscriptions&quot;,subscriptions);
+  if(!dynContains(subscriptions,dp)){
+    dynAppend(subscriptions,dp);
+    dpSetWait(&quot;_OPCUACANOPENSERVER.Config.Subscriptions&quot;,subscriptions);
+  }
+
+
+}
+
+
+void createSubscription (string subscription)
+{
+  string dp=&quot;_&quot;+subscription;
+  if(!dpExists(dp))
+    {
+      wrapper_fwElmbUser_createUASubscription(dp,CHKBOX_EXPERTS.state(5));
+      cSub.text = (int)cSub.text + 1;
+   }
+  else {
+
+  dyn_anytype subscriptions;
+  dpGet(&quot;_OPCUACANOPENSERVER.Config.Subscriptions&quot;,subscriptions);
+  if(!dynContains(subscriptions,dp)){
+    dynAppend(subscriptions,dp);
+    dpSetWait(&quot;_OPCUACANOPENSERVER.Config.Subscriptions&quot;,subscriptions);
+  }
+
+
+
+  }
+
+
+
+}
+
+void createAllSubscriptionsForBus (string busName)
+{
+  if (busName!=&quot;&quot;) busName=&quot;_&quot;+busName;
+  /* Cmd , CmdReadback and Value subscriptions shall be present on any ELMB independently of type and number of IO configured */
+  createSubscription (subCmdReadBackG + busName);
+  createSubscription (subValue + busName);
+  createSubscription (subAi + busName);
+  createSubscription (subDi + busName);
+}
+
+int getNumSplitSubstrings (string dp)
+{
+  return dynlen (strsplit (dp, &quot;/&quot;));
+}
+
+void markError ()
+{
+   this.text = &quot;ERRORS&quot;;
+   this.backCol = &quot;FwAlarmFatalAck&quot;;
+}
+
+bool showErrorAskToContinue (string msg)
+{
+  dyn_string ds;
+  dyn_float df;
+  markError();
+ 	ChildPanelOnCentralReturn(&quot;vision/MessageInfo&quot;,
+																&quot;Error during address setup -- continue?&quot;,
+																makeDynString(msg, &quot;Continue converting&quot;, &quot;Abort&quot;),
+																df, ds);
+  if (df[1]==1)
+    return true;
+  else
+    return false;
+}
+
+main()
+{
+
+  //Start conversion
+  this.text = &quot;Processing...&quot;;
+  this.backCol = &quot;FwAlarmWarnAck&quot;;
+  DebugTN(&quot;FwElmb - Processing FW address configs for conversion to OPC UA&quot;);
+
+  string opcServerName = &quot;OPCUACANOPENSERVER&quot;;
+  int driverNum = 9;
+  string opcKind = &quot;1&quot;;
+  string opcVariant = &quot;1&quot;;
+  string opcSubscription, pollGroup;
+  int mode;
+  int dataType = 750; //default
+  dyn_string dps,exceptionInfo;
+  bool useSubscriptionsForAi = true;
+  bool skipIfAddressExists = CHKBOX_EXPERTS.state(0);
+  bool keepAddressActiveFlag = CHKBOX_EXPERTS.state(1);
+  bool useAdcFlags = CHKBOX_Subscriptions.state(0);
+  bool useServerInSubscriptionDP = CHKBOX_EXPERTS.state(4);
+  bool useGroupSubscriptionDPs=CHKBOX_EXPERTS.state(3);
+  bool useDifferentSubscriptionsPerBus=CHKBOX_EXPERTS.state(2);
+
+ if (!dpExists(&quot;_OPCUACANOPENSERVER_2&quot;)) dpCreate(&quot;_OPCUACANOPENSERVER&quot;,&quot;_OPCUAServer&quot;);
+ int error;
+ dpSetWait(&quot;_OPCUACANOPENSERVER.Config.Subscriptions&quot;,makeDynString());
+ dpCopyOriginal(&quot;_OPCUACANOPENSERVER&quot;,&quot;_OPCUACANOPENSERVER_2&quot;,error);
+
+ string defaultPrefixSub;
+ if (!useServerInSubscriptionDP) defaultPrefixSub=&quot;UAsub_&quot;;
+ else defaultPrefixSub=&quot;OPCUACANOPENSERVER_&quot;;
+ if (useGroupSubscriptionDPs) {
+   subCmdReadBackG=defaultPrefixSub+&quot;CmdReadBack&quot;;
+   subValue=defaultPrefixSub+&quot;Value&quot;;
+   subAi=defaultPrefixSub+&quot;Ai&quot;;
+   subDi=defaultPrefixSub+&quot;Di&quot;;
+ }
+ else {
+   subCmdReadBackG=defaultPrefixSub+&quot;DefaultSubscription&quot;;
+   subValue=defaultPrefixSub+&quot;DefaultSubscription&quot;;
+   subAi=defaultPrefixSub+&quot;DefaultSubscription&quot;;
+   subDi=defaultPrefixSub+&quot;DefaultSubscription&quot;;
+ }
+
+
+  // To implement the warning mechanism for elements with smoothing
+  dyn_string dsAiWithSmoothing;
+
+  //FwElmbCANbus
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbCANbus&quot;);
+  if (!useDifferentSubscriptionsPerBus) createAllSubscriptionsForBus(&quot;&quot;);
+
+
+
+  pollGroup=&quot;&quot;;
+
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+
+      if (getNumSplitSubstrings(dps[i]) != 2)
+      {
+          if (!showErrorAskToContinue (&quot;FwElmbCANbus dp=&quot;+dps[i]+&quot; incorrect dp name - can't continue &quot;))
+            return;
+      }
+      string item = &quot;&quot;;
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+
+      if (useDifferentSubscriptionsPerBus) {
+        createAllSubscriptionsForBus(busName);
+      }
+
+
+      item = &quot;ns=2;s=&quot;+busName + &quot;.NMT&quot;;
+      opcSubscription=&quot;&quot;;
+      mode = DPATTR_ADDR_MODE_OUTPUT_SINGLE;
+      wrapper_setOPCUA        (dps[i]+&quot;.management&quot;,opcServerName,driverNum,item,opcSubscription,
+                               opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,
+                               skipIfAddressExists,keepAddressActiveFlag);
+      item = &quot;ns=2;s=&quot;+busName + &quot;.SynchCommand&quot;;
+      wrapper_setOPCUA        (dps[i]+&quot;.syncCmd&quot;,opcServerName,driverNum,item,opcSubscription,
+                               opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,
+                               skipIfAddressExists,keepAddressActiveFlag);
+
+      item = &quot;ns=2;s=&quot;+busName + &quot;.SynchInterval&quot;;
+      if (useDifferentSubscriptionsPerBus) {
+         opcSubscription = subCmdReadBackG +&quot;_&quot;+ busName;
+      }
+      else opcSubscription=subCmdReadBackG;
+      mode = DPATTR_ADDR_MODE_IO_SPONT;
+      wrapper_setOPCUA        (dps[i]+&quot;.syncInterval&quot;,opcServerName,driverNum,item,opcSubscription,
+                               opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,
+                               skipIfAddressExists,keepAddressActiveFlag);
+      item = &quot;ns=2;s=&quot;+busName + &quot;.NodeGuardingInterval&quot;;
+      wrapper_setOPCUA        (dps[i]+&quot;.nodeGuardInterval&quot;,opcServerName,driverNum,item,opcSubscription,
+                               opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,
+                               skipIfAddressExists,keepAddressActiveFlag);
+
+      item = &quot;ns=2;s=&quot;+busName + &quot;.PortError&quot;;
+      if (useDifferentSubscriptionsPerBus) {
+        opcSubscription = subValue +&quot;_&quot;+ busName;
+      }
+      else opcSubscription=  subValue;
+      mode = DPATTR_ADDR_MODE_INPUT_SPONT;
+      wrapper_setOPCUA        (dps[i]+&quot;.portError&quot;,opcServerName,driverNum,item,opcSubscription,
+                               opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,
+                               skipIfAddressExists,keepAddressActiveFlag);
+      item = &quot;ns=2;s=&quot;+busName + &quot;.PortErrorDescription&quot;;
+      wrapper_setOPCUA        (dps[i]+&quot;.portErrorDescription&quot;,opcServerName,driverNum,item,opcSubscription,
+                               opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,
+                               skipIfAddressExists,keepAddressActiveFlag);
+
+      // OPCUA-394 When setting addresses, remove old address from errorPassive
+      fwPeriphAddress_delete(dps[i]+&quot;.errorPassive&quot;, exceptionInfo)   ;
+
+      cAd.text = (int)cAd.text + 6;
+      if(dynlen(exceptionInfo) &gt; 0)
+      {
+        fwExceptionHandling_display(exceptionInfo);
+        if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+          return;
+      }
+    }
+  }
+
+  //FwElmbNode
+
+
+
+
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbNode&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) != 3)
+      {
+        if (!showErrorAskToContinue (&quot;FwElmbNode dp=&quot;+dps[i]+&quot; incorrect dp name&quot;))
+          return;
+        continue;
+      }
+      // Automatically assume type as standard ELMB if none declared
+      string type;
+      if (dpGet (dps[i]+&quot;.type&quot;, type) == 0)
+      {
+        if (type == &quot;&quot;)
+        {
+          dpSetWait (dps[i]+&quot;.type&quot;, &quot;ELMB&quot;);
+          DebugN (&quot;Warning: automatically assigned standard type of this ELMB (type was empty): &quot;+dps[i]);
+        }
+      }
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+
+      dyn_string dpes = makeDynString(&quot;.serialNumber&quot;,&quot;.hwVersion&quot;,&quot;.swVersion&quot;,&quot;.state.value&quot;,&quot;.error&quot;,&quot;.management&quot;,
+                                      &quot;.emergency.errorCodeByte1&quot;,&quot;.emergency.errorCodeByte2&quot;,&quot;.emergency.errorCodeByte3&quot;,
+                                      &quot;.emergency.errorCodeByte4&quot;,&quot;.emergency.errorCodeByte5&quot;,&quot;.emergency.emergencyErrorCode&quot;,
+                                      &quot;.supervision.life.read&quot;,&quot;.supervision.life.write&quot;,&quot;.supervision.guard.read&quot;,
+                                      &quot;.eeprom.save&quot;,&quot;.eeprom.load&quot;,&quot;.bootup&quot;,&quot;.swMinorVersion&quot;,&quot;.rtrCommand.analogInputRtr&quot;,&quot;.rtrCommand.digitalInputRtr&quot;);
+
+      dyn_string items = makeDynString(&quot;.serialNumber&quot;,&quot;.hwVersion&quot;,&quot;.elmbSw.swVersion&quot;,&quot;.State&quot;,&quot;.NodeError&quot;,&quot;.NMT&quot;,
+                                       &quot;.Emergency.SpecificErrorCodeByte1&quot;,&quot;.Emergency.SpecificErrorCodeByte2&quot;,&quot;.Emergency.SpecificErrorCodeByte3&quot;,
+                                       &quot;.Emergency.SpecificErrorCodeByte4&quot;,&quot;.Emergency.SpecificErrorCodeByte5&quot;,&quot;.Emergency.EmergencyErrorCode&quot;,
+                                       &quot;.lifeTime&quot;,&quot;.lifeTime&quot;,&quot;.guardTime&quot;,
+                                       &quot;.storeParams.save&quot;,&quot;.RestoreParams.Load&quot;,&quot;.Bootup&quot;,&quot;.elmbSw.swMinorVersion&quot;,&quot;.TPDO3.RTRcommand&quot;,&quot;.TPDO1.RTRcommand&quot;);
+
+      dyn_string directions = makeDynString(&quot;IN_SQ&quot;,&quot;IN_SQ&quot;,&quot;IN_SQ&quot;,&quot;IN&quot;,&quot;IN_SQ&quot;,&quot;OUT&quot;,
+                                            &quot;IN&quot;,&quot;IN&quot;,&quot;IN&quot;,
+                                            &quot;IN&quot;,&quot;IN&quot;,&quot;IN&quot;,
+                                            &quot;IN_SQ&quot;,&quot;OUT&quot;,&quot;IN_SQ&quot;,
+                                            &quot;OUT&quot;,&quot;OUT&quot;,&quot;IN&quot;,&quot;IN_SQ&quot;,&quot;OUT&quot;,&quot;OUT&quot;);
+
+      for(int j = 1; j &lt;= dynlen(dpes); j++)
+      {
+        opcSubscription = &quot;&quot;;
+        if(directions[j] == &quot;IN&quot;){
+          mode = DPATTR_ADDR_MODE_INPUT_SPONT;
+          if (useDifferentSubscriptionsPerBus) {
+            opcSubscription = subValue +&quot;_&quot;+ busName;
+          }
+          else opcSubscription=subValue;
+        }
+        else if(directions[j] == &quot;IN_SQ&quot;){
+          mode = DPATTR_ADDR_MODE_INPUT_SQUERY;
+        }
+        else if(directions[j] == &quot;OUT&quot;){
+          mode = DPATTR_ADDR_MODE_OUTPUT_SINGLE;
+        }
+        else if(directions[j] == &quot;IO&quot;){
+          mode = DPATTR_ADDR_MODE_IO_SPONT;
+          if (useDifferentSubscriptionsPerBus) {
+            opcSubscription = subCmdReadBackG +&quot;_&quot;+busName;
+          }
+          else opcSubscription=subCmdReadBackG;
+        }
+
+        wrapper_setOPCUA(dps[i]+dpes[j],opcServerName,driverNum,&quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+items[j],opcSubscription,
+                                 opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+        cAd.text = (int)cAd.text + 1;
+        if(dynlen(exceptionInfo) &gt; 0)
+        {
+          fwExceptionHandling_display(exceptionInfo);
+           if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+            return;
+        }
+      }
+    }
+  }
+
+  //FwElmbAi
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbAi&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) != 5)
+      {
+        if (!showErrorAskToContinue (&quot;FwElmbAi dp=&quot;+dps[i]+&quot; incorrect dp name&quot;))
+          return;
+        continue;
+      }
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+      string deviceName = strsplit(dps[i],&quot;/&quot;)[5];
+      string type,function;
+      dpGet(dps[i]+&quot;.type&quot;,type);
+      dpGet(dps[i]+&quot;.function&quot;,function);
+      //Construct UA item name
+      string item = &quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+&quot;.&quot;;
+      // For &quot;Raw ADC Value&quot; we hook directly to TPDO3 as this doesnt need any conversion
+      if (type == &quot;Raw ADC Value&quot;)
+      {
+        /* Which physical channel number is to be used? */
+        dyn_string channels;
+        dpGet( dps[i]+&quot;.channel&quot;, channels);
+        string channel = channels[1]; /* For Raw ADC Value only 1 channel makes final result */
+        if (useAdcFlags)
+          item = item+&quot;ai_&quot;+channel;
+        else
+          item = item+&quot;TPDO3.Value_&quot;+channel;
+      }
+      else
+        item = item+deviceName;
+
+
+      mode = DPATTR_ADDR_MODE_INPUT_SPONT;
+      if (useDifferentSubscriptionsPerBus)  opcSubscription = subAi +&quot;_&quot;+ busName;
+      else          opcSubscription = subAi ;
+      wrapper_setOPCUA(dps[i]+&quot;.value&quot;,opcServerName,driverNum,item,opcSubscription,
+                           opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+      cAd.text = (int)cAd.text + 1;
+
+      // .smooth presence early warning mechanism (https://its.cern.ch/jira/browse/OPCUA-423)
+      string smoothing_config = dps[i]+&quot;.value:_smooth.._type&quot;;
+      int type;
+      dpGet( smoothing_config, type );
+      if (type != 0)
+      {
+        dynAppend(dsAiWithSmoothing, dps[i]);
+      }
+
+      if(dynlen(exceptionInfo) &gt; 0)
+       {
+          fwExceptionHandling_display(exceptionInfo);
+           if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+            return;
+        }
+    }
+  }
+
+  if (dynlen( dsAiWithSmoothing ) &gt; 0)
+  {
+
+    if (!showErrorAskToContinue (&quot;FwElmbAi with .smooth config were found (number:&quot;+dynlen(dsAiWithSmoothing)+&quot;). This may mean stuck invalid bits (JIRA: OPCUA-423). If you continue, the list will be dumped to your log.&quot;))
+      return;
+    DebugTN(&quot;List of FwElmbAi with .smooth config:&quot;);
+    DebugTN(dsAiWithSmoothing);
+  }
+
+  //FwElmbAiConfig
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbAiConfig&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) &lt; 3)
+      {
+        if (!showErrorAskToContinue (&quot;FwElmbAiConfig dp=&quot;+dps[i]+&quot; incorrect dp name!&quot;))
+          return;
+        continue;
+      }
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+
+      dyn_string dpes = makeDynString(&quot;.rate.byte.read&quot;,&quot;.rate.byte.write&quot;,&quot;.range.byte.read&quot;,&quot;.range.byte.write&quot;,
+                                      &quot;.mode.read&quot;,&quot;.mode.write&quot;,&quot;.chNumber.read&quot;,&quot;.chNumber.write&quot;,
+                                      &quot;.transmissionType.read&quot;,&quot;.transmissionType.write&quot;,&quot;.eventTimer.read&quot;,&quot;.eventTimer.write&quot;);
+
+      dyn_string items = makeDynString(&quot;.aiConfig.rate&quot;,&quot;.aiConfig.rate&quot;,&quot;.aiConfig.range&quot;,&quot;.aiConfig.range&quot;,
+                                       &quot;.aiConfig.mode&quot;,&quot;.aiConfig.mode&quot;,&quot;.aiConfig.channelMax&quot;,&quot;.aiConfig.channelMax&quot;,
+                                       &quot;.aiTransmit.aiTransmissionType&quot;,&quot;.aiTransmit.aiTransmissionType&quot;,&quot;.aiTransmit.aiEventTimer&quot;,&quot;.aiTransmit.aiEventTimer&quot;);
+
+      dyn_string directions = makeDynString(&quot;IN_SQ&quot;,&quot;OUT&quot;,&quot;IN_SQ&quot;,&quot;OUT&quot;,
+                                            &quot;IN_SQ&quot;,&quot;OUT&quot;,&quot;IN_SQ&quot;,&quot;OUT&quot;,
+                                            &quot;IN_SQ&quot;,&quot;OUT&quot;,&quot;IN_SQ&quot;,&quot;OUT&quot;);
+
+
+      for(int j = 1; j &lt;= dynlen(dpes); j++){
+        opcSubscription = &quot;&quot;;
+        if(directions[j] == &quot;IN&quot;){
+          mode = DPATTR_ADDR_MODE_INPUT_SPONT;
+          if (useDifferentSubscriptionsPerBus) {
+            opcSubscription = subValue +&quot;_&quot;+ busName;
+          }
+          else opcSubscription=subValue;
+        }
+         else if(directions[j] == &quot;IN_SQ&quot;){
+          mode = DPATTR_ADDR_MODE_INPUT_SQUERY;
+        }
+        else if(directions[j] == &quot;OUT&quot;){
+          mode = DPATTR_ADDR_MODE_OUTPUT_SINGLE;
+        }
+        else if(directions[j] == &quot;IO&quot;){
+          mode = DPATTR_ADDR_MODE_IO_SPONT;
+          if (useDifferentSubscriptionsPerBus) {
+            opcSubscription = subCmdReadBackG +&quot;_&quot;+ busName;
+          }
+          else opcSubscription=subCmdReadBackG;
+        }
+        wrapper_setOPCUA(dps[i]+dpes[j],opcServerName,driverNum,&quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+items[j],opcSubscription,
+                                 opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+        cAd.text = (int)cAd.text + 1;
+        if(dynlen(exceptionInfo) &gt; 0)
+        {
+           fwExceptionHandling_display(exceptionInfo);
+           if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+            return;
+        }
+      }
+    }
+  }
+
+  //FwElmbAiSDO
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbAiSDO&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) != 5) {
+        if (!showErrorAskToContinue (&quot;FwElmbAiSDO dp=&quot;+dps[i]+&quot; incorrect dp name&quot;))
+          return;
+        continue;
+      }
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+      string deviceName = strsplit(dps[i],&quot;/&quot;)[5];
+
+      //Construct UA item name
+      string item = &quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+&quot;.aisdo.&quot;+deviceName;
+      mode = DPATTR_ADDR_MODE_INPUT_SQUERY;
+      opcSubscription=&quot;&quot;;
+      wrapper_setOPCUA(dps[i]+&quot;.rawValue&quot;,opcServerName,driverNum,item,opcSubscription,
+                           opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+      cAd.text = (int)cAd.text + 1;
+      if(dynlen(exceptionInfo) &gt; 0)
+      {
+        fwExceptionHandling_display(exceptionInfo);
+        if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+          return;
+      }
+    }
+  }
+
+  //FwElmbDi
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbDi&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) != 5)
+      {
+        if (!showErrorAskToContinue (&quot;FwElmbDi dp=&quot;+dps[i]+&quot; incorrect dp name&quot;))
+          return;
+        continue;
+      }
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+      string deviceName = strsplit(dps[i],&quot;/&quot;)[5];
+      string item = &quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+&quot;.TPDO1.&quot;+deviceName;
+      mode = DPATTR_ADDR_MODE_INPUT_SPONT;
+      if (useDifferentSubscriptionsPerBus)  opcSubscription = subDi+&quot;_&quot;+ busName;
+      else          opcSubscription = subDi ;
+
+      wrapper_setOPCUA(dps[i]+&quot;.value&quot;,opcServerName,driverNum,item,opcSubscription,
+                           opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+      cAd.text = (int)cAd.text + 1;
+      if(dynlen(exceptionInfo) &gt; 0)
+      {
+        fwExceptionHandling_display(exceptionInfo);
+        if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+          return;
+      }
+    }
+  }
+  //FwElmbDiConfig
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbDiConfig&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) &lt;= 3)
+      {
+        if (!showErrorAskToContinue (&quot;FwElmbDiConfig dp=&quot;+dps[i]+&quot; incorrect dp name&quot;))
+          return;
+        continue;
+      }
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+
+      dyn_string dpes = makeDynString(&quot;.enable.read&quot;,&quot;.enable.write&quot;,&quot;.transmissionType.read&quot;,&quot;.transmissionType.write&quot;,
+                                      &quot;.debounceTimer.read&quot;,&quot;.debounceTimer.write&quot;,&quot;.eventTimer.read&quot;,&quot;.eventTimer.write&quot;,
+                                      &quot;.portFInterruptMask.read&quot;,&quot;.portFInterruptMask.write&quot;,&quot;.portAInterruptMask.read&quot;,&quot;.portAInterruptMask.write&quot;,
+                                      &quot;.portAInEnMask.read&quot;,&quot;.portAInEnMask.write&quot;);
+
+      dyn_string items = makeDynString(&quot;.diGlobalInterruptEnable&quot;,&quot;.diGlobalInterruptEnable&quot;,&quot;.diTransmit.diTransmissionType&quot;,&quot;.diTransmit.diTransmissionType&quot;,
+                                       &quot;.diDebounceTimer&quot;,&quot;.diDebounceTimer&quot;,&quot;.diTransmit.diEventTimer&quot;,&quot;.diTransmit.diEventTimer&quot;,
+                                       &quot;.diInterrupt.diInterruptMaskF&quot;,&quot;.diInterrupt.diInterruptMaskF&quot;,&quot;.diInterrupt.diInterruptMaskA&quot;,&quot;.diInterrupt.diInterruptMaskA&quot;,
+                                       &quot;.dioPortA.dioOutputMaskA&quot;,&quot;.dioPortA.dioOutputMaskA&quot;);
+
+      dyn_string directions = makeDynString(&quot;IN_SQ&quot;,&quot;OUT&quot;,&quot;IN_SQ&quot;,&quot;OUT&quot;,
+                                            &quot;IN_SQ&quot;,&quot;OUT&quot;,&quot;IN_SQ&quot;,&quot;OUT&quot;,
+                                            &quot;IN_SQ&quot;,&quot;OUT&quot;,&quot;IN_SQ&quot;,&quot;OUT&quot;,
+                                            &quot;IN_SQ&quot;,&quot;OUT&quot;);
+
+
+      for(int j = 1; j &lt;= dynlen(dpes); j++)
+      {
+        opcSubscription = &quot;&quot;;
+        if(directions[j] == &quot;IN&quot;){
+          mode = DPATTR_ADDR_MODE_INPUT_SPONT;
+         if (useDifferentSubscriptionsPerBus) {
+            opcSubscription = subValue +&quot;_&quot;+ busName;
+          }
+          else opcSubscription=subValue;
+        }
+        else if(directions[j] == &quot;IN_SQ&quot;){
+          mode = DPATTR_ADDR_MODE_INPUT_SQUERY;
+        }
+        else if(directions[j] == &quot;OUT&quot;){
+          mode = DPATTR_ADDR_MODE_OUTPUT_SINGLE;
+        }
+
+        wrapper_setOPCUA(dps[i]+dpes[j],opcServerName,driverNum,&quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+items[j],opcSubscription,
+                                 opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+        cAd.text = (int)cAd.text + 1;
+        if(dynlen(exceptionInfo) &gt; 0)
+        {
+          fwExceptionHandling_display(exceptionInfo);
+          if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+            return;
+        }
+      }
+    }
+  }
+
+  //FwElmbDoBytes
+  // -- Note that single do are not handled with direct addressing in the current framework
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbDoBytes&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) &lt; 3)
+      {
+        error (&quot;FwElmbDoBytes dp=&quot;+dps[i]+&quot; incorrect dp name&quot;);
+        markError();
+        continue;
+      }
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+      string deviceName = &quot;do_write&quot;;
+      string item = &quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+&quot;.RPDO1.&quot;+deviceName;
+      mode = DPATTR_ADDR_MODE_OUTPUT_SINGLE;
+      opcSubscription=&quot;&quot;;
+      wrapper_setOPCUA(dps[i]+&quot;.&quot; + deviceName,opcServerName,driverNum,item,opcSubscription,
+                           opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+      deviceName = &quot;do_A_read&quot;;
+      item = &quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+&quot;.do_read.&quot;+deviceName;
+      mode = DPATTR_ADDR_MODE_INPUT_SQUERY;
+      opcSubscription = &quot;&quot;;
+      wrapper_setOPCUA(dps[i]+&quot;.&quot; + deviceName,opcServerName,driverNum,item,opcSubscription,
+                           opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+      deviceName = &quot;do_C_read&quot;;
+      item = &quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+&quot;.do_read.&quot;+deviceName;
+      wrapper_setOPCUA(dps[i]+&quot;.&quot; + deviceName,opcServerName,driverNum,item,opcSubscription,
+                           opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+      cAd.text = (int)cAd.text + 3;
+      if(dynlen(exceptionInfo) &gt; 0)
+      {
+        fwExceptionHandling_display(exceptionInfo);
+        if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+          return;
+
+      }
+    }
+  }
+  //FwElmbDoConfig
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbDoConfig&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) &lt; 3)
+      {
+        error (&quot;FwElmbDoConfig dp=&quot;+dps[i]+&quot; incorrect dp name&quot;);
+        markError ();
+        continue;
+      }
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+      string item = &quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName + &quot;.doInitHigh&quot;;
+
+
+      mode = DPATTR_ADDR_MODE_INPUT_SQUERY;
+      opcSubscription = &quot;&quot;;
+      wrapper_setOPCUA(dps[i]+&quot;.initHigh.read&quot;,opcServerName,driverNum,item,opcSubscription,
+                           opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+      if(dynlen(exceptionInfo) &gt; 0)
+        error(&quot;ELMB DP address UA update - OPC UA address set up failed&quot;);
+
+      mode = DPATTR_ADDR_MODE_OUTPUT_SINGLE;
+      opcSubscription=&quot;&quot;;
+      wrapper_setOPCUA(dps[i]+&quot;.initHigh.write&quot;,opcServerName,driverNum,item,opcSubscription,
+                           opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+      cAd.text = (int)cAd.text + 2;
+      if(dynlen(exceptionInfo) &gt; 0)
+      {
+        fwExceptionHandling_display(exceptionInfo);
+        if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+          return;
+      }
+    }
+  }
+
+  //FwElmbAo
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbAo&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) &lt; 5)
+      {
+        error (&quot;FwElmbAo dp=&quot;+dps[i]+&quot; incorrect dp name&quot;);
+        markError ();
+        continue;
+      }
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+      string deviceName = strsplit(dps[i],&quot;/&quot;)[5];
+      //Construct UA item name
+      string item = &quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+&quot;.&quot;+deviceName;
+      mode = DPATTR_ADDR_MODE_OUTPUT_SINGLE;
+      opcSubscription=&quot;&quot;;
+      wrapper_setOPCUA(dps[i]+&quot;.value&quot;,opcServerName,driverNum,item,opcSubscription,
+                           opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+      cAd.text = (int)cAd.text + 1;
+      if(dynlen(exceptionInfo) &gt; 0)
+      {
+        fwExceptionHandling_display(exceptionInfo);
+        if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+          return;
+      }
+    }
+  }
+
+  //FwElmbAoConfig
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbAoConfig&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) &lt; 3)
+      {
+        error (&quot;FwElmbAoConfig dp=&quot;+dps[i]+&quot; incorrect dp name&quot;);
+        markError ();
+        continue;
+      }
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+
+      dyn_string dpes = makeDynString(&quot;.chNumber.read&quot;,&quot;.dacType.read&quot;,&quot;.dacType.write&quot;,
+                                      &quot;.sclkHighPeriod.read&quot;,&quot;.sclkHighPeriod.write&quot;);
+
+      dyn_string items = makeDynString(&quot;.aoChannelMax&quot;,&quot;.dacType&quot;,&quot;.dacType&quot;,
+                                       &quot;.aoSpiSclkHigh&quot;,&quot;.aoSpiSclkHigh&quot;);
+
+      dyn_string directions = makeDynString(&quot;IN&quot;,&quot;IN&quot;,&quot;OUT&quot;,
+                                            &quot;IN&quot;,&quot;OUT&quot;);
+
+      for(int j = 1; j &lt;= dynlen(dpes); j++){
+        opcSubscription = &quot;&quot;;
+        if(directions[j] == &quot;IN&quot;){
+          mode = DPATTR_ADDR_MODE_INPUT_SQUERY;
+        }
+        else if(directions[j] == &quot;OUT&quot;){
+          mode = DPATTR_ADDR_MODE_OUTPUT_SINGLE;
+        }
+
+        wrapper_setOPCUA(dps[i]+dpes[j],opcServerName,driverNum,&quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+items[j],opcSubscription,
+                                 opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+        cAd.text = (int)cAd.text + 1;
+        if(dynlen(exceptionInfo) &gt; 0)
+        {
+          fwExceptionHandling_display(exceptionInfo);
+          if (!showErrorAskToContinue (&quot;ELMB DP address UA update - OPC UA address set up failed&quot;))
+            return;
+        }
+      }
+    }
+  }
+
+  //FwElmbSpi
+  dps = dpNames(getSystemName()+&quot;*&quot;,&quot;FwElmbSPI&quot;);
+  if(dynlen(dps) &gt; 0){
+    for(int i = 1; i &lt;= dynlen(dps); i++){
+      if (getNumSplitSubstrings(dps[i]) &lt; 3)
+      {
+        error (&quot;FwElmbSpi dp=&quot;+dps[i]+&quot; incorrect dp name&quot;);
+        markError ();
+        continue;
+      }
+
+      string busName = strsplit(dps[i],&quot;/&quot;)[2];
+      string elmbName = strsplit(dps[i],&quot;/&quot;)[3];
+
+      dyn_string dpes = makeDynString(&quot;.oneByteData&quot;,&quot;.twoByteData&quot;,&quot;.threeByteData&quot;,&quot;.fourByteData&quot;,
+                                      &quot;.chipSelect&quot;,&quot;.sclkHighPeriod&quot;,&quot;.sclkRisingEdge&quot;);
+
+      dyn_string items = makeDynString(&quot;.SPIaccess.oneByteData&quot;, &quot;.SPIaccess.twoByteData&quot;, &quot;.SPIaccess.threeByteData&quot;, &quot;.SPIaccess.fourByteData&quot;,
+                                       &quot;.chipSelect&quot;,&quot;.SPIconfig.sclkHighPeriod&quot;, &quot;.SPIconfig.sclkRisingEdge&quot;);
+      opcSubscription = &quot;&quot;;
+      for(int j = 1; j &lt;= dynlen(dpes); j++){
+        mode = DPATTR_ADDR_MODE_IO_SQUERY;
+
+        wrapper_setOPCUA(dps[i]+dpes[j],opcServerName,driverNum,&quot;ns=2;s=&quot;+busName+&quot;.&quot;+elmbName+items[j],opcSubscription,
+                                 opcKind,opcVariant,dataType,mode,pollGroup,exceptionInfo,skipIfAddressExists,keepAddressActiveFlag);
+        cAd.text = (int)cAd.text + 1;
+        if(dynlen(exceptionInfo) &gt; 0)
+        {
+          fwExceptionHandling_display(exceptionInfo);
+          error(&quot;ELMB DP address UA update - OPC UA address set up failed&quot;);
+        }
+      }
+
+    }
+  }
+  // Mark the project to be OPC-UA based after the conversion
+  fwElmb_setMiddlewareKind (FWELMB_MIDDLEWARE_OPCUA);
+
+  setSubscriptionsOnTimeStamp();
+
+  configureHighFrequencyDigitalInputs();
+
+  //End conversion
+  if(dynlen(exceptionInfo) &gt; 0){
+   markError();
+  }
+  else{
+    this.text = &quot;Finished&quot;;
+    this.backCol = &quot;FwStateOKPhysics&quot;;
+  }
+
+
+
+  //take care of alert handling (cover case OPCDA -&gt; OPCUA without installation of new fw)
+  dyn_string argdsExceptionInfo;
+  fwElmb_createOpcServerAlertHandling(getSystemName(), argdsExceptionInfo);
+  if (dynlen(argdsExceptionInfo)&gt;0) DebugTN(argdsExceptionInfo);
+
+
+
+}
+
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+}
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT2" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">150 210</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">150 210</prop>
+    <prop name="Size">151 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT3" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">310 212</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">310 212</prop>
+    <prop name="Size">166 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Address configs setup</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT4" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">310 243</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">310 243</prop>
+    <prop name="Size">166 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">UA subscriptions created</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT6" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">440 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">440 10</prop>
+    <prop name="Size">131 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">atlas-dcs@cern.ch</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT11" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">20 100</prop>
+    <prop name="Size">521 91</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">The procedure sets up OPC UA Addressing for all fwElmb devices. It may fail 
+in case your fwElmb datapoints are inconsistent (look in the Log Viewer). 
+It is safe to run this procedure multiple times if needed.
+
+Whole OPC DA Config of fwElmb datapoints will be suppressed.
+</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="FRAME1" shapeType="FRAME">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 242</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 2.435897435897437 0 -249.4871794871799</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Extra tools - for experts</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 242</prop>
+    <prop name="Size">541 79</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="FRAME2" shapeType="FRAME">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 22</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.008064516129032 0 47.82258064516128</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Basic tools</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 22</prop>
+    <prop name="Size">541 249</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="CHKBOX_Subscriptions" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 270</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 270</prop>
+    <prop name="Size">500 31</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Use ADC conversion flags</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="CHKBOX_EXPERTS" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">28 365</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">28 365</prop>
+    <prop name="Size">501 124</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Don't set an OPC UA address if it already exists</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Keep AddressActive flag as it is</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Create different subscriptions per bus</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Separate subscriptions in groups (Ai,Di,Value,CmdReadbacks)</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"> Use name of server in subscription DP</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Force QueryInterval/Queu 0/1 in Subscription DPs</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="TEXT_STATE" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">30 470</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">30 470</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> </prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

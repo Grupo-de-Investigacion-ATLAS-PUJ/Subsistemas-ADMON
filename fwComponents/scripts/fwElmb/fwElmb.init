@@ -1,0 +1,43 @@
+#uses "fwInstallation/fwInstallationManager.ctl"
+
+main()
+{
+    DebugTN("fwElmb.init: starting script");
+
+    if (!dpExists("_CtrlDebug_CTRL_70"))
+        dpCreate("_CtrlDebug_CTRL_70","_CtrlDebug");
+
+    //Create and set up the OPC UA client
+    if(!dpExists("_Stat_Configs_driver_9")) {
+        dpCreate("_Stat_Configs_driver_9","_Statistics_DriverConfigs");
+    }
+    if(!dpExists("_Driver9")) {
+        dpCreate("_Driver9","_DriverCommon");
+    }
+	
+    if(!dpExists("_OPCUA9")) {
+        dpCreate("_OPCUA9","_OPCUA");
+    }
+
+	if (isRedundant()) 
+	 if(!dpExists("_Driver9_2")) {
+        dpCreate("_Driver9_2","_DriverCommon");
+     }
+
+	
+    dyn_string servers;
+    dynAppend(servers, "OPCUACANOPENSERVER");
+    dpSet("_OPCUA9.Config.Servers", servers);
+
+    
+
+    // Add client / simulation manager with correct number into console for OPC UA
+    fwInstallationManager_appendDriver("SIM",
+                                       "OPC UA Client -num 9",
+                                       "WCCOAopcua",
+                                       "always",
+                                       30, 2, 2,
+                                       "-num 9");
+
+    DebugTN("fwElmb.init: done");
+}

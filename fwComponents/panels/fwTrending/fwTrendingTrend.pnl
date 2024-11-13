@@ -1,0 +1,2733 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">522 241</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+  <prop name="sizePolicy">
+   <sizePolicy vertical="MinimumExpanding" horizontal="MinimumExpanding"/>
+  </prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwGeneral/fwScreenShot.ctl&quot;
+#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+// DO NOT explicitly load fwAccessControl; it would be loaded 
+// only if it is installed by the main panel (as it will embed
+// the fwAccessControl_currentUser.pnl), 
+// or by fwTrending.ctl using fwGeneral_loadCtrlLib()
+//#uses &quot;fwAccessControl/fwAccessControl.ctc&quot;
+
+// ------------------------------------- ScopeLib -------------------------------------------------
+
+bool g_bLoadedPlotConfig = FALSE;
+bool g_bAccessGranted    = TRUE;
+bool g_bDpAvailable;
+time g_tLastConfigUpdate;
+string g_sReferenceName;
+mapping g_mSystemConnected;
+dyn_bool g_dbFirstCallbacks;
+dyn_string g_dsConnectedSystems;
+dyn_string g_dsTrendingDpes;
+dyn_string g_dsCurveDpeSystems;
+
+// ------------------------------------------------------------------------------------------------
+// CALLBACK FUNCTIONS
+// ------------------------------------------------------------------------------------------------
+  
+// ------------------------------------------------------------------------------------------------
+
+/**
+  ESSENTIAL - Callback function checking user rights and enabling/disabling UI elements accordingly.
+
+@param [in] sDp              string, datapoint name
+@param [in] sUser            string, user name
+*/
+void checkHasSaveRights(string sDp, string sUser)
+{
+  bool bRunning, bIsAllowed, bSaveAsAllowed;
+  dyn_string dsPlots, dsPlotData, exceptionInfo;
+
+  bIsAllowed = TRUE;
+  bSaveAsAllowed = true; // FWTREND-1011
+
+  fwTrending_getRuntimePlotDataWithStrings(g_sReferenceName, bRunning, dsPlots, dsPlotData, exceptionInfo, TRUE);
+
+  if( dsPlotData[fwTrending_PLOT_OBJECT_ACCESS_CONTROL_SAVE] != &quot;&quot; )
+  {
+	if (isFunctionDefined(&quot;fwAccessControl_isGranted&quot;)) fwAccessControl_isGranted(dsPlotData[fwTrending_PLOT_OBJECT_ACCESS_CONTROL_SAVE], bIsAllowed, exceptionInfo);
+    g_bAccessGranted = bIsAllowed;
+  }
+
+  setMultiValue(g_sReferenceName + &quot;saveSettings&quot;,       &quot;enabled&quot;,    (g_bDpAvailable &amp;&amp; g_bAccessGranted),
+              g_sReferenceName + &quot;OtherCascadeButton&quot;, &quot;enableItem&quot;, &quot;9&quot;, (g_bDpAvailable &amp;&amp; bSaveAsAllowed));
+
+  if (dynlen(exceptionInfo)) fwExceptionHandling_display(exceptionInfo);
+}// checkHasSaveRights()
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Callback function updating the connection status of a system and triggering the necessary re-drawing.
+
+@param [in] sDpe             string, datapoint name
+@param [in] bConnected       bool, connection status
+*/
+void updateCurveAndSystemConnectionStateCB(string sDpe, bool bConnected)
+{
+  int iPos, iLoop;
+  string sSystemName;
+
+  sSystemName = dpSubStr(sDpe, DPSUB_DP);
+  
+  if( !mappingHasKey(g_mSystemConnected, sSystemName) )
+  {
+    g_mSystemConnected[sSystemName] = bConnected;
+  }
+
+  strreplace(sSystemName, c_unDistributedControl_dpName, &quot;&quot;);
+  iPos = dynContains(g_dsConnectedSystems, sSystemName + &quot;:&quot;);
+  // if the system name is not part of the connected systems, the for-loop further down will always be reached. Can this break something?
+  if( iPos &gt; 0 )
+  {
+    if( g_dbFirstCallbacks[iPos] )
+    {
+      // Abort redraw of curves as it is first call back
+      g_dbFirstCallbacks[iPos] = FALSE;
+      return;
+    }
+  }
+
+  for( iLoop = 1 ; iLoop &lt;= fwTrending_MAX_NUM_CURVES ; iLoop++ )
+  {
+    if( sDpe == (c_unDistributedControl_dpName + strrtrim(g_dsCurveDpeSystems[iLoop], &quot;:&quot;)) )
+    {
+      drawCurve(iLoop, FALSE);
+    }
+  }
+
+}// updateCurveAndSystemConnectionStateCB()
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Callback function updating the connection status of a datapoint.
+
+@param [in] sDpe             string, datapoint name
+@param [in] bConnected       bool, connection status
+*/
+void updateConfigDpConnectionCB(string sDpe, bool bConnected)
+{
+  string sDpName;
+  shape errorShape;
+  dyn_string dsErrorMessage;
+
+  sDpName        = $sDpName;
+  g_bDpAvailable = bConnected;
+
+  if( !g_bLoadedPlotConfig )
+  {
+    if( bConnected )
+    {
+      if( dpExists(sDpName) )
+      {
+        if( dpTypeName(sDpName) == fwTrending_PLOT )
+        {
+          loadAndConnectToDp(sDpName, $sRefName);
+          setMultiValue($sRefName + &quot;trend.dpNotExist&quot;,     &quot;visible&quot;, FALSE,
+                        $sRefName + &quot;trend.dpNotAvailable&quot;, &quot;visible&quot;, FALSE);
+        }
+      }
+    }
+    else
+    {
+      if( dpExists(sDpName) )
+      {
+        errorShape = getShape($sRefName + &quot;trend.dpNotAvailable&quot;);
+      }
+      else
+      {
+        errorShape = getShape($sRefName + &quot;trend.dpNotExist&quot;);
+      }
+      
+      dsErrorMessage     = errorShape.text;
+      dsErrorMessage[2]  = &quot;\&quot;&quot; + sDpName + &quot;\&quot;&quot;;
+      errorShape.text    = dsErrorMessage;
+      errorShape.visible = TRUE;
+    }
+  }
+
+  enableSaveButton(bConnected);
+
+}// updateConfigDpConnectionCB()
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Callback function updating the shown trend.
+
+@param [in] sDpe             string, datapoint name
+@param [in] dsValues         dyn_string, datapoint values
+*/
+void updateTrendingDisplayCB(string sDpe, dyn_string dsValues)
+{
+  time tTimestamp;
+  string sIsRunning;
+  dyn_string dsPlotShapes, exceptionInfo;
+  dyn_dyn_string ddsExtendedPlotData, ddsPlotData;
+
+  sDpe = dpSubStr(sDpe, DPSUB_SYS_DP_EL);
+  
+  if( (sDpe != &quot;&quot;) &amp;&amp; (dpExists(sDpe + &quot;:_online.._stime&quot;)) )
+  {
+    dpGet(sDpe + &quot;:_online.._stime&quot;, tTimestamp);
+  }
+  else
+  {
+    DebugTN(&quot;Error in &quot; + myPanelName() + &quot; -&gt; updateTrendingDisplayCB() -&gt; sDpe &quot; + sDpe + &quot; is empty or, doesn't exist: &quot; + sDpe + &quot;:_online.._stime&quot;);
+    return;
+  }
+
+  if( tTimestamp != g_tLastConfigUpdate )
+  {
+    if( refreshTrend.text == &quot;TRUE&quot; )
+    {
+      fwTrending_getRuntimePlotDataWithExtendedObject($sRefName, sIsRunning, dsPlotShapes, ddsPlotData, exceptionInfo);
+      fwTrending_getPlotExtended($sDpName, $sRefName, ddsExtendedPlotData, exceptionInfo, TRUE);
+
+      if( dynlen(ddsExtendedPlotData) == fwTrending_getPlotData_LEN_RETURN_DATA )
+      {
+        string sComponentVersion;
+        if( (fwInstallation_isComponentInstalled(&quot;unCore&quot;, sComponentVersion) &amp;&amp; strpos(sDpe, UN_DEVICE_DYNAMICTREND)) &gt; 0 )
+        {
+          ddsExtendedPlotData[fwTrending_PLOT_OBJECT_AXII]                = fwTrending_getCurrentScaleVisibilities(g_sReferenceName);
+          ddsExtendedPlotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE]   = fwTrending_getCurrentScaleMinMaxRanges(g_sReferenceName);
+          ddsExtendedPlotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE_X] = fwTrending_getCurrentScaleMinMaxRangesX(g_sReferenceName);
+        }
+        fwTrending_setRuntimePlotDataWithExtendedObject($sRefName, sIsRunning, ddsExtendedPlotData, exceptionInfo);
+      }
+
+      if( g_dsTrendingDpes == ddsExtendedPlotData[fwTrending_PLOT_OBJECT_DPES] )
+      {
+        refreshTrend(FALSE);
+      }
+      else
+      {
+        refreshTrend(TRUE);
+      }
+
+      g_dsTrendingDpes    = ddsExtendedPlotData[fwTrending_PLOT_OBJECT_DPES];
+      g_tLastConfigUpdate = tTimestamp;
+  
+      setMultiValue($sRefName + &quot;trend.dpNotExist&quot;,     &quot;visible&quot;, FALSE,
+                    $sRefName + &quot;trend.dpNotAvailable&quot;, &quot;visible&quot;, FALSE);
+    }
+  }
+
+}// updateTrendingDisplayCB()
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+// GENERAL FUNCTIONS
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Reads all dollar values and processes them into the plot data format.
+
+@param [out] exceptionInfo    dyn_string, exception information
+
+@return dyn_string, the prepared parameters from the dollar values
+*/
+dyn_string prepareDollarValues(dyn_string &amp;exceptionInfo)
+{
+  int i, iPos, iCurrentTimeRange;
+  float fTemp;
+  dyn_string dsPlotData;
+  dyn_string dsCurveTypes, dsCurveScalePosition, dsCurveScaleVisible, dsCurveLinkTo, dsCurveScaleFormat;
+  dyn_string dsForeProperties;
+  dyn_string dsXAxisFormat;
+  dyn_string dsLegendText, dsLegendValFormat, dsCurveVisible, dsAlarmLimitsVisible;
+
+  fTemp = $fMinForLog;
+  if(fTemp &lt;= 0)
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_EXT_MIN_FOR_LOG] = fwTrending_MIN_FOR_LOG;
+  }
+  else
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_EXT_MIN_FOR_LOG] = $fMinForLog;
+  }
+      
+  fTemp = $fMaxPercentageForLog;
+  if(fTemp &lt;= 0)
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_EXT_MAX_PERCENTAGE_FOR_LOG] = fwTrending_MAX_PERCENTAGE_FOR_LOG;
+  }
+  else
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_EXT_MAX_PERCENTAGE_FOR_LOG] = $fMaxPercentageForLog;
+  }
+  
+  dsPlotData[fwTrending_PLOT_OBJECT_TITLE] = $ZoomWindowTitle;
+  dsPlotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC] = $bTrendLog;
+  dsPlotData[fwTrending_PLOT_OBJECT_DPES] = $dsCurveDPE;
+  dsPlotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS] = $dsCurveToolTipText;
+  dsPlotData[fwTrending_PLOT_OBJECT_COLORS] = $dsCurveColor;
+  dsPlotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE] = $dsCurveRange;
+  dsPlotData[fwTrending_PLOT_OBJECT_EXT_UNITS] = $dsUnit;
+  dsPlotData[fwTrending_PLOT_OBJECT_CURVE_TYPES] = $dsCurvesType;
+  dsPlotData[fwTrending_PLOT_OBJECT_BACK_COLOR] = $sBackColor;
+  dsPlotData[fwTrending_PLOT_OBJECT_GRID] = $bShowGrid;
+  dsPlotData[fwTrending_PLOT_OBJECT_MARKER_TYPE] = $iMarkerType;
+ 
+  //extract legend, caption and menu bar visibility
+  fwTrending_convertStringToDyn($bShowLegend,dsForeProperties,exceptionInfo);
+  dsPlotData[fwTrending_PLOT_OBJECT_LEGEND_ON] = dsForeProperties[1];  
+  if(dynlen(dsForeProperties)&gt;1)
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_CONTROL_BAR_ON] = dsForeProperties[2];
+  }
+  else
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_CONTROL_BAR_ON] = 0;  
+  }
+
+  //extract fore colour and font
+  fwTrending_convertStringToDyn($sForeColor,dsForeProperties,exceptionInfo);
+  dsPlotData[fwTrending_PLOT_OBJECT_FORE_COLOR] = dsForeProperties[1];  
+  if(dynlen(dsForeProperties)&gt;1)
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_DEFAULT_FONT] = dsForeProperties[2];
+  }
+  else
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_DEFAULT_FONT] = fwTrending_DEFAULT_FONT;  
+  }
+
+  //extract curve marker and style
+  fwTrending_convertStringToDyn($iMarkerType,dsForeProperties,exceptionInfo);
+  dsPlotData[fwTrending_PLOT_OBJECT_MARKER_TYPE] = dsForeProperties[1];
+  if(dynlen(dsForeProperties)&gt;1)
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_CURVE_STYLE] = dsForeProperties[2];
+  }
+  else
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_CURVE_STYLE] = fwTrending_DEFAULT_CURVE_STYLE; 
+  }
+  
+  /*the $dsCurveScaleVisible contains the following info: 
+  1-8: curve 1-8 scale visibility (FALSE=hidden, TRUE=visible)
+  9-16: curve 1-8 scale position (SCALE_LEFT, SCALE_RIGHT)
+  17-24: curve 1-8 link to (index of curve to link to)
+  25-32: curve 1-8 scale value format (i.e. &quot;%2.1f&quot;)
+  */   
+  /*extract scale positions or build default ones*/
+  fwTrending_convertStringToDyn($dsCurveScaleVisible,dsCurveScaleVisible,exceptionInfo);  
+  if(dynlen(dsCurveScaleVisible)==(fwTrending_MAX_NUM_CURVES*4))
+  {
+    for(i = (fwTrending_MAX_NUM_CURVES+1); i &lt;= (fwTrending_MAX_NUM_CURVES*2); i++)
+    {
+      dynAppend(dsCurveScalePosition, dsCurveScaleVisible[i]);
+    }
+    
+    for(i = (fwTrending_MAX_NUM_CURVES+1); i &lt;= (fwTrending_MAX_NUM_CURVES*2); i++)
+    {
+      dynRemove(dsCurveScaleVisible,fwTrending_MAX_NUM_CURVES+1);
+    }
+  }
+  else
+  {
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynAppend(dsCurveScalePosition, SCALE_LEFT);
+    }
+  }  
+  
+  /*extract link info*/
+  if(dynlen(dsCurveScaleVisible)==(fwTrending_MAX_NUM_CURVES*3))
+  {
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynAppend(dsCurveLinkTo, dsCurveScaleVisible[i]);
+    }
+    
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynRemove(dsCurveScaleVisible,fwTrending_MAX_NUM_CURVES+1);
+    }
+  }
+  else
+  {
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynAppend(dsCurveLinkTo, &quot;0&quot;);
+    }
+  }  
+  
+  /*extract scale value format*/
+  if(dynlen(dsCurveScaleVisible)==(fwTrending_MAX_NUM_CURVES*2))
+  {
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynAppend(dsCurveScaleFormat, dsCurveScaleVisible[i]);
+    }
+    
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynRemove(dsCurveScaleVisible,fwTrending_MAX_NUM_CURVES+1);
+    }
+  }
+  else
+  {
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynAppend(dsCurveScaleFormat, &quot;&quot;);
+    }
+  }  
+  
+  fwTrending_convertDynToString(dsCurveScaleVisible,dsPlotData[fwTrending_PLOT_OBJECT_AXII],exceptionInfo);
+  fwTrending_convertDynToString(dsCurveScalePosition,dsPlotData[fwTrending_PLOT_OBJECT_AXII_POS],exceptionInfo);
+  fwTrending_convertDynToString(dsCurveLinkTo,dsPlotData[fwTrending_PLOT_OBJECT_AXII_LINK],exceptionInfo);
+  fwTrending_convertDynToString(dsCurveScaleFormat,dsPlotData[fwTrending_PLOT_OBJECT_AXII_Y_FORMAT],exceptionInfo);
+  fwTrending_convertStringToDyn(dsPlotData[fwTrending_PLOT_OBJECT_CURVE_TYPES], dsCurveTypes, exceptionInfo);
+  
+  /* extract curves visibility and alarm limits visibility
+   1-8 curve visibility
+   9-16 alarms limits visibility
+  */
+  /*extract legends text, separate from value format */ 
+  fwTrending_convertStringToDyn($dsCurveVisible,dsCurveVisible,exceptionInfo);  
+  if(dynlen(dsCurveVisible)==(fwTrending_MAX_NUM_CURVES*2))
+  {
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynAppend(dsAlarmLimitsVisible, dsCurveVisible[i]);
+    }
+    
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynRemove(dsCurveVisible,fwTrending_MAX_NUM_CURVES+1);
+    }
+  }
+  else
+  {
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynAppend(dsAlarmLimitsVisible, &quot;0&quot;);
+    }
+  }  
+  
+  fwTrending_convertDynToString(dsCurveVisible,dsPlotData[fwTrending_PLOT_OBJECT_CURVES_HIDDEN],exceptionInfo);
+  fwTrending_convertDynToString(dsAlarmLimitsVisible,dsPlotData[fwTrending_PLOT_OBJECT_ALARM_LIMITS_SHOW],exceptionInfo);
+
+  // Extract (separately) legend texts and legend values format
+  fwTrending_convertStringToDyn($dsCurveLegend,dsLegendText,exceptionInfo);
+  if(dynlen(dsLegendText)==(fwTrending_MAX_NUM_CURVES*2))
+  {
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynAppend(dsLegendValFormat, dsLegendText[i]);
+    }
+    
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynRemove(dsLegendText,fwTrending_MAX_NUM_CURVES+1);
+    }
+  }
+  else
+  {
+    for(i=(fwTrending_MAX_NUM_CURVES+1) ; i&lt;=(fwTrending_MAX_NUM_CURVES*2) ; i++)
+    {
+      dynAppend(dsLegendValFormat, fwTrending_DEFAULT_LEGEND_VALUE_FORMAT);
+    }
+  }
+  
+  fwTrending_convertDynToString(dsLegendText,dsPlotData[fwTrending_PLOT_OBJECT_LEGENDS],exceptionInfo);
+  fwTrending_convertDynToString(dsLegendValFormat,dsPlotData[fwTrending_PLOT_OBJECT_LEGEND_VALUES_FORMAT],exceptionInfo);
+ 
+  dynUnique(dsCurveTypes);
+  iPos = dynContains(dsCurveTypes, &quot;&quot;);
+  if(iPos &gt; 0)
+  {
+    dynRemove(dsCurveTypes, iPos);
+  }
+  
+  if(dynlen(dsCurveTypes) &gt;= 1)
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_CURVE_TYPES] = &quot;&quot;;
+  
+    for(i=1; i&lt;=fwTrending_MAX_NUM_CURVES; i++)
+    {
+      dsPlotData[fwTrending_PLOT_OBJECT_CURVE_TYPES] += dsCurveTypes[1] + fwTrending_CONTENT_DIVIDER;
+    }
+    
+    dsPlotData[fwTrending_PLOT_OBJECT_TYPE] = dsCurveTypes[1];
+  }
+  else
+  {
+    dsPlotData[fwTrending_PLOT_OBJECT_TYPE] = fwTrending_PLOT_TYPE_INDIVIDUAL;
+  }
+
+  fwTrending_convertStringToDyn($sTimeRange,dsXAxisFormat,exceptionInfo);
+  
+  /*extract scale positions*/
+  iCurrentTimeRange = dsXAxisFormat[1];//the first element is the time range.
+  if(iCurrentTimeRange &lt;= 0)
+  {
+    iCurrentTimeRange = fwTrending_SECONDS_IN_ONE_HOUR;
+  }
+  
+  //extract time format for the X axis. Position 2 is for first line, position 3 is for the second line.
+  if(dynlen(dsXAxisFormat)&gt;1)
+  {
+    dynRemove(dsXAxisFormat,1);//remove the time range element. The elements for the time format will remain
+    fwTrending_convertDynToString(dsXAxisFormat,dsPlotData[fwTrending_PLOT_OBJECT_AXII_X_FORMAT],exceptionInfo);
+  }
+  
+  dsPlotData[fwTrending_PLOT_OBJECT_TIME_RANGE] = iCurrentTimeRange;
+  dsPlotData[fwTrending_PLOT_OBJECT_MODEL] = fwTrending_YT_PLOT_MODEL;
+  
+  g_bDpAvailable = FALSE;
+  
+  return dsPlotData;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Loads the plot data and connects the datapoint storing the trending DPEs for updates.
+
+@param [in] sDpName          string, name of the datapoint
+@param [in] sReferenceName   string, the reference of the trend object
+*/
+void loadAndConnectToDp(string sDpName, string sReferenceName)
+{
+  dyn_string exceptionInfo;
+  dyn_dyn_string dsPlotExtendedData;
+
+  fwTrending_getPlotExtended(sDpName, sReferenceName, dsPlotExtendedData, exceptionInfo, TRUE);
+  
+  g_bLoadedPlotConfig = TRUE;
+  
+  if(dynlen(dsPlotExtendedData) == fwTrending_getPlotData_LEN_RETURN_DATA)
+  {
+    fwTrending_setRuntimePlotDataWithExtendedObject(sReferenceName, TRUE, dsPlotExtendedData, exceptionInfo);
+  }
+
+  dpConnect(&quot;updateTrendingDisplayCB&quot;, TRUE, sDpName + fwTrending_PLOT_DPES);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Draws a single curve.
+
+@param [in] iCurveNumber     int, number of the curve
+@param [in] bEraseData       bool, OPTIONAL, tells function if curve data has to be removed
+*/
+void drawCurve(int iCurveNumber, bool bEraseData = TRUE)
+{
+  int iMarkerType;
+  bool bRunning;
+  string sReferenceName, sCleanReferenceName, sParameters;
+  dyn_string dsPlotShapes, exceptionInfo;
+  dyn_dyn_string ddsPlotData;
+  shape activeTrendShape;
+          
+  sReferenceName = $sRefName;
+  sCleanReferenceName = $sRefName;
+ 
+  if(sReferenceName != &quot;&quot;)
+  {
+    sReferenceName +=&quot;trend.&quot;;
+  }
+
+  fwTrending_getRuntimePlotDataWithExtendedObject(sReferenceName, bRunning, dsPlotShapes, ddsPlotData, exceptionInfo);
+
+  activeTrendShape = getShape(dsPlotShapes[fwTrending_ACTIVE_TREND_NAME]);
+  
+  //disconnect and clear old curves
+  activeTrendShape.disconnectDirectly(&quot;curve_&quot; + iCurveNumber);
+  
+  if(bEraseData)
+  {
+    activeTrendShape.curveRemoveData(&quot;curve_&quot; + iCurveNumber, getCurrentTime());
+  }
+
+  //start 20/05/2008: Herve
+  sParameters = getParameters(sReferenceName);
+  
+  _fwTrending_preparePlotObjectForDisplay(ddsPlotData, sParameters, exceptionInfo);
+  _fwTrending_convertFrameworkToPvssMarkerType(ddsPlotData[fwTrending_PLOT_OBJECT_MARKER_TYPE][1], iMarkerType, exceptionInfo);
+  //end 20/05/2008: Herve
+
+  _fwTrending_initCurve(&quot;curve_&quot;+iCurveNumber,
+            iCurveNumber,
+            sCleanReferenceName,
+            makeDynString(sReferenceName + &quot;trendCaption.Text&quot;+iCurveNumber),
+            makeDynString(sReferenceName + &quot;trendCaption.valueCurve&quot;+iCurveNumber),
+            makeDynString(ddsPlotData[fwTrending_PLOT_OBJECT_DPES][iCurveNumber]), 
+            makeDynString(ddsPlotData[fwTrending_PLOT_OBJECT_LEGENDS][iCurveNumber]),
+            makeDynString(ddsPlotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS][iCurveNumber]),
+            ddsPlotData[fwTrending_PLOT_OBJECT_COLORS][iCurveNumber],
+            makeDynBool(ddsPlotData[fwTrending_PLOT_OBJECT_AXII][iCurveNumber]),
+            makeDynBool(ddsPlotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC][1]), 
+            sReferenceName + &quot;trendCaption.visibility&quot;+iCurveNumber,
+            makeDynString(ddsPlotData[fwTrending_PLOT_OBJECT_EXT_UNITS][iCurveNumber]),
+            makeDynString(sReferenceName + &quot;trendCaption.unit&quot;+iCurveNumber),
+            ddsPlotData[fwTrending_PLOT_OBJECT_CURVES_HIDDEN][iCurveNumber],
+            dsPlotShapes[fwTrending_ACTIVE_TREND_NAME],
+            ddsPlotData[fwTrending_PLOT_OBJECT_CURVE_TYPES][iCurveNumber],
+            makeDynString(sReferenceName + &quot;trendCaption.curveTime&quot;),
+            TRUE,
+            exceptionInfo, 
+            iMarkerType,
+            ddsPlotData[fwTrending_PLOT_OBJECT_AXII_POS][iCurveNumber],
+            ddsPlotData[fwTrending_PLOT_OBJECT_AXII_LINK][iCurveNumber],
+            ddsPlotData[fwTrending_PLOT_OBJECT_CURVE_STYLE][1],
+            ddsPlotData[fwTrending_PLOT_OBJECT_LEGEND_VALUES_FORMAT][iCurveNumber]);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/** 
+  Calls &quot;drawTrend()&quot;. Serves as a logical layer bridging the gap between the concepts of 
+  refreshing and drawing the trend.
+
+@param [in] bEraseData       bool, OPTIONAL, tells function if curve data has to be removed
+*/
+void refreshTrend(bool bEraseData = TRUE)
+{
+  drawTrend($sRefName, bEraseData);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Prepares the plot data, draws the trend and its scales, initialises the control buttons, 
+  and connects to alarm limits.
+
+@param [in] sReferenceName   string, the reference of the trend object
+@param [in] bEraseData       bool, OPTIONAL, tells function if curve data has to be removed
+*/
+void drawTrend(string sReferenceName, bool bEraseData = TRUE)
+{
+  bool bRunning, bLog;
+  int i;
+  string sParameters;
+  dyn_string dsPlotShapes, exceptionInfo;
+  dyn_dyn_string ddsPlotData;
+  shape activeTrendShape;
+
+  // here get all data and initialize the trends and the control trend buttons.
+  fwTrending_getRuntimePlotDataWithExtendedObject(sReferenceName, bRunning, dsPlotShapes, ddsPlotData, exceptionInfo);
+
+  sParameters = getParameters(sReferenceName, TRUE);
+  
+  _fwTrending_preparePlotObjectForDisplay(ddsPlotData, sParameters, exceptionInfo);
+
+  activeTrendShape = getShape(dsPlotShapes[fwTrending_ACTIVE_TREND_NAME]);
+
+  // again, if trend was not initialized correctly, the standardTrendShape
+  // and activeTrendShape may be some static text widgets, and not trend widgets
+  // and lead to errors FWTREND-1009
+  if(activeTrendShape.shapeType != &quot;TREND&quot;) {
+    return;
+  }
+
+  //disconnect and clear old curves
+  for(i=1; i&lt;=fwTrending_MAX_NUM_CURVES; i++)
+  {
+    activeTrendShape.disconnectDirectly(&quot;curve_&quot; + i);
+    if(bEraseData)
+    {
+      activeTrendShape.curveRemoveData(&quot;curve_&quot; + i, getCurrentTime());
+    }
+  }
+    
+  setValue($sRefName + &quot;trend.updatedTrend&quot;, &quot;text&quot;, &quot;TRUE&quot;);
+
+  if( (ddsPlotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC][1] == &quot;TRUE&quot;) ||
+      (ddsPlotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC][1] == TRUE)        )
+  {
+    bLog = TRUE;          
+    /*start 20/05/2008: Herve*/
+    setValue(sReferenceName + &quot;trend.activeTrendText&quot;, &quot;text&quot;, dsPlotShapes[fwTrending_LINEAR_TREND_NAME]);
+    dsPlotShapes[fwTrending_ACTIVE_TREND_NAME] = dsPlotShapes[fwTrending_LINEAR_TREND_NAME];
+    /*start/end 20/05/2008: Herve*/
+  }
+  else
+  {
+    bLog = FALSE;
+    setValue(sReferenceName+&quot;trend.activeTrendText&quot;, &quot;text&quot;, dsPlotShapes[fwTrending_LINEAR_TREND_NAME]);
+    dsPlotShapes[fwTrending_ACTIVE_TREND_NAME] = dsPlotShapes[fwTrending_LINEAR_TREND_NAME];
+  }
+
+  if(fwTrending_valuesAreValid(ddsPlotData[fwTrending_PLOT_OBJECT_DPES]))
+  {
+    fwTrending_initTrendWithObject($sRefName, dsPlotShapes[fwTrending_ACTIVE_TREND_NAME], dsPlotShapes, ddsPlotData, bRunning, TRUE, exceptionInfo, TRUE);
+    fwTrending_showStandardTrend(!bLog, dsPlotShapes[fwTrending_LINEAR_TREND_NAME], dsPlotShapes[fwTrending_LOG_TREND_NAME], ddsPlotData);
+    fwTrending_trendUpdateScales($sRefName, ddsPlotData, dsPlotShapes[fwTrending_ACTIVE_TREND_NAME], exceptionInfo);
+    fwTrending_initControlTrendButtons(ddsPlotData[fwTrending_PLOT_OBJECT_TIME_RANGE][1], $sRefName, $sDpName, ddsPlotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC][1]);
+  }
+  
+  if(isFunctionDefined(&quot;unMessageText_sendException&quot;))
+  {
+    unMessageText_sendException(getSystemName(), myManNum(), &quot;trending&quot;, &quot;user&quot;, &quot;*&quot;, exceptionInfo);
+  }
+  
+  _fwTrending_connectToAlarmHandling($sRefName,ddsPlotData);
+    
+  for(i = 1; i &lt;= dynlen(ddsPlotData[fwTrending_PLOT_OBJECT_DPES]); i++)
+  {
+    string remoteStmt=&quot;&quot;;
+    string sysOfDpe=dpSubStr(ddsPlotData[fwTrending_PLOT_OBJECT_DPES][i],DPSUB_SYS);
+    string dpe     =dpSubStr(ddsPlotData[fwTrending_PLOT_OBJECT_DPES][i], DPSUB_SYS_DP_EL);
+    if (sysOfDpe!=&quot;&quot;) remoteStmt=&quot; REMOTE \'&quot;+sysOfDpe+&quot;\'&quot;;
+
+    int rc = dpQueryConnectSingle(&quot;fwTrending_trendUpdateAlarmLimits&quot;, 0, $sRefName,
+                         &quot;SELECT '_alert_hdl.._active' FROM '&quot; + dpe + &quot;'&quot;+remoteStmt);
+    if (rc) {
+      DebugTN(&quot;ERROR in&quot;,__FILE__,&quot;Could not establish alert-active query&quot;,&quot;SELECT '_alert_hdl.._active' FROM '&quot; + dpe + &quot;'&quot;+remoteStmt,
+              getErrorText(getLastError()));
+      continue;
+    }
+  }
+    
+  if(dynlen(exceptionInfo)&gt;0)
+  {
+    fwExceptionHandling_display(exceptionInfo);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/** 
+  Establishes callback connections to all currently connected systems and deletes those connections
+  for systems that are no longer connected.
+
+@param [in] sReferenceName   string, the reference of the trend object
+*/
+void handleSystemConnects(string sReferenceName)
+{
+  bool bRunning, bConnected, bRemote;
+  int i, iRes;
+  string sParameters, sSystemName;
+  dyn_string dsPlotShapes, exceptionInfo, dsSystems, dsPreviousSystems;
+  dyn_dyn_string ddsPlotData;
+
+  setValue(sReferenceName + &quot;trend.updatedTrend&quot;, &quot;text&quot;, &quot;FALSE&quot;);
+  
+  fwTrending_getRuntimePlotDataWithExtendedObject(sReferenceName, bRunning, dsPlotShapes, ddsPlotData, exceptionInfo);
+
+  sParameters = getParameters(sReferenceName);
+  
+  _fwTrending_preparePlotObjectForDisplay(ddsPlotData, sParameters, exceptionInfo);
+
+  //connect to new list of systems
+  for(i=1; i&lt;=dynlen(ddsPlotData[fwTrending_PLOT_OBJECT_DPES]); i++)
+  {
+    fwGeneral_getSystemName(ddsPlotData[fwTrending_PLOT_OBJECT_DPES][i], sSystemName, exceptionInfo);
+    unDistributedControl_isRemote(bRemote, sSystemName);
+    g_dsCurveDpeSystems[i] = sSystemName;
+      
+    if((sSystemName != &quot;&quot;) &amp;&amp; bRemote)
+    {
+      dynAppend(dsSystems, sSystemName);
+    }
+  }
+  
+  dynUnique(dsSystems);
+  dsPreviousSystems = g_dsConnectedSystems;
+  g_dsConnectedSystems = dsSystems;
+
+  for(i=1; i&lt;=dynlen(dsSystems); i++)
+  {
+    if(dynContains(dsPreviousSystems, dsSystems[i]) &lt;= 0)
+    {
+      g_dbFirstCallbacks[i] = TRUE;
+      dynClear(exceptionInfo);
+      unDistributedControl_register(&quot;updateCurveAndSystemConnectionStateCB&quot;, iRes, bConnected, dsSystems[i], exceptionInfo);
+      //FVR: Sow exception to the user
+      if(dynlen(exceptionInfo))
+      {
+        handleMisconfigurationUnDistributedControl(dsSystems[i], exceptionInfo);
+        updateConfigDpConnectionCB(dsSystems[i], TRUE);
+      }
+    }
+  }
+    
+  for(i=1; i&lt;=dynlen(dsPreviousSystems); i++)
+  {
+    if(dynContains(dsSystems, dsPreviousSystems[i]) &lt;= 0)
+    {
+      unDistributedControl_deregister(&quot;updateCurveAndSystemConnectionStateCB&quot;, iRes, bConnected, dsPreviousSystems[i], exceptionInfo);
+    }
+  }  
+
+  // handle all the exceptions here at once:
+  if (dynlen(exceptionInfo))
+  {
+    fwException_raise(exceptionInfo,&quot;ERROR&quot;,&quot;Cannot initialize the trend plot&quot;,&quot;&quot;);
+    fwExceptionHandling_display(exceptionInfo);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+// AUXILIARY FUNCTIONS
+// ------------------------------------------------------------------------------------------------
+
+/** 
+  Enables the save button of a trend depending on connection status and access rights.
+
+@param [in] bConnected       bool, the connection status
+*/
+void enableSaveButton(bool bConnected)
+{
+  string sTooltip;
+  
+  if(bConnected)
+  {
+    sTooltip = &quot;Save configuration to plot DP.&quot;;
+  }
+  else
+  {
+    sTooltip = &quot;Cannot be saved: Remote plot DP is unavailable.&quot;;
+  }
+
+  setValue(g_sReferenceName + &quot;saveSettings&quot;, &quot;enabled&quot;, (bConnected &amp;&amp; g_bAccessGranted));
+  setValue(g_sReferenceName + &quot;saveSettings&quot;, &quot;toolTipText&quot;, sTooltip);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/** 
+  Gets template parameters for a plot.
+
+@param [in] sReferenceName   string, the reference of the trend object
+@param [in] bCheckTemplates  bool, OPTIONAL, tells the function if additional checks are necessary
+
+@return string, the parameters as concatenated string
+*/
+string getParameters(string sReferenceName, bool bCheckTemplates = FALSE)
+{
+  string sParameters;
+  dyn_string exceptionInfo;
+  dyn_dyn_string ddsPlotData;
+  shape parameterStorageShape;
+  
+  if(sReferenceName == &quot;&quot;)
+  {
+    parameterStorageShape = getShape(&quot;parameterValues&quot;);
+  }
+  else
+  {
+    parameterStorageShape = getShape(sReferenceName + &quot;trend.parameterValues&quot;);
+  }
+  
+  if(bCheckTemplates &amp;&amp; (parameterStorageShape.text == parameterStorageShape.name))
+  {
+    if(isDollarDefined(&quot;$templateParameters&quot;))
+    {
+      parameterStorageShape.text = $templateParameters;
+    }
+    else
+    {
+      parameterStorageShape.text = &quot;&quot;;
+    }
+    
+    sParameters = parameterStorageShape.text;
+    fwTrending_checkAndGetAllTemplateParameters(sReferenceName, ddsPlotData, fwTrending_PLOT, sParameters, exceptionInfo, TRUE);
+    parameterStorageShape.text = sParameters;
+  }
+
+  return parameterStorageShape.text;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+  Makes sure that the passed string has exactly one full-stop point at the end.
+
+@param [in] sReferenceName   string, the string to be prepared
+
+@return string, the prepared string with a full-stop point at its end
+*/
+string getPreparedReferenceName(string sReferenceName)
+{
+  if(sReferenceName == &quot;&quot;)
+  {
+    return &quot;&quot;;
+  }
+  else
+  {
+    return strrtrim(sReferenceName, &quot;.&quot;) + &quot;.&quot;;
+  }
+}
+
+
+
+// Search for Emply curve slots in online trending configuration dyn_string object
+// Return free slot positions
+dyn_int searchEmptySlots(dyn_string dsDpes)
+{
+  int iLoop, iLen;
+  dyn_int diFreeSlots;
+
+  //DebugTN(&quot;searchEmptySlots() -&gt; dsDpes = &quot;, dsDpes);
+ 
+  iLen = dynlen(dsDpes);
+  for( iLoop = 1 ; (iLoop &lt;= iLen) &amp;&amp; (iLoop &lt;= fwTrending_MAX_NUM_CURVES) ; iLoop++ )
+  {
+    if( dsDpes[iLoop] == &quot;&quot; )
+    {
+      //DebugTN(&quot;searchEmptySlots() -&gt; found empty slot position: &quot; + iLoop);
+      dynAppend(diFreeSlots, iLoop);
+    }
+  }
+ 
+  // In case some curves are missing.
+  for( iLoop = (iLen + 1) ; iLoop &lt;= fwTrending_MAX_NUM_CURVES ; iLoop++)
+  {
+    //DebugTN(&quot;searchEmptySlots() -&gt; missing curve found, added its index: &quot; + iLoop);
+	dynAppend(diFreeSlots, iLoop);
+  }
+
+  //DebugTN(&quot;searchEmptySlots() -&gt; Total empty slots = &quot; + dynlen(diFreeSlots) + &quot;: &quot; + diFreeSlots);
+  return diFreeSlots;
+
+}
+
+void handleMisconfigurationUnDistributedControl(string sSystemName, dyn_string exceptionInfo)
+{
+  //check if the internal dp for unDistributedControl exists. If this is not the case, warn the user.  
+  string unDistributedControlDp = &quot;_unDistributedControl_&quot;+substr(sSystemName, 0, strpos(sSystemName, &quot;:&quot;));
+  if(!dpExists(unDistributedControlDp))
+  {
+    ChildPanelOnCentral(&quot;vision/MessageWarning&quot;, &quot;UnDistributedControl Not Configured&quot;, makeDynString(&quot;$1: dp: &quot; + unDistributedControlDp + &quot; does not exist.\nPlease, configure the unDistributedControl Component&quot;));
+  } 
+  else
+   {
+    fwExceptionHandling_display(exceptionInfo);
+  }
+
+  return;
+}
+
+
+// --------------------------------- End of ScopeLib ----------------------------------------------
+
+
+
+
+
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{  
+  bool bConnected, bRemote;
+  int iRes;
+  string sSystemName, sExternalUpdate;
+  dyn_string exceptionInfo, dsPreparedDollarValues;  
+  
+  // all the data necessary for the initialisation or switch from standard to log trend and vice-versa is stored in Text graphical components
+
+ g_sReferenceName = getPreparedReferenceName($sRefName);
+  dpNameText.text = $sDpName;
+  refName.text = $sRefName;
+
+  // if data is not read from the database, use the $-params instead
+  if($sDpName == &quot;&quot;)
+  {
+    dsPreparedDollarValues = prepareDollarValues(exceptionInfo);
+    g_bDpAvailable = FALSE;
+    g_bLoadedPlotConfig = TRUE;
+    fwTrending_setRuntimePlotDataWithStrings($sRefName, TRUE, dsPreparedDollarValues, exceptionInfo);
+    drawTrend($sRefName);
+  }
+  else
+  {
+    fwGeneral_getSystemName($sDpName, sSystemName, exceptionInfo);
+    unDistributedControl_isRemote(bRemote, sSystemName);
+        
+    if((sSystemName == &quot;&quot;) || !bRemote)
+    {
+      updateConfigDpConnectionCB(&quot;&quot;, TRUE);
+    }
+    else
+    {
+      dynClear(exceptionInfo);
+      unDistributedControl_register(&quot;updateConfigDpConnectionCB&quot;, iRes, bConnected, sSystemName, exceptionInfo);
+      //Show exception to the user
+      if(dynlen(exceptionInfo))
+      {
+        handleMisconfigurationUnDistributedControl(sSystemName, exceptionInfo);
+        updateConfigDpConnectionCB(&quot;&quot;, FALSE);
+      }
+
+    }
+  }
+  
+
+  bool bRdbDirect, bRdbDirectPrevious;
+  while(1)
+  {
+    getValue($sRefName + &quot;trend.updatedTrend&quot;, &quot;text&quot;, sExternalUpdate);
+    if(sExternalUpdate == &quot;TRUE&quot;)
+    {
+      handleSystemConnects($sRefName);
+    }
+    
+    fwGeneral_getQueryRDBdirectEnabled(bRdbDirect);
+    if(bRdbDirect != bRdbDirectPrevious)
+    {
+      drawTrend($sRefName);
+      bRdbDirectPrevious = bRdbDirect;
+    }
+    delay(5,000);
+  }
+}
+
+
+
+
+
+
+
+
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="refName" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">330</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 60</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 62</prop>
+    <prop name="Size">42 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">refName</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="trendRunningText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">332</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 42</prop>
+    <prop name="Size">86 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">trendRunningText</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="standardTrendText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">333</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">38</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 82</prop>
+    <prop name="Size">93 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">standardTrendText</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="activeTrendText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">335</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">40</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 122</prop>
+    <prop name="Size">79 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">activeTrendText</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="dpNameText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">347</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">70 60</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">72 62</prop>
+    <prop name="Size">61 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">dpNameText</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="refreshTrend" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">360</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 150</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">63</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 152</prop>
+    <prop name="Size">57 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">TRUE</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="dpNotAvailable" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">363</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">107 44</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">66</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">115 52</prop>
+    <prop name="Size">291 59</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">The plot configuration data point
+{name}
+is from a remote system which is not available.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">8</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="dpNotExist" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">362</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">107 44</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">65</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">115 52</prop>
+    <prop name="Size">291 59</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">The plot configuration data point
+{name}
+does not exist.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">8</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="parameterValues" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">364</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">180 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">67</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">182 92</prop>
+    <prop name="Size">157 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">parameterValues</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="updatedTrend" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">365</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 170</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">67</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 172</prop>
+    <prop name="Size">57 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">FALSE</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="standardTrend" shapeType="TREND">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-2 9</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">FwTrendingTrendForeground</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="AcceptDrops">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">-2 9</prop>
+    <prop name="Size">517 223</prop>
+    <prop name="TimeTrend">True</prop>
+    <prop name="Logarithmic">False</prop>
+    <prop name="ShowToolBox">False</prop>
+    <prop name="ShowLegend">False</prop>
+    <prop name="Vertical">False</prop>
+    <prop name="ShowGrid">True</prop>
+    <prop name="ShowBackgroundGrid">False</prop>
+    <prop name="TimeRange">1</prop>
+    <prop name="ScrollPercent">5</prop>
+    <prop name="LegendFont">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="ScaleFont">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="DefaultFont">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="TrendArea">
+     <prop name="PixmapFile"></prop>
+     <prop name="TrendCurve" type="ValueOverTime">
+      <prop name="Name">curve_1</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat">%6.2f</prop>
+      <prop name="LegendShowDate">True</prop>
+      <prop name="LegendShowMilli">True</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape">trendCaption.valueCurve1</prop>
+      <prop name="TimeShape">trendCaption.curveTime</prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen1</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%64.0f</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">True</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverTime">
+      <prop name="Name">curve_2</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat">%6.2f</prop>
+      <prop name="LegendShowDate">True</prop>
+      <prop name="LegendShowMilli">True</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape">trendCaption.valueCurve2</prop>
+      <prop name="TimeShape">trendCaption.curveTime2</prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen2</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%183.2f</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">True</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverTime">
+      <prop name="Name">curve_3</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat">%6.2f</prop>
+      <prop name="LegendShowDate">True</prop>
+      <prop name="LegendShowMilli">True</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape">trendCaption.valueCurve3</prop>
+      <prop name="TimeShape">trendCaption.curveTime3</prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen3</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%183.2f</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">True</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverTime">
+      <prop name="Name">curve_4</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat">%6.2f</prop>
+      <prop name="LegendShowDate">True</prop>
+      <prop name="LegendShowMilli">True</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape">trendCaption.valueCurve4</prop>
+      <prop name="TimeShape">trendCaption.curveTime4</prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen4</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%183.2f</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">True</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverTime">
+      <prop name="Name">curve_5</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat">%6.2f</prop>
+      <prop name="LegendShowDate">True</prop>
+      <prop name="LegendShowMilli">True</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape">trendCaption.valueCurve5</prop>
+      <prop name="TimeShape">trendCaption.curveTime5</prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen5</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%183.2f</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">True</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverTime">
+      <prop name="Name">curve_6</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat">%6.2f</prop>
+      <prop name="LegendShowDate">True</prop>
+      <prop name="LegendShowMilli">True</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape">trendCaption.valueCurve6</prop>
+      <prop name="TimeShape">trendCaption.curveTime6</prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen6</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%183.2f</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">True</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverTime">
+      <prop name="Name">curve_7</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat">%6.2f</prop>
+      <prop name="LegendShowDate">True</prop>
+      <prop name="LegendShowMilli">True</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape">trendCaption.valueCurve7</prop>
+      <prop name="TimeShape">trendCaption.curveTime7</prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen7</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%183.2f</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">True</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverTime">
+      <prop name="Name">curve_8</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat">%6.2f</prop>
+      <prop name="LegendShowDate">True</prop>
+      <prop name="LegendShowMilli">True</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape">trendCaption.valueCurve8</prop>
+      <prop name="TimeShape">trendCaption.curveTime8</prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen8</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%183.2f</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">True</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+     </prop>
+     <prop name="TimeScaleOneLine">True</prop>
+     <prop name="TimeScale">
+      <prop name="Format1">%c</prop>
+      <prop name="Format2"></prop>
+      <prop name="AutoFormat">True</prop>
+      <prop name="Visible">True</prop>
+      <prop name="Position">Bottom</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="CurvesScaled" isEscaped="1"><![CDATA[main(dyn_string curves)
+{
+  int iIndex;
+  bool isRunning;
+  string sMinMaxRanges, sMinRanges, sMaxRanges;
+  string sMinMaxRangesX, sMinRangesX, sMaxRangesX;
+  dyn_string dsPlotShapes, dsPlotData, exceptionInfo;
+  dyn_string dsMinRanges, dsMaxRanges, dsMinMaxRanges;
+  dyn_string dsMinRangesX, dsMaxRangesX, dsMinMaxRangesX;
+  string sReferenceName = $sRefName;
+  
+  fwTrending_getRuntimePlotDataWithStrings(sReferenceName, isRunning, dsPlotShapes, dsPlotData, exceptionInfo, FALSE);
+
+  fwTrending_convertStringToDyn(dsPlotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE], dsMinMaxRanges, exceptionInfo);
+  fwTrending_convertStringToDyn(dsPlotData[fwTrending_PLOT_OBJECT_RANGES_MIN], dsMinRanges, exceptionInfo);
+  fwTrending_convertStringToDyn(dsPlotData[fwTrending_PLOT_OBJECT_RANGES_MAX], dsMaxRanges, exceptionInfo);
+  fwTrending_convertStringToDyn(dsPlotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE_X], dsMinMaxRangesX, exceptionInfo);
+  fwTrending_convertStringToDyn(dsPlotData[fwTrending_PLOT_OBJECT_RANGES_MIN_X], dsMinRangesX, exceptionInfo);
+  fwTrending_convertStringToDyn(dsPlotData[fwTrending_PLOT_OBJECT_RANGES_MAX_X], dsMaxRangesX, exceptionInfo);
+  
+  for(int i = 1; i &lt;= dynlen(curves); i++)
+  {
+    iIndex = substr(curves[i], 6);
+    dsMinMaxRanges[iIndex] = this.curveMin(curves[i]) + &quot;:&quot; + this.curveMax(curves[i]);
+    dsMinRanges[iIndex] = this.curveMin(curves[i]);
+    dsMaxRanges[iIndex] = this.curveMax(curves[i]);    
+    dsMinMaxRangesX[iIndex] = this.curveMinX(curves[i]) + &quot;:&quot; + this.curveMaxX(curves[i]);
+    dsMinRangesX[iIndex] = this.curveMinX(curves[i]);
+    dsMaxRangesX[iIndex] = this.curveMaxX(curves[i]);
+  }
+    
+  fwTrending_convertDynToString(dsMinMaxRanges, sMinMaxRanges, exceptionInfo);
+  fwTrending_convertDynToString(dsMinRanges, sMinRanges, exceptionInfo);
+  fwTrending_convertDynToString(dsMaxRanges, sMaxRanges, exceptionInfo);
+  fwTrending_convertDynToString(dsMinMaxRangesX, sMinMaxRangesX, exceptionInfo);
+  fwTrending_convertDynToString(dsMinRangesX, sMinRangesX, exceptionInfo);
+  fwTrending_convertDynToString(dsMaxRangesX, sMaxRangesX, exceptionInfo);
+      
+  dsPlotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE] = sMinMaxRanges;
+  dsPlotData[fwTrending_PLOT_OBJECT_RANGES_MIN] = sMinRanges;
+  dsPlotData[fwTrending_PLOT_OBJECT_RANGES_MAX] = sMaxRanges;
+  dsPlotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE_X] = sMinMaxRangesX;
+  dsPlotData[fwTrending_PLOT_OBJECT_RANGES_MIN_X] = sMinRangesX;
+  dsPlotData[fwTrending_PLOT_OBJECT_RANGES_MAX_X] = sMaxRangesX;
+
+  fwTrending_setRuntimePlotDataWithStrings(sReferenceName, isRunning, dsPlotData, exceptionInfo, FALSE);
+}]]></script>
+    <script name="TimeScroll" isEscaped="1"><![CDATA[main(time start, time span)
+{
+  /* uncomment this if you want that the time format for the X axis shows/hides automatically the date
+  if the timespan visible is within today. This code overrides the configuration for custom time format. */
+
+//   time now = getCurrentTime();
+//   time until = start+span;
+//     if(day(start)==day(now) &amp;&amp; month(start)==month(now)  &amp;&amp; year(start)==year(now)
+//       &amp;&amp; day(until)==day(now) &amp;&amp; month(until)==month(now)  &amp;&amp; year(until)==year(now))
+//       this.timeFormat(0,true,&quot;%H:%M:%S&quot;,&quot;&quot;);
+//     else
+//       this.timeFormat(0,true,&quot;%d/%m/%Y %H:%M:%S&quot;,&quot;&quot;);
+//
+//CG
+  fwTrending_timeAxisChanged($sRefName, start, span);
+}
+
+
+
+
+
+
+
+
+
+]]></script>
+    <script name="CurveLegendClicked" isEscaped="1"><![CDATA[main(string sCurve)
+{
+  int iCurve;
+  string sReferenceName = $sRefName;
+  string bRunning;
+  dyn_string dsPlotShapes, dsPlotData, dsSplit, exceptionInfo;
+  bool bCurveVisibility;
+
+  strreplace(sCurve,&quot;curve_&quot;,&quot;&quot;);
+  iCurve = sCurve;
+
+  if(sCurve&gt;0 &amp;&amp; sCurve&lt;=fwTrending_TRENDING_MAX_CURVE)
+  {
+    fwTrending_getRuntimePlotDataWithStrings(sReferenceName, bRunning, dsPlotShapes, dsPlotData, exceptionInfo, FALSE);
+    fwTrending_convertStringToDyn(dsPlotData[fwTrending_PLOT_OBJECT_CURVES_HIDDEN], dsSplit, exceptionInfo);
+    bCurveVisibility = !(dsSplit[sCurve] == &quot;TRUE&quot;);
+    fwTrending_ShowCurve(sReferenceName, &quot;trend.activeTrendText&quot;, sCurve, bCurveVisibility);
+  }  
+}
+
+
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  setMultiValue($sRefName + &quot;trend.standardTrend&quot;, &quot;timeFormat&quot;, 0, FALSE, &quot;%X&quot;, &quot;%x&quot;,
+                $sRefName + &quot;trend.standardTrend&quot;, &quot;legendDTV&quot;, true);
+}
+
+]]></script>
+    <script name="DragDrop" isEscaped="1"><![CDATA[main(string sInformation, int iDragType, int iArea)
+{
+  int iCount, iLoop;
+  string sCustomLegend;
+  dyn_string dsDpes, dsLegends, dsTemp, dsDpAndLegend;
+
+
+  dsDpAndLegend = strsplit( sInformation, &quot;;&quot; );
+  iCount        = dynlen(dsDpAndLegend);
+
+
+  // Checking each argument
+  for( iLoop = 1 ; iLoop &lt;= iCount ; iLoop++ )
+  {
+    dsTemp = strsplit(dsDpAndLegend[iLoop], &quot;,&quot;); // dsTemp[1] = DPE, dsTemp[2] = Legend
+
+    if( dpExists(dsTemp[1]) )
+    {
+      switch( dynlen(dsTemp) )
+      {
+        case 2: // DPE + legend
+          dynAppend(dsDpes,    dsTemp[1]);
+          dynAppend(dsLegends, dsTemp[2]);
+          break;
+
+        case 1: // DPE
+          dynAppend(dsDpes,    dsTemp[1]);
+          dynAppend(dsLegends, &quot;&quot;);
+          break;
+
+        default:
+          DebugTN(&quot;DragDrop -&gt; Error unexpected number of parameters&quot;);
+          return;
+          break;
+      }
+    }
+    else
+    {
+      DebugTN(&quot;DragDrop -&gt; Error: DPE: &quot; + dsTemp[1] + &quot;, doesn't exist, DPE will be not added to trend&quot;);
+    }
+
+  }//for (iCount)
+
+
+  addCurves(dsDpes, dsLegends);
+
+}
+
+
+
+
+
+
+void addCurves(dyn_string dsNewDpe, dyn_string dsNewLegend)
+{
+  int iLoop, iNumberCurvesToAdd;
+  string sOnlineDpes, sOnlineLegend, sOnlineAxiis;
+  dyn_int diFreePositions;
+  dyn_string dsOnlineCurves, dsOnlineDpes, dsOnlineLegend, dsOnlineAxiis, exceptionInfo;
+
+
+  // --- If Legend doesn't exist -&gt; Alias -&gt; DPE name
+  iNumberCurvesToAdd = dynlen(dsNewDpe);
+  for( iLoop = 1 ; iLoop &lt;= iNumberCurvesToAdd ; iLoop++ )
+  {
+    if( dsNewLegend[iLoop] == &quot;&quot; )
+    {
+      dsNewLegend[iLoop] = dpGetAlias(dsNewDpe[iLoop]);
+      if( dsNewLegend[iLoop] == &quot;&quot; )
+      {
+        dsNewLegend[iLoop] = dpSubStr(dsNewDpe[iLoop], DPSUB_SYS_DP_EL);
+      }
+    }
+
+  }
+
+
+  // --- Getting online configuration
+  if( shapeExists($sRefName + &quot;trendInfo&quot;) )
+  {
+    getValue($sRefName + &quot;trendInfo&quot;, &quot;items&quot;, dsOnlineCurves);
+  }
+  else
+  {
+    DebugTN(&quot;addCurves() -&gt; Error, shape doesn't exists: &quot; + $sRefName + &quot;trendInfo&quot;);
+    return;
+  }
+
+
+  // --- Getting free curve slots from online configuration
+  // If dsPlotDataLive &gt; 37 (fwTrending_PLOT_OBJECT_ALARM_LIMITS_SHOW) extended information is available
+  if( dynlen(dsOnlineCurves) &gt;= fwTrending_PLOT_OBJECT_ALARM_LIMITS_SHOW )
+  {
+    sOnlineDpes  = dsOnlineCurves[fwTrending_PLOT_OBJECT_DPES];
+    dsOnlineDpes = strsplit(sOnlineDpes, fwTrending_CONTENT_DIVIDER);
+
+    sOnlineLegend  = dsOnlineCurves[fwTrending_PLOT_OBJECT_LEGENDS];
+    dsOnlineLegend = strsplit(sOnlineLegend, fwTrending_CONTENT_DIVIDER);
+
+    sOnlineAxiis  = dsOnlineCurves[fwTrending_PLOT_OBJECT_AXII];
+    dsOnlineAxiis = strsplit(sOnlineAxiis, fwTrending_CONTENT_DIVIDER);
+
+  }
+  else
+  {
+    DebugTN(&quot;addCurves() -&gt; Error: Unknown number of empty slots from widget information&quot;);
+    return;
+  }
+
+
+  // --- Search for free curve slots in the plot
+  diFreePositions = searchEmptySlots(dsOnlineDpes);
+  if( dynlen(diFreePositions) &lt; iNumberCurvesToAdd )
+  {
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;There are not enough free curves available&quot;, &quot;&quot;);
+    return;
+  }
+  else
+  {
+    // Adding to trending object new DPEs
+    for( iLoop = 1 ; iLoop &lt;= iNumberCurvesToAdd ; iLoop++ )
+    {
+      dsOnlineDpes  [diFreePositions[iLoop]] = dsNewDpe[iLoop];
+      dsOnlineLegend[diFreePositions[iLoop]] = dsNewLegend[iLoop];
+      dsOnlineAxiis [diFreePositions[iLoop]] = TRUE;  // By default we enable the Y-Axiis
+    }
+
+    // Add new curves
+    fwGeneral_dynStringToString(dsOnlineDpes, dsOnlineCurves[fwTrending_PLOT_OBJECT_DPES], fwTrending_CONTENT_DIVIDER);
+    dsOnlineCurves[fwTrending_PLOT_OBJECT_DPES] += fwTrending_CONTENT_DIVIDER; // Missing &quot;;&quot; at end of string
+
+    // Add new legends
+    fwGeneral_dynStringToString(dsOnlineLegend, dsOnlineCurves[fwTrending_PLOT_OBJECT_LEGENDS], fwTrending_CONTENT_DIVIDER);
+    dsOnlineCurves[fwTrending_PLOT_OBJECT_LEGENDS] += fwTrending_CONTENT_DIVIDER; // Missing &quot;;&quot; at end of string
+
+    // Add new Axiis settings
+    fwGeneral_dynStringToString(dsOnlineAxiis, dsOnlineCurves[fwTrending_PLOT_OBJECT_AXII], fwTrending_CONTENT_DIVIDER);
+    dsOnlineCurves[fwTrending_PLOT_OBJECT_AXII] += fwTrending_CONTENT_DIVIDER; // Missing &quot;;&quot; at end of string
+
+    // Set online trend and redraw
+    fwTrending_setRuntimePlotDataWithStrings($sRefName, TRUE, dsOnlineCurves, exceptionInfo);
+    if( dynlen(exceptionInfo) &gt; 0 )
+    {
+      fwExceptionHandling_display(exceptionInfo);
+    }
+
+    refreshTrend(TRUE, FALSE);
+    drawCurve   (1,    FALSE);
+
+  }//else
+
+}
+
+
+
+
+]]></script>
+    <script name="DragEnter" isEscaped="1"><![CDATA[main(string sInformation, int iDragType, int iArea)
+{
+  int iPos, iDpesToAdd, iEmptySlots;
+  string sDpes;
+  dyn_string dsPlotDataLive, dsDpes, dsDpesInformation;
+
+
+  // --- Get number of DPEs to plot
+  dsDpesInformation  = strsplit(sInformation, &quot;;&quot;);
+  iDpesToAdd         = dynlen(dsDpesInformation);
+
+
+  // --- Get online trending configuration
+  fwTrending_getAndSaveFromTrendWidget();
+  getValue(&quot;trendInfo&quot;, &quot;items&quot;, dsPlotDataLive);
+
+
+  // If dsPlotDataLive &gt; 37 (fwTrending_PLOT_OBJECT_ALARM_LIMITS_SHOW) extended information is available
+  if( dynlen(dsPlotDataLive) &gt;= fwTrending_PLOT_OBJECT_ALARM_LIMITS_SHOW )
+  {
+    sDpes       = dsPlotDataLive[fwTrending_PLOT_OBJECT_DPES];
+    dsDpes      = strsplit(sDpes, fwTrending_CONTENT_DIVIDER);
+    iEmptySlots = dynlen(searchEmptySlots(dsDpes));
+
+    if( iDpesToAdd &lt;= iEmptySlots )
+    {
+      dropAccept(1);
+    }
+    else
+    {
+      dropAccept(0);
+    }
+
+  }
+  else
+  {
+    dropAccept(0);
+  }
+
+}
+
+
+
+
+]]></script>
+    <script name="MouseOver" isEscaped="1"><![CDATA[main(bool enter)
+{
+ //CG
+  if(enter)
+    fwTrending_timeAxisOwner($sRefName);
+}]]></script>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main()
+{
+  bool bLogarithmicOn, bAutoScaleOn, bAutoScaleEnabled;
+  int iAnswer, iLoop, iDay, iHour, iMinute, iTimeSeconds, iSaveEnabled, iSaveAsEnabled, iEditEnabled, iLegendOn, iToolBarOn, iGridOn;
+  long iMiddleTime, iStartTime, iTimeStart, iTimeEnd;
+  string sReference, sTemp, sTrendRunning, sCurrentParameterValues, sTimeRange;
+  shape shActiveTrendShape, shStandardTrendShape;
+  dyn_int diAxii, diCurveExists;
+  dyn_float dfResult;
+  dyn_string dsResult, dsTimeRangeText, dsPopupMenu, dsPlotShapes, dsPlotData, exceptionInfo, dsSplit, dsSplitDpe, dsSplitLegend, dsPlotShapes, dsRunningPlotData;
+
+
+  sReference        = $sRefName;
+  bLogarithmicOn    = logCheckBox.state(0);
+  bAutoScaleOn      = autoScaleCheckBox.state(0);
+  bAutoScaleEnabled = autoScaleCheckBox.enabled;
+  dsTimeRangeText   = makeDynString(&quot;10 minutes&quot;,
+                                    &quot;1 hour&quot;,
+                                    &quot;8 hours&quot;,
+                                    &quot;1 day&quot;,
+                                    &quot;10 days&quot;,
+                                    &quot;User Specified&quot;);
+
+  getValue(g_sReferenceName + &quot;saveSettings&quot;, &quot;enabled&quot;,    iSaveEnabled);
+  getValue(&quot;OtherCascadeButton&quot;,              &quot;enableItem&quot;, &quot;8&quot;,      iEditEnabled);
+  getValue(&quot;OtherCascadeButton&quot;,              &quot;enableItem&quot;, &quot;saveas&quot;, iSaveAsEnabled);
+
+
+  fwTrending_getRuntimePlotDataWithStrings(sReference, sTrendRunning, dsPlotShapes, dsPlotData, exceptionInfo, FALSE);
+
+
+  // Get standard trend shape
+  shStandardTrendShape = getShape(dsPlotShapes[fwTrending_LINEAR_TREND_NAME]);
+
+  // Get the active trend shape
+  shActiveTrendShape = getShape(dsPlotShapes[fwTrending_ACTIVE_TREND_NAME]);
+
+  sTemp = dsPlotData[fwTrending_PLOT_OBJECT_LEGEND_ON];
+  if( (sTemp == &quot;TRUE&quot;) ||
+      (sTemp == TRUE)       )
+  {
+    iLegendOn = true;
+  }
+
+  sTemp = dsPlotData[fwTrending_PLOT_OBJECT_CONTROL_BAR_ON];
+  if( getBit((int)sTemp, 0) == false )
+  {
+    iToolBarOn = true;
+  }
+
+  sTemp = dsPlotData[fwTrending_PLOT_OBJECT_GRID];
+  if( (sTemp == &quot;TRUE&quot;) ||
+      (sTemp == TRUE)       )
+  {
+    iGridOn = true;
+  }
+
+
+  // Get info to create Y axix menu
+  diAxii = makeDynInt(0,0,0,0,0,0,0,0);
+  getValue(sReference + &quot;trend.parameterValues&quot;, &quot;text&quot;, sCurrentParameterValues);
+  fwTrending_getRuntimePlotDataWithStrings(sReference, sTrendRunning, dsPlotShapes, dsRunningPlotData, exceptionInfo, FALSE);
+  _fwTrending_evaluateTemplate(sCurrentParameterValues, dsRunningPlotData[fwTrending_PLOT_OBJECT_DPES],         exceptionInfo);
+  _fwTrending_evaluateTemplate(sCurrentParameterValues, dsRunningPlotData[fwTrending_PLOT_OBJECT_LEGENDS],      exceptionInfo);
+  _fwTrending_evaluateTemplate(sCurrentParameterValues, dsRunningPlotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS], exceptionInfo);
+
+
+  // Get the shape of the list of DPE
+  dsSplitDpe = strsplit(dsRunningPlotData[fwTrending_PLOT_OBJECT_DPES], &quot;;&quot;);
+
+
+  // Get the shape of the list of legends
+  dsSplitLegend = strsplit(dsRunningPlotData[fwTrending_PLOT_OBJECT_LEGENDS], &quot;;&quot;);
+
+
+  // Get the visibility state of the curve scale
+  dsSplit = strsplit(dsRunningPlotData[fwTrending_PLOT_OBJECT_AXII], &quot;;&quot;);
+  for( iLoop = 1 ; iLoop &lt;= fwTrending_MAX_NUM_CURVES ; iLoop++ )
+  {
+    if( dsSplit[iLoop] == &quot;TRUE&quot; )
+    {
+      diAxii[iLoop] = 1;
+    }
+
+    if( dsSplitLegend[iLoop] == &quot;&quot; )
+    {
+      diCurveExists[iLoop] = false;
+    }
+    else
+    {
+      diCurveExists[iLoop] = true;
+    }
+  }
+
+
+  // Popup menu
+  dsPopupMenu = makeDynString(&quot;PUSH_BUTTON,    Undo Last Zoom,           1,  1&quot;,
+                              &quot;PUSH_BUTTON,    Goto Now,                 4,  1&quot;,
+                              &quot;PUSH_BUTTON,    Zoom to Alarm Limits,     3,  1&quot;,
+                              &quot;SEPARATOR&quot;,
+                              &quot;CHECK_BUTTON,   Auto scale,               14, &quot; + (int)bAutoScaleEnabled + &quot;, &quot; + (int)bAutoScaleOn,
+                              &quot;CHECK_BUTTON,   Log scale,                15, 1, &quot; + (int)bLogarithmicOn,
+                              &quot;PUSH_BUTTON,    Zoom 1:1,                 2,  1&quot;,
+                              &quot;CASCADE_BUTTON, Other,                    1&quot;,
+                              &quot;PUSH_BUTTON,    Save,                     7,  &quot; + iSaveEnabled,
+                              &quot;CASCADE_BUTTON, Y Axes,                   1&quot;,
+                              &quot;CASCADE_BUTTON, Time Range,               1&quot;,
+                              &quot;Snapshot&quot;,
+                              &quot;PUSH_BUTTON,    Send by e-mail,           8,  1&quot;,
+                              &quot;PUSH_BUTTON,    Save to disk,             9,  1&quot;,
+                              &quot;Other&quot;,
+                              &quot;PUSH_BUTTON,    Zoomed window,            13, 1&quot;,
+                              &quot;PUSH_BUTTON,    Export plot to CSV,       11, 1&quot;,
+                              &quot;PUSH_BUTTON,    Print plot,               18, 1&quot;,
+                              &quot;SEPARATOR&quot;,
+                              &quot;CHECK_BUTTON,   Legend,                   12, 1, &quot; + iLegendOn,
+                              &quot;CHECK_BUTTON,   Control Bar,              6,  1, &quot; + iToolBarOn,
+                              &quot;CHECK_BUTTON,   Grid,                     19, 1, &quot; + iGridOn,
+                              &quot;SEPARATOR&quot;,
+                              &quot;PUSH_BUTTON,    Open Configuration,       5,  &quot; + iEditEnabled,
+                              &quot;PUSH_BUTTON,    Save plot settings as,    10, &quot; + iSaveAsEnabled,
+                              &quot;SEPARATOR&quot;,
+                              &quot;CASCADE_BUTTON, Snapshot,                 1&quot;,
+                              &quot;CASCADE_BUTTON, Markers style,            1&quot;,
+                              &quot;Y Axes&quot;,
+                              &quot;CHECK_BUTTON,   &quot; + dsSplitLegend[1] + &quot;, 21, &quot; + diCurveExists[1] + &quot;, &quot; + diAxii[1],
+                              &quot;CHECK_BUTTON,   &quot; + dsSplitLegend[2] + &quot;, 22, &quot; + diCurveExists[2] + &quot;, &quot; + diAxii[2],
+                              &quot;CHECK_BUTTON,   &quot; + dsSplitLegend[3] + &quot;, 23, &quot; + diCurveExists[3] + &quot;, &quot; + diAxii[3],
+                              &quot;CHECK_BUTTON,   &quot; + dsSplitLegend[4] + &quot;, 24, &quot; + diCurveExists[4] + &quot;, &quot; + diAxii[4],
+                              &quot;CHECK_BUTTON,   &quot; + dsSplitLegend[5] + &quot;, 25, &quot; + diCurveExists[5] + &quot;, &quot; + diAxii[5],
+                              &quot;CHECK_BUTTON,   &quot; + dsSplitLegend[6] + &quot;, 26, &quot; + diCurveExists[6] + &quot;, &quot; + diAxii[6],
+                              &quot;CHECK_BUTTON,   &quot; + dsSplitLegend[7] + &quot;, 27, &quot; + diCurveExists[7] + &quot;, &quot; + diAxii[7],
+                              &quot;CHECK_BUTTON,   &quot; + dsSplitLegend[8] + &quot;, 28, &quot; + diCurveExists[8] + &quot;, &quot; + diAxii[8],
+                              &quot;SEPARATOR&quot;,
+                              &quot;CASCADE_BUTTON, Zoom Y,                   1&quot;,
+                              &quot;Zoom Y&quot;,
+                              &quot;PUSH_BUTTON,    Zoom in,                  16, 1&quot;,
+                              &quot;PUSH_BUTTON,    Zoom out,                 17, 1&quot;,
+                              &quot;Time Range&quot;,
+                              &quot;PUSH_BUTTON,  &quot; + dsTimeRangeText[1] + &quot;, 31, 1&quot;,
+                              &quot;PUSH_BUTTON,  &quot; + dsTimeRangeText[2] + &quot;, 32, 1&quot;,
+                              &quot;PUSH_BUTTON,  &quot; + dsTimeRangeText[3] + &quot;, 33, 1&quot;,
+                              &quot;PUSH_BUTTON,  &quot; + dsTimeRangeText[4] + &quot;, 34, 1&quot;,
+                              &quot;PUSH_BUTTON,  &quot; + dsTimeRangeText[5] + &quot;, 35, 1&quot;,
+                              &quot;PUSH_BUTTON,  &quot; + dsTimeRangeText[6] + &quot;, 36, 1&quot;,
+                              &quot;SEPARATOR&quot;,
+                              &quot;CASCADE_BUTTON, Zoom time,                1&quot;,
+                              &quot;PUSH_BUTTON,    Jump to time,             37, 1&quot;,
+                              &quot;Zoom time&quot;,
+                              &quot;PUSH_BUTTON,    Zoom in,                  38, 1&quot;,
+                              &quot;PUSH_BUTTON,    Zoom out,                 39, 1&quot;,
+                              &quot;Markers style&quot;,
+                              &quot;PUSH_BUTTON,    Filled circle,            40, 1&quot;,
+                              &quot;PUSH_BUTTON,    Unfilled circle,          41, 1&quot;,
+                              &quot;PUSH_BUTTON,    None,                     42, 1&quot;);
+
+  // Launch popup
+  popupMenu(dsPopupMenu, iAnswer);
+
+
+  // Processing action
+  switch( iAnswer )
+  {
+    case 1:
+      this.undoLastZoom();
+      break;
+
+
+    case 2:
+      fwTrending_trendUnzoom(sReference);
+      break;
+
+
+    case 3:
+      fwTrending_trendZoomToAlarmLimits(sReference);
+      break;
+
+
+    case 4:
+      this.gotoNow();
+      break;
+
+
+    case 5:
+      fwTrending_openConfiguration(sReference, dsPlotData);
+      break;
+
+
+    case 6:
+      fwTrending_toggleControlBar(sReference);
+      break;
+
+
+    case 7:
+      fwTrending_save($sRefName);
+      break;
+
+
+    case 8: //Send to email
+      fwScreenShot_sendScreenShotByEmail( exceptionInfo, &quot;&quot;, &quot;&quot;);
+      break;
+
+
+    case 9: //Save screenshot
+      fwTrending_saveSnapshot();
+      break;
+
+
+    case 10: //Save as
+      fwTrending_saveAs(sReference, dsPlotData, (bool) iSaveEnabled);
+      break;
+
+
+    case 11: //&quot;export&quot;
+      getValue(sReference + &quot;trend.parameterValues&quot;, &quot;text&quot;, sCurrentParameterValues);
+      fwTrending_pageExportTrend(makeDynString(sReference), sCurrentParameterValues);
+      break;
+
+
+    case 12: //&quot;Legends&quot;
+      iLegendOn = !(bool)iLegendOn;
+      fwTrending_legendOnOff(sReference, iLegendOn, &quot;&quot;, exceptionInfo);
+      break;
+
+
+    case 13: //&quot;Zoom&quot;
+      fwTrending_openZoomedWindow(sReference, dsPlotData);
+      break;
+
+
+    case 14: //auto
+      bAutoScaleOn = !bAutoScaleOn;
+      autoScaleCheckBox.state(0) = bAutoScaleOn;
+      fwTrendingControl_autoScalePushed(bAutoScaleOn);
+      break;
+
+
+    case 15: //log
+      bLogarithmicOn = !bLogarithmicOn;
+      logCheckBox.state(0) = bLogarithmicOn;
+      fwTrending_toggleLog(bLogarithmicOn);
+      break;
+
+
+    case 16: //zoom in
+      fwTrending_trendZoomY(sReference, false);
+      break;
+
+
+    case 17: //zoom out
+      fwTrending_trendZoomY(sReference, true);
+      break;
+
+
+    case 18: //print
+      printPanel(myModuleName(), myPanelName());
+      break;
+
+
+    case 19: //&quot;grid&quot;
+      sTemp = dsPlotData[fwTrending_PLOT_OBJECT_GRID];
+      if( (sTemp == &quot;TRUE&quot;) ||
+          (sTemp == TRUE)       )
+      {
+        fwTrending_gridOnOff(sReference, FALSE, &quot;&quot;, exceptionInfo);
+      }
+      else
+      {
+        fwTrending_gridOnOff(sReference, TRUE, &quot;&quot;, exceptionInfo);
+      }
+      break;
+
+
+    case 21: //Yaxis 1
+      diAxii[1] = !diAxii[1];
+      fwTrending_setCurveScaleVisibility(sReference, diAxii, 1, dsSplitDpe, dsSplitLegend);
+      break;
+
+
+    case 22: //Yaxis 2
+      diAxii[2] = !diAxii[2];
+      fwTrending_setCurveScaleVisibility(sReference, diAxii, 2, dsSplitDpe, dsSplitLegend);
+      break;
+
+
+    case 23: //Yaxis 3
+      diAxii[3] = !diAxii[3];
+      fwTrending_setCurveScaleVisibility(sReference, diAxii, 3, dsSplitDpe, dsSplitLegend);
+      break;
+
+
+    case 24: //Yaxis 4
+      diAxii[4] = !diAxii[4];
+      fwTrending_setCurveScaleVisibility(sReference, diAxii, 4, dsSplitDpe, dsSplitLegend);
+      break;
+
+
+    case 25: //Yaxis 5
+      diAxii[5] = !diAxii[5];
+      fwTrending_setCurveScaleVisibility(sReference, diAxii, 5, dsSplitDpe, dsSplitLegend);
+      break;
+
+
+    case 26: //Yaxis 6
+      diAxii[6] = !diAxii[6];
+      fwTrending_setCurveScaleVisibility(sReference, diAxii, 6, dsSplitDpe, dsSplitLegend);
+      break;
+
+
+    case 27: //Yaxis 7
+      diAxii[7] = !diAxii[7];
+      fwTrending_setCurveScaleVisibility(sReference, diAxii, 7, dsSplitDpe, dsSplitLegend);
+      break;
+
+
+    case 28: //Yaxis 8
+      diAxii[8] = !diAxii[8];
+      fwTrending_setCurveScaleVisibility(sReference, diAxii, 8, dsSplitDpe, dsSplitLegend);
+      break;
+
+
+    // Time range
+    case 31: //&quot;10minutes&quot;
+      fwTrending_changeTrendTimeRange(sReference, 600,    &quot;&quot;, &quot;  0 d  0 h 10 m&quot;, 0, dsTimeRangeText[1] + &quot;  *&quot;);
+      break;
+
+
+    case 32: //&quot;1hour&quot;
+      fwTrending_changeTrendTimeRange(sReference, 3600,   &quot;&quot;, &quot;  0 d  1 h  0 m&quot;, 1, dsTimeRangeText[2] + &quot;  *&quot;);
+      break;
+
+
+    case 33: //&quot;8hours&quot;
+      fwTrending_changeTrendTimeRange(sReference, 28800,  &quot;&quot;, &quot;  0 d  8 h  0 m&quot;, 2, dsTimeRangeText[3] + &quot;  *&quot;);
+      break;
+
+
+    case 34: //&quot;1day&quot;
+      fwTrending_changeTrendTimeRange(sReference, 86400,  &quot;&quot;, &quot;  1 d  0 h  0 m&quot;, 3, dsTimeRangeText[4] + &quot;  *&quot;);
+      break;
+
+
+    case 35: //&quot;10days&quot;
+      fwTrending_changeTrendTimeRange(sReference, 864000, &quot;&quot;, &quot; 10 d  0 h  0 m&quot;, 4, dsTimeRangeText[5] + &quot;  *&quot;);
+      break;
+
+
+    case 36: //&quot;userSpec&quot;
+      fwTrending_getRuntimePlotDataWithStrings(sReference, sTrendRunning, dsPlotShapes, dsRunningPlotData, exceptionInfo, FALSE);
+
+      sTimeRange = dsRunningPlotData[fwTrending_PLOT_OBJECT_TIME_RANGE];
+      sscanf(sTimeRange, &quot;%d&quot;, iTimeSeconds);
+      fwTrending_decodeTime(iTimeSeconds, iDay, iHour, iMinute);
+      ChildPanelOnCentralModalReturn(&quot;fwTrending/fwTrendingTimeSpec.pnl&quot;,
+                                     &quot;Specify a Time Range&quot;,
+                                     makeDynString(&quot;$iDays:&quot;  + iDay,
+                                                   &quot;$iHours:&quot; + iHour,
+                                                   &quot;$iMins:&quot;  + iMinute),
+                                     dfResult, dsResult);
+
+      if( (dynlen(dsResult) &gt; 0) &amp;&amp;
+          (dsResult[1] == &quot;ok&quot;)    )
+      {
+        iDay    = dfResult[1];
+        iHour   = dfResult[2];
+        iMinute = dfResult[3];
+
+        fwTrending_encodeTime(iTimeSeconds, iDay, iHour, iMinute);
+        fwTrending_decodeTime(iTimeSeconds, iDay, iHour, iMinute);
+
+        if( iTimeSeconds &gt; 0 )
+        {
+          sprintf(sTimeRange, &quot;%3d d %2d h %2d m&quot;, iDay, iHour, iMinute);
+          dsRunningPlotData[fwTrending_PLOT_OBJECT_TIME_RANGE] = iTimeSeconds;
+          fwTrending_setRuntimePlotDataWithStrings(sReference, sTrendRunning, dsRunningPlotData, exceptionInfo, FALSE);
+          fwTrending_changeTrendTimeRange(sReference,
+                                          iTimeSeconds,
+                                          &quot;&quot;,
+                                          sTimeRange,
+                                          5,
+                                          dsTimeRangeText[6] + &quot; (&quot; + iDay + &quot;d &quot; + iHour + &quot;h &quot; + iMinute + &quot;m)  *&quot;);
+        }
+      }
+      break;
+
+
+    case 37: //&quot;jump&quot;
+      fwTrending_getRuntimePlotDataWithStrings(sReference, sTrendRunning, dsPlotShapes, dsRunningPlotData, exceptionInfo, FALSE);
+      sTimeRange = dsRunningPlotData[fwTrending_PLOT_OBJECT_TIME_RANGE];
+      getValue(dsPlotShapes[fwTrending_ACTIVE_TREND_NAME], &quot;visibleTimeRange&quot;, 0, iTimeStart, iTimeEnd);
+      iMiddleTime = iTimeStart + (iTimeEnd - iTimeStart) / 2;
+
+      sscanf(sTimeRange, &quot;%d&quot;, iTimeSeconds);
+      fwTrending_decodeTime(iTimeSeconds, iDay, iHour, iMinute);
+      ChildPanelOnCentralModalReturn(&quot;fwTrending/fwTrendingTimeJumpSpec.pnl&quot;,
+                                     &quot;Specify a Time Range to Display&quot;,
+                                     makeDynString(&quot;$iDays:&quot;    + iDay,
+                                                   &quot;$iHours:&quot;   + iHour,
+                                                   &quot;$iMins:&quot;    + iMinute,
+                                                   &quot;$iMidTime:&quot; + iMiddleTime),
+                                     dfResult, dsResult);
+
+      if( (dynlen(dsResult) &gt; 0) &amp;&amp;
+          (dsResult[1] == &quot;ok&quot;)    )
+      {
+        iDay        = dfResult[1];
+        iHour       = dfResult[2];
+        iMinute     = dfResult[3];
+        iMiddleTime = dfResult[4];
+
+        fwTrending_encodeTime(iTimeSeconds, iDay, iHour, iMinute);
+        fwTrending_decodeTime(iTimeSeconds, iDay, iHour, iMinute);
+
+        iStartTime = iMiddleTime - (iTimeSeconds / 2);
+        if( (iStartTime + iTimeSeconds) &gt; getCurrentTime() )
+        {
+          iStartTime = getCurrentTime() - iTimeSeconds;
+        }
+
+        if( iTimeSeconds &gt; 0 )
+        {
+          sprintf(sTimeRange, &quot;%3d d %2d h %2d m&quot;, iDay, iHour, iMinute);
+          dsRunningPlotData[fwTrending_PLOT_OBJECT_TIME_RANGE] = iTimeSeconds;
+          fwTrending_setRuntimePlotDataWithStrings(sReference, sTrendRunning, dsRunningPlotData, exceptionInfo, FALSE);
+          fwTrending_changeTrendTimeRange(sReference,
+                                          iTimeSeconds,
+                                          &quot;&quot;,
+                                          sTimeRange,
+                                          5,
+                                          dsTimeRangeText[6] + &quot; (&quot; + iDay + &quot;d &quot; + iHour + &quot;h &quot; + iMinute + &quot;m)  *&quot;);
+
+          setValue(dsPlotShapes[fwTrending_LINEAR_TREND_NAME], &quot;timeBegin&quot;, iStartTime);
+        }
+      }
+      break;
+
+
+    case 38: //zoom in x
+      fwTrending_trendZoomX(sReference, false);
+      break;
+
+
+    case 39: //zoom out x
+      fwTrending_trendZoomX(sReference, true);
+      break;
+
+
+    case 40: //&quot;markersFilled&quot;
+      fwTrending_markersOnOff(sReference, fwTrending_MARKER_TYPE_FILLED_CIRCLE, &quot;&quot;, exceptionInfo);
+      break;
+
+
+    case 41: //&quot;markersUnfilled&quot;
+      fwTrending_markersOnOff(sReference, fwTrending_MARKER_TYPE_UNFILLED_CIRCLE, &quot;&quot;, exceptionInfo);
+      break;
+
+
+    case 42: //&quot;markersNone&quot;
+      fwTrending_markersOnOff(sReference, fwTrending_MARKER_TYPE_NONE, &quot;&quot;, exceptionInfo);
+      break;
+  }
+
+
+  if( (dynlen(exceptionInfo) &gt; 0)                                               &amp;&amp;
+      (!patternMatch(&quot;*_fwScreenShot_getTemporaryFileName*&quot;, exceptionInfo[2]))   )
+  {
+    fwExceptionHandling_display(exceptionInfo);
+  }
+
+}
+
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="trendInfo" shapeType="SELECTION_LIST">
+   <properties>
+    <prop name="serialId">359</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">62</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Size">21 21</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="storedMinimums" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">366</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">100 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">69</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">102 102</prop>
+    <prop name="Size">167 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">storedMinimums</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="storedMaximums" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">367</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">220 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">71</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">222 102</prop>
+    <prop name="Size">167 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">storedMaximums</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="txtCurvesDpes" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">369</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">73</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 190</prop>
+    <prop name="Size">481 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

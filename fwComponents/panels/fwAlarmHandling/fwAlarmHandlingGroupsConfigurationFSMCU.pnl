@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">408 136</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+
+void addRow(string name,string tableName, bool after=false)
+{
+  shape table = getShape(tableName);
+  dyn_int diIndexes;
+  int index;
+  string oldName;
+  bool added;
+  getValue(tableName,&quot;getSelectedLines&quot;,diIndexes);  
+  if(table.lineCount()==0)
+    after = false;
+  if(!strlen(name)) 
+    return;
+  if(dynlen(diIndexes))
+    index = diIndexes[1]+after;
+  else
+    index = table.lineCount()+after;
+
+  table.insertLineN(index);
+  table.cellValueRC(index,&quot;name&quot;,name);
+  
+}
+
+void modifyRow(string name,string tableName)
+{
+  shape table = getShape(tableName);
+  dyn_int diIndexes;
+  int index;
+  string oldName;
+  bool modified;
+  getValue(tableName,&quot;getSelectedLines&quot;,diIndexes);  
+  if(dynlen(diIndexes) &amp;&amp; strlen(name))
+    index = diIndexes[1];
+  else
+    return;
+  getValue(tableName,&quot;cellValueRC&quot;,index,&quot;name&quot;,oldName);  
+  setValue(tableName,&quot;cellValueRC&quot;,index,&quot;name&quot;,name);  
+}
+
+deleteRow(string tableName, int index)
+{
+  shape table = getShape(tableName);
+  string value = table.cellValueRC(index,&quot;name&quot;);
+  table.deleteLineN(index);
+  table.deleteSelection(); 
+}
+
+deleteRows(string tableName)
+{
+  shape table = getShape(tableName);
+  int i;
+  dyn_int diIndexes;
+  getValue(tableName,&quot;getSelectedLines&quot;,diIndexes);
+  for(i=1 ; i&lt;=dynlen(diIndexes) ; i++)
+    deleteRow(tableName, diIndexes[i]);
+}
+
+deleteAll(string tableName)
+{
+  shape table = getShape(tableName);
+  setValue(tableName,&quot;deleteAllLines&quot;);
+}
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">20 10</prop>
+    <prop name="Size">476 26</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Add dp pattern for system </prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+      if(strlen($sFilter))
+        this.text(&quot;Edit &quot;+$sMode+ &quot; &quot; + $sFilter);
+      else
+        this.text(&quot;Add new &quot;+$sMode);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">290 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">290 100</prop>
+    <prop name="Size">107 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[// SimpleCtrlScriptStart {valid}
+main()
+{
+  EP_panelOff();
+}
+
+EP_panelOff()
+{
+  PanelOff();
+}
+
+// SimpleCtrlScript {EP_panelOff}
+// Function {PanelOff}
+// Panel {}
+// Module {}
+// SimpleCtrlScriptEnd {EP_panelOff}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmOk" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">150 100</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">150 100</prop>
+    <prop name="Size">107 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Ok</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOffReturn(makeDynFloat(1), makeDynString(ComboBoxNodes.text));
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="ComboBoxNodes" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Add Plant and Loop device units</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 50</prop>
+    <prop name="Size">391 24</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Loading...</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+    cmOk.enabled = (this.text !=&quot;&quot;);
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	dyn_string devices, cleanedDevices, excp;
+	int i, totDevs, namePos;
+	string devName;
+	
+	//get the total number of devices
+	fwTree_getAllNodes(devices,excp);//dpNames(&quot;*&quot;, &quot;_FwTreeNode&quot;);
+	
+	totDevs = dynlen(devices);
+//         DebugN(&quot;Tot devices: &quot; + totDevs);
+        
+  for(i=1; i&lt;=totDevs; i++)
+	{
+		if (strpos(devices[i],&quot;-Clipboard&quot;)&lt;1 )
+		{
+			devName = devices[i];
+			if((fwFsm_isCU(devName,devName)))
+				dynAppend(cleanedDevices,devName);
+		}
+	}
+
+	this.deleteAllItems;
+	this.items = cleanedDevices;
+	totDevs = dynlen(cleanedDevices);
+  if(totDevs&gt;0)
+  {
+  	this.text = &quot;&quot;;
+	  this.enabled=true;
+  }
+  else
+  {
+    this.text = &quot;No nodes found in the FSM tree&quot;;
+    this.enabled=false;
+    cmOk.enabled = false;
+  }
+           
+	return;
+//DebugN(devices);
+
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

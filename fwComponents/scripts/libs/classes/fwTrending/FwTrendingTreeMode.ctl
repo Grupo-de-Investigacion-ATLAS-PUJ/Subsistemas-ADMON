@@ -1,0 +1,5 @@
+
+enum FwTrendingTreeMode{
+    navigator,
+    editor
+};

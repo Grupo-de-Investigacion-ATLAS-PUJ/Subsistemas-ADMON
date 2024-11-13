@@ -1,0 +1,699 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   <prop name="en_US.iso88591"></prop>
+  </prop>
+  <prop name="Size">271 289</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTree/fwTree.ctl&quot;
+
+int Initializing = 0;
+
+lock()
+{
+  while(Initializing)
+  {
+    delay(0,100);
+  }
+  Initializing = 1;
+//  DebugN(&quot;inside&quot;);
+}
+
+unlock()
+{
+//  DebugN(&quot;outside&quot;);
+  Initializing = 0;
+}
+
+int treeInit()
+{
+  int i, treeIndex = 0;
+
+  lock();
+/*
+  if(!globalExists(&quot;FwTreeIndexes&quot;))
+  {
+    addGlobal(&quot;FwTreeIndexes&quot;,INT_VAR);
+    treeIndex = FwTreeIndexes = 1;
+  }
+  else
+    treeIndex = ++FwTreeIndexes;
+*/
+  if(!globalExists(&quot;FwTreeIndexes&quot;))
+  {
+    addGlobal(&quot;FwTreeIndexes&quot;,DYN_INT_VAR);
+    treeIndex = 1;
+  }
+  else
+  {
+//DebugTN(FwTreeIndexes);
+    for(i = 1; i &lt;= dynlen(FwTreeIndexes); i++)
+    {
+      if(FwTreeIndexes[i] == 0)
+      {
+        treeIndex = i;
+        break;
+      }
+    }
+    if(!treeIndex)
+      treeIndex = dynlen(FwTreeIndexes)+1;
+  }
+  FwTreeIndexes[treeIndex] = 1;
+//  DebugN(&quot;New Tree&quot;, treeIndex);
+  TreeArrayIndex.text = treeIndex;
+  unlock();
+//   DebugTN(&quot;Tree Index is: &quot;, treeIndex);
+  return treeIndex;
+}
+]]></script>
+  <script name="Clicked" isEscaped="1"><![CDATA[main(int x, int y, mapping event)
+{
+  DebugN(&quot;Clicked here.&quot;);
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+  int treeIndex;
+  
+  treeIndex = fwTreeDisplay_getTreeIndex();
+  FwTreeIndexes[treeIndex] = 0;
+//  DebugTN(&quot;Terminated&quot;, treeIndex);
+}]]></script>
+ </events>
+ <shapes>
+  <shape layerId="0" Name="Tree" shapeType="TREE">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="MinimumExpanding" horizontal="MinimumExpanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 0</prop>
+    <prop name="Size">251 280</prop>
+    <extended>
+     <prop name="sizeAdjustPolicy" type="ENUM">2</prop>
+     <script name="expanded" isEscaped="1"><![CDATA[expanded(string id)
+{
+//   FwCounter += 1;
+// char manType, manNum;
+// int sysNum;
+// int managerID = myManId();
+// getManIdFromInt(managerID, manType, manNum, sysNum);
+//   DebugTN(&quot;Expand UI function call&quot;, manNum, id, &quot;TreeID&quot;, fwTreeDisplay_getTreeIndex(), &quot;Counter&quot;, FwCounter);
+  fwTreeDisplay_expand(id);
+}]]></script>
+     <script name="collapsed" isEscaped="1"><![CDATA[collapsed(string id)
+{
+// char manType, manNum;
+// int sysNum;
+// int managerID = myManId();
+// getManIdFromInt(managerID, manType, manNum, sysNum);
+// 
+//   DebugTN(&quot;Collapse UI function call&quot;, manNum, id, &quot;TreeID&quot;, fwTreeDisplay_getTreeIndex(), &quot;Counter&quot;, FwCounter);
+  fwTreeDisplay_collapse(id);
+}]]></script>
+     <script name="clicked" isEscaped="1"><![CDATA[clicked(string id, int column)
+{
+// char manType, manNum;
+// int sysNum;
+// int managerID = myManId();
+// getManIdFromInt(managerID, manType, manNum, sysNum);
+// 
+//   DebugTN(&quot;Select UI function call&quot;, manNum, id, fwTreeDisplay_getTreeIndex());
+  fwTreeDisplay_selectNode(id);
+}]]></script>
+     <script name="rightClicked" isEscaped="1"><![CDATA[rightClicked(string id, int column)
+{
+  // A right-click can also be considered a click, so item is selected.
+  fwTreeDisplay_selectNode(id);
+  
+  fwTreeDisplay_configNode(id);
+}]]></script>
+    </extended>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[char manType, manNum;
+int sysNum, treeIndex;
+//mapping expandedState;
+bool treeUpdateSubscription = FALSE;
+
+main()
+{
+  int i;
+  string currExpand;
+  dyn_string items, exInfo;
+  string root, types, names, selectedItem, backupSelectedItem;
+  string treeType;
+  dyn_string expandedNodes, redos;
+
+  dyn_string all_nodes = makeDynString();
+
+  treeIndex = treeInit();
+  if(!globalExists(&quot;FwActiveTrees&quot;))
+  {
+  		addGlobal(&quot;FwActiveTrees&quot;,DYN_STRING_VAR);
+  		addGlobal(&quot;FwTreeModes&quot;,DYN_STRING_VAR);
+  		addGlobal(&quot;FwTreeRedos&quot;,DYN_DYN_STRING_VAR);
+  		addGlobal(&quot;FwTreeCollapses&quot;,DYN_STRING_VAR);
+  		addGlobal(&quot;FwTreeExpands&quot;,DYN_STRING_VAR);
+  		addGlobal(&quot;FwTreeSelects&quot;,DYN_STRING_VAR);
+  		addGlobal(&quot;FwTreeTops&quot;,DYN_STRING_VAR);
+  		addGlobal(&quot;FwTreeDontShowInvisible&quot;,DYN_INT_VAR);
+  		addGlobal(&quot;FwTreeTopNodes&quot;,DYN_DYN_STRING_VAR);
+  		addGlobal(&quot;FwTreeInit&quot;,INT_VAR);
+  }
+
+  if(!globalExists(&quot;FwCounter&quot;))
+  {
+    addGlobal(&quot;FwCounter&quot;, INT_VAR);
+    FwCounter = 0;
+  }
+
+  this.name=&quot;Tree_&quot;+treeIndex;
+  FwActiveTrees[treeIndex] = $1;
+  FwTreeModes[treeIndex] = $2;
+  FwTreeRedos[treeIndex] = makeDynString();
+  FwTreeExpands[treeIndex] = makeDynString();
+  FwTreeCollapses[treeIndex] = &quot;&quot;;
+  FwTreeSelects[treeIndex] = &quot;&quot;;
+  FwTreeDontShowInvisible[treeIndex] = 0;
+  FwTreeTopNodes[treeIndex] = makeDynString();
+  FwTreeInit = 1;
+  this.addColumn(&quot;Column One&quot;);
+  this.showHeader(FALSE);
+  if(($2 == &quot;editor&quot;) || ($2 == &quot;navigator&quot;))
+    this.font = &quot;Arial,10,-1,5,50,0,0,0,0,0&quot;;
+  treeType = fwTreeDisplay_getTree(treeIndex);
+
+  // Identify this manager
+  int managerID = myManId();
+  getManIdFromInt(managerID, manType, manNum, sysNum);
+
+  // Connect DPs for tree updates and subscription to tree structural changes from other managers
+  dpConnect(&quot;treeUpdateCB&quot;, false, treeType+&quot;.treeRedos&quot;);
+  dpConnect(&quot;treeUpdateModeCB&quot;, true, treeType+&quot;.treeUpdateMode&quot;);
+
+	 while(1)
+	 {
+    // Check for tree redos and execute them
+    if(dynlen(FwTreeRedos[treeIndex]))
+    {
+
+//      //DebugTN(&quot;Tree redos:&quot;, FwTreeRedos[treeIndex]);
+//      // Save the current expanded/collapsed state
+//      mapping mStates;
+////      string sFsmNode = _fwTree_makeNodeName(&quot;FSM&quot;);
+//      string sFsmNode = _fwTree_makeNodeName(FwActiveTrees[treeIndex]);
+//      all_nodes = getAllChildrenExpandedState(sFsmNode, sFsmNode, mStates);
+//DebugTN(&quot;getAllChildrenExpandedState&quot;,sFsmNode, sFsmNode, expandedState);
+      dynClear(expandedNodes);
+//      traverseTreeGetExpanded(FwActiveTrees[treeIndex], expandedNodes);
+      traverseTreeGetExpanded(&quot;&quot;, expandedNodes);
+//DebugTN(&quot;traverseTreeGetExpanded&quot;,FwActiveTrees[treeIndex], expandedNodes);
+      // all_nodes now contains all nodes in the tree - use as required
+
+      // Remember which item is selected before any tree redos are applied
+      selectedItem = this.selectedItem();
+      backupSelectedItem = this.parent(selectedItem);
+
+//DebugTN(&quot;Tree redos:&quot;);
+      // Carry out the queued tree redos
+      for(i = 1; i &lt;= dynlen(FwTreeRedos[treeIndex]); i++)
+      {
+//DebugTN(&quot;Tree redo&quot;, FwTreeRedos[treeIndex][i]);
+        fwTreeDisplay_redoTree(treeIndex, FwTreeRedos[treeIndex][i]);
+  		}
+
+      // In case the tree structural changes from other managers should be applied, as set through the option
+      if (treeUpdateSubscription)
+      {
+        if(FwTreeModes[treeIndex] == &quot;editor&quot;)
+        {
+          dpSetWait(treeType+&quot;.treeRedos&quot;, FwTreeRedos[treeIndex]);
+//DebugTN(&quot;++++++++++++++ Tree Redos --- Setting DP&quot;, treeIndex, FwTreeRedos[treeIndex]);
+        }
+      }
+//DebugTN(&quot;++++++++++++++ Tree Redos&quot;, treeIndex, FwTreeRedos[treeIndex]);
+      dynClear(FwTreeRedos[treeIndex]);
+
+      // Re-sort the tree
+//       this.setSorting(0, true);
+
+      // Collapse and expanded the tree as we had before
+/*
+      for(i = 1; i&lt;=mappinglen(expandedState); i++)
+      {
+        anytype key = mappingGetKey(expandedState, i);
+        if (this.itemExists(key))
+        {
+          if (expandedState[key] == TRUE)
+            this.setOpen(key, TRUE);
+          else
+            this.setOpen(key, FALSE);
+        }
+      }
+*/
+      for(i = 1; i&lt;=dynlen(expandedNodes); i++)
+      {
+        if (this.itemExists(expandedNodes[i]))
+        {
+//DebugTN(&quot;********************** Expanding &quot;+expandedNodes[i]);
+            this.setOpen(expandedNodes[i], TRUE);
+            delay(0, 100);
+//DebugTN(treeIndex, FwTreeExpands);
+            fwTreeDisplay_expandTreeNode(treeIndex, FwTreeExpands[treeIndex]);
+            FwTreeExpands[treeIndex] = &quot;&quot;;
+        }
+        else
+        {
+          DebugTN(&quot;********************** Expanding Tree/Does not exist &quot;+expandedNodes[i]);
+        }
+      }
+
+      // Return to last selected item; if it's been deleted, select its parent
+      if (this.itemExists(selectedItem))
+        this.setSelectedItem(selectedItem, TRUE);
+      else {
+        if (this.itemExists(backupSelectedItem))
+          this.setSelectedItem(backupSelectedItem, TRUE);
+      }
+    }
+
+    // Check for tree expands and execute them
+    if(FwTreeExpands[treeIndex]!= &quot;&quot;)
+    {
+      fwTreeDisplay_expandTreeNode(treeIndex, FwTreeExpands[treeIndex]);
+      FwTreeExpands[treeIndex] = &quot;&quot;;
+    }
+
+    // Check for tree collapses and execute them
+  		if(FwTreeCollapses[treeIndex]!= &quot;&quot;)
+  		{
+  		  fwTreeDisplay_collapseTreeNode(treeIndex, FwTreeCollapses[treeIndex]);
+  		  FwTreeCollapses[treeIndex] = &quot;&quot;;
+  		}
+
+    // Check for tree selects and execute them
+  		if(FwTreeSelects[treeIndex]!= &quot;&quot;)
+  		{
+  		  fwTreeDisplay_selectTreeNode(treeIndex, FwTreeSelects[treeIndex]);
+  		  FwTreeSelects[treeIndex] = &quot;&quot;;
+  		}
+
+    // Delay to slow down while loop execution
+		  delay(0,50);
+  }
+}
+
+/**
+  Callback for the treeUpdateMode attribute, linked to the ToDo datapoint element, of type FwCtrlInternal. Sets/disables the sharing
+  of tree updates across managers.
+
+  @param dp is the datapoint that triggered the callback
+  @param val is the value of the datapoint element.
+*/
+
+int treeUpdateModeCB(string dp, anytype val)
+{
+//    dpGet(&quot;ToDo.treeUpdateMode&quot;, treeUpdateSubscription);
+   if (val == 1)
+     treeUpdateSubscription = TRUE;
+   else
+     treeUpdateSubscription = FALSE;
+   return 0;
+}
+
+/**
+  Callback for the treeUpdate attribute, linked to the ToDo datapoint element, of type FwCtrlInternal.
+
+  @param dp is the datapoint that triggered the callback
+  @param val is the value of the datapoint element.
+*/
+
+int treeUpdateCB(string dp, anytype val)
+{
+  int dpManagerID;
+
+  char dpManType, dpManNum;
+  int dpSysNum;
+
+  dyn_string localTreeRedos;
+//  mapping mStates;
+  string treeType;
+  dyn_string expandedNodes;
+  int i;
+
+
+  treeType = fwTreeDisplay_getType(FwActiveTrees[treeIndex]);
+//  dpGet(&quot;ToDo.treeRedos:_original.._manager&quot;, dpManagerID);
+  dpGet(treeType+&quot;.treeRedos:_original.._manager&quot;, dpManagerID);
+  getManIdFromInt(dpManagerID, dpManType, dpManNum, dpSysNum);
+
+  // If this was the manager that changed the datapoint, do nothing else
+  if ((dpManNum == manNum) &amp;&amp; (dpSysNum == sysNum))
+    return 0;
+
+  // If another manager changed this DPE, and we are subscribed to tree updates from other managers
+  if (treeUpdateSubscription)
+  {
+
+    // Store the expansion state for each node, i.e. whether they are collapsed or expanded
+////      getAllChildrenExpandedState(_fwTree_makeNodeName(&quot;FSM&quot;), _fwTree_makeNodeName(&quot;FSM&quot;), mStates);
+//      getAllChildrenExpandedState(_fwTree_makeNodeName(FwActiveTrees[treeIndex]), _fwTree_makeNodeName(FwActiveTrees[treeIndex]), mStates);
+      dynClear(expandedNodes);
+//      traverseTreeGetExpanded(FwActiveTrees[treeIndex], expandedNodes);
+      traverseTreeGetExpanded(&quot;&quot;, expandedNodes);
+//DebugTN(&quot;traverseTreeGetExpanded&quot;,FwActiveTrees[treeIndex], expandedNodes);
+
+    // Get the tree redos that were written by the other manager, write them to a local structure
+//    dpGet(&quot;ToDo.treeRedos&quot;, localTreeRedos);
+    dpGet(treeType+&quot;.treeRedos&quot;, localTreeRedos);
+    for(int i = 1; i &lt;= dynlen(localTreeRedos); i++)
+    {
+      fwTreeDisplay_redoTree(treeIndex, localTreeRedos[i]);
+		}
+
+    // Restore the expansion state that we had previous to the tree redos
+/*
+    for(int i = 1; i&lt;=mappinglen(expandedState); i++)
+    {
+      anytype key = mappingGetKey(expandedState, i);
+      if (this.itemExists(key))
+      {
+        if (expandedState[key] == TRUE)
+          this.setOpen(key, TRUE);
+        else
+          this.setOpen(key, FALSE);
+      }
+    }
+*/
+      for(i = 1; i&lt;=dynlen(expandedNodes); i++)
+      {
+        if (this.itemExists(expandedNodes[i]))
+        {
+//DebugTN(&quot;********************** Expanding &quot;+expandedNodes[i]);
+            this.setOpen(expandedNodes[i], TRUE);
+            delay(0, 100);
+//DebugTN(treeIndex, FwTreeExpands);
+            fwTreeDisplay_expandTreeNode(treeIndex, FwTreeExpands[treeIndex]);
+            FwTreeExpands[treeIndex] = &quot;&quot;;
+        }
+        else
+        {
+          DebugTN(&quot;********************** Expanding/Does not exist &quot;+expandedNodes[i]);
+        }
+      }
+    return 0;
+  }
+}
+
+/**
+  Recursive function which collects the expansion state (i.e. collapsed or expanded) for all nodes in the tree widget.
+  Returns a node's direct children as a dynamic string.
+
+  @param dp is the datapoint that triggered the callback
+  @param val is the value of the datapoint element.
+*/
+/*
+dyn_string getChildrenExpandedState(string node)
+{
+  dyn_string nodeChildren, exInfo, subNodeChildren, partialChildren;
+
+  // Get the children of this node directly from FSM tree, even if not available in tree widget.
+  fwTree_getChildren(node, nodeChildren, exInfo);
+
+  // If the node has children
+  if (dynlen(nodeChildren) &gt; 0)
+  {
+
+    // Recursive call to this function for every child node
+    for (int i=1; i&lt;=dynlen(nodeChildren); i++)
+    {
+      partialChildren = getChildrenExpandedState(nodeChildren[i]);
+      dynAppend(nodeChildren, partialChildren);
+    }
+
+    // If the node is in the tree widget, determine whether it's expanded or collapsed
+    if(this.itemExists(node))
+      expandedState[node]=this.isOpen(node);
+    return nodeChildren;
+  }
+
+  // This node is a leaf node, no children
+  else
+  {
+    // If the node is in the tree widget, determine whether it's expanded or collapsed
+    if(this.itemExists(node))
+      expandedState[node]=this.isOpen(node);
+    return makeDynString();
+  }
+}
+*/
+
+traverseTreeGetExpanded(string node, dyn_string &amp;expanded)
+{
+  dyn_string children;
+  int i;
+
+  children = this.children(node);
+//DebugTN(&quot;TraverseTree&quot;, node, children);
+  if(this.itemExists(node))
+  {
+    if(this.isOpen(node))
+    {
+      if(!dynContains(expanded,node))
+      {
+        dynAppend(expanded, node);
+      }
+    }
+  }
+  for(i = 1; i &lt;= dynlen(children); i++)
+  {
+    traverseTreeGetExpanded(children[i], expanded);
+  }
+}
+
+/*
+void getTreeNodesChildren(string sMainNode, mapping &amp;mMapping, string &amp;sTreeNodeClipBoard)
+{
+  int iLen, iLoop, iPosMainNode;
+  string sNodeMapping;
+  dyn_string dsTreeNodes, dsDpeChildren, dsDpeParent, dsTreeNodeParent, exceptionInfo;
+  dyn_dyn_string ddsTreeNodeChildren;
+  dyn_errClass err;
+
+
+  // Get all fwTreeNodes definitions
+  dsTreeNodes = dpNames(&quot;fwTN_*&quot;, &quot;_FwTreeNode&quot;);
+  iLen        = dynlen(dsTreeNodes);
+
+
+  if( iLen &gt; 0 )
+  {
+    // Create list of DPE to query (children and parent nodes)
+    for( iLoop = 1 ; iLoop &lt;= iLen ; iLoop++ )
+    {
+      dsTreeNodes  [iLoop] = dpSubStr(dsTreeNodes[iLoop], DPSUB_DP);
+      dsDpeChildren[iLoop] = dsTreeNodes[iLoop] + &quot;.children&quot;;
+      dsDpeParent  [iLoop] = dsTreeNodes[iLoop] + &quot;.parent&quot;;
+
+      // Get position of main node to check later if there is a clipboard children
+      if( sMainNode == dsTreeNodes[iLoop] )
+      {
+        iPosMainNode = iLoop;
+      }
+    }
+
+    // Get values
+    if( dpGet(dsDpeChildren, ddsTreeNodeChildren,
+              dsDpeParent,   dsTreeNodeParent    ) != 0 )
+    {
+      err = getLastError();
+      if( dynlen(err) &gt; 0 )
+      {
+        fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;getTreeNodesChildren() -&gt; Error in getting all fwTreeNodes in the local system. Due to: &quot; + getErrorText(), &quot;&quot;);
+        fwExceptionHandling_display(exceptionInfo);
+        return;
+      }
+    }
+
+
+    // Create mapping and generate clipboard node in case it is a root node
+    for( iLoop = 1 ; iLoop &lt;= iLen ; iLoop++ )
+    {
+      // Find clipboard TreeNode
+      if( iLoop == iPosMainNode )
+      {
+        // Check if node is root and create clipboard name
+        if( dsTreeNodeParent[iLoop] == &quot;&quot; ) // root node
+        {
+          sTreeNodeClipBoard = _fwTree_makeClipboard(_fwTree_getNodeName(sMainNode));
+          sTreeNodeClipBoard = _fwTree_makeNodeName (sTreeNodeClipBoard);
+        }
+      }
+
+      // Pepare mapping
+      sNodeMapping              = _fwTree_getNodeName(dsTreeNodes[iLoop]);
+      mMapping[sNodeMapping]    = makeDynAnytype();
+      mMapping[sNodeMapping][1] = ddsTreeNodeChildren[iLoop];
+    }
+
+
+    // Remove clipboard TreeNode from the mapping in case main node it is a root node
+    if( mappingHasKey(mMapping, sTreeNodeClipBoard) )
+    {
+      mappingRemove(mMapping, sTreeNodeClipBoard);
+    }
+  }
+  else
+  {
+    mappingClear(mMapping);
+  }
+
+}
+
+dyn_string getAllChildrenExpandedState(string sNode, string sMainNode, mapping &amp;mFsmNodes, bool bFoundClipBoard = FALSE)
+{
+  int iLen, iLoop, iPos;
+  string sTreeNodeClipBoard, sNodeName;
+  dyn_string dsChildren, dsChildrenCopy, dsPartialChildren, dsFullChildren, exceptionInfo;
+
+
+  dsChildren = makeDynString();
+  sNodeName  = _fwTree_getNodeName(sNode);
+
+
+  // Populate the mapping if still is not populated (it will be done once in the recurrent call)
+  if( mappinglen(mFsmNodes) == 0 )
+  {
+    // Get all children in a mapping
+    getTreeNodesChildren(sMainNode, mFsmNodes, sTreeNodeClipBoard);
+  }
+
+
+  // In case mapping contains the node
+  if( (mappinglen(mFsmNodes) &gt; 0) &amp;&amp; (mappingHasKey(mFsmNodes, sNodeName)) )
+  {
+
+    // Remove clipboard children
+    if( bFoundClipBoard == FALSE )
+    {
+      // Remove clipboard TreeNode from the children to process
+      iPos = dynContains(mFsmNodes[sNodeName][1], sTreeNodeClipBoard);
+      if( iPos &gt; 0 )
+      {
+        dynRemove(mFsmNodes[sNodeName][1], iPos);
+      }
+    }
+
+    // Add children from current node
+    iLen           = dynlen(mFsmNodes[sNodeName][1]);
+    dsChildrenCopy = mFsmNodes[sNodeName][1];
+    dynAppend(dsFullChildren, dsChildrenCopy);
+
+    if( iLen &gt; 0 )
+    {
+      // Node has children
+      for( iLoop = 1 ; iLoop &lt;= iLen ; iLoop++ )
+      {
+        // Recurrent call to discover all children bellow current node
+        dsPartialChildren = getAllChildrenExpandedState(mFsmNodes[sNodeName][1][iLoop], sMainNode, mFsmNodes, TRUE);
+        if( dynlen(dsPartialChildren) &gt; 0 )
+        {
+          dynAppend(dsFullChildren, dsPartialChildren);
+        }
+      }
+
+      // Check node state and add it
+      if( this.itemExists(sNodeName) )
+        expandedState[sNodeName] = this.isOpen(sNodeName);
+
+      return dsFullChildren;
+    }
+    else
+    {
+      // Node doesn't have children
+      // Check node state and add it
+      if( this.itemExists(sNodeName) )
+        expandedState[sNodeName] = this.isOpen(sNodeName);
+
+      return makeDynString();
+    }
+  }
+  else
+  {
+DebugTN(&quot;Error, node: &quot; + sNodeName + &quot; not available in fwTN_* definitions&quot;, mFsmNodes);
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;getAllChildrenExpandedState() -&gt; Error, node: &quot; + sNodeName + &quot; not available in fwTN_* definitions&quot;, &quot;&quot;);
+    fwExceptionHandling_display(exceptionInfo);
+    return makeDynString();
+  }
+}
+*/]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="TreeArrayIndex" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 260</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">10 250</prop>
+    <prop name="Size">51 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">MS Shell Dlg,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">text</prop>
+     <prop name="en_US.iso88591">text</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

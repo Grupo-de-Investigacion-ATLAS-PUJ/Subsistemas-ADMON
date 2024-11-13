@@ -1,0 +1,3214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">MainPanel</prop>
+  </prop>
+  <prop name="Size">850 800</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[bool gEnableReduButtons = true;
+bool gUpdateComponentList = true;
+
+const shape TABLE_AVAILABLE_COMPONENTS_SHAPE = getShape(&quot;tblAvailableComponents&quot;);
+const shape TABLE_INSTALLED_COMPONENTS_SHAPE = getShape(&quot;tblInstalledComponents&quot;);
+const shape LABEL_FILE_ISSUE_FEEDBACK_SHAPE = getShape(&quot;fileIssueFeedbackText&quot;);
+const shape POLYGON_FILE_ISSUE_FEEDBACK_SHAPE = getShape(&quot;fileIssueFeedbackArrow&quot;);
+
+string checkInstallationDirectory()
+{
+  string destinationDir;
+  string dp = fwInstallation_getInstallationDp();
+  dpGet(dp + &quot;.installationDirectoryPath&quot;, destinationDir);
+  if(destinationDir == &quot;&quot;)
+  {
+    // ask for the installation directory
+    ChildPanelOnCentral(&quot;fwInstallation/fwInstallationSelectDirectory.pnl&quot;, &quot;fwInstallation_SelectDirectory&quot;, &quot;&quot;);
+    dpGet(dp + &quot;.installationDirectoryPath&quot;, destinationDir);
+  }
+
+  return destinationDir;
+}
+
+updateSysDB()
+{
+    //Update the System Configuration DB if required:
+  if(fwInstallationDB_getUseDB())
+  {
+    if(fwInstallationDB_connect()){fwInstallation_throw(&quot;Failed to connect to the System Configuration DB after component deletion&quot;, &quot;WARNING&quot;, 10); return;}
+    int restartProject = 0;
+    int projectId, autoregEnabled;
+    fwInstallationDB_isProjectRegistered(projectId);
+    fwInstallationDB_getProjectAutoregistration(autoregEnabled);
+    if (projectId &gt; 0 || autoregEnabled == 1) //if the project is already registered or the autoregistration is enabled
+    {
+      if(fwInstallationDBAgent_synchronize(restartProject)) {fwInstallation_throw(&quot;Failed to upate the System Configuration DB after component deletion&quot;, &quot;WARNING&quot;, 10); return;}
+      fwInstallationDB_storeInstallationLog();
+    }
+  }
+
+}
+
+void updateComponentsListWhenPostInstallsDoneCB(string pendingPostInstallDpe, dyn_string pendingPostInstallList)
+{
+  if(gUpdateComponentList &amp;&amp; dynlen(pendingPostInstallList) == 0)
+    fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                                 POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0));
+}
+
+void showAdvancedOptions()
+{
+  int mode;
+  dyn_string ds;
+  dyn_float df;
+  bool oldUseDB = fwInstallationDB_getUseDB();
+
+  gUpdateComponentList = false;
+  enablePanelControls(FALSE);
+
+  ChildPanelOnCentralReturn(&quot;fwInstallation/fwInstallationAdvancedOptions.pnl&quot;, &quot;Advanced Options ...&quot;, &quot;&quot;, df, ds);
+  dbVisibility(fwInstallationDB_getUseDB());
+
+  if(!oldUseDB &amp;&amp; fwInstallationDB_getUseDB()){
+    dpConnect(&quot;overallProjectStatusCB&quot;, &quot;fwInstallation_agentParametrization.db.projectStatus&quot;, &quot;fwInstallation_agentParametrization.db.projectStatus:_original.._stime&quot;);
+  }
+
+  initPanel(&quot;&quot;, &quot;&quot;);
+
+  //refresh agent panel
+  if(fwInstallationDB_getUseDB() &amp;&amp; fwInstallationDB_connect() == 0)
+  {
+    mode = fwInstallationDB_getCentrallyManaged();
+    if(mode)
+    {
+      txManagement.text = &quot;Centrally managed.&quot;;
+      txManagement.toolTipText(&quot;Database is master.&quot;);
+    }
+    else
+    {
+      txManagement.text = &quot;Locally managed.&quot;;
+      txManagement.toolTipText(&quot;Project is master.&quot;);
+    }
+  }
+}
+
+const string lastSourcePathDpe = &quot;.lastSourcePath&quot;;
+
+void storeSourceDir(string sourceDir)
+{
+  txtSourceDir.text = sourceDir;
+  dpSet(fwInstallation_getInstallationDp() + lastSourcePathDpe, sourceDir);
+}
+
+string getLastSourcePath()
+{
+  string lastSourceDir;
+  dpGet(fwInstallation_getInstallationDp() + lastSourcePathDpe, lastSourceDir);
+  return lastSourceDir;
+}
+
+void updateAvailableComponentsInstallationStatus()
+{
+  int tableRows = tblAvailableComponents.lineCount();
+  for(int i=0;i&lt;tableRows;i++)
+  {
+    string componentDispName = tblAvailableComponents.cellValueRC(i, &quot;componentName&quot;);
+    string componentVersion = tblAvailableComponents.cellValueRC(i, &quot;componentVersion&quot;);
+    bool isSubcomponent = tblAvailableComponents.cellValueRC(i, &quot;isSubcomponent&quot;);
+    string componentName = isSubcomponent?substr(componentDispName, 1):componentDispName;
+    int result = 0;
+    fwInstallation_componentInstalled(componentName, componentVersion, result, getSystemName(), true);
+    tblAvailableComponents.cellValueRC(i, &quot;colStatus&quot;, (result == 1)?FW_INSTALLATION_COMPONENT_STATUS_INSTALLED:&quot;&quot;);
+  }
+  //tblAvailableComponents.deleteSelection();
+}
+
+void getComponentsMarkedForInstallation(string &amp;componentsInfo, string &amp;descFilesInfo, dyn_string &amp;descFiles)
+{
+  dyn_string columns;
+  columns[1] = &quot;componentName&quot;;
+  columns[2] = &quot;componentVersion&quot;;
+  columns[3] = &quot;descFile&quot;;
+  dyn_dyn_mixed componentsToInstall;
+  fwInstallation_ui_getMarkedComponentsData(TABLE_AVAILABLE_COMPONENTS_SHAPE, makeDynString(&quot;Install&quot;, &quot;Re-Install&quot;), columns, componentsToInstall);
+
+  int componentsToInstallLen = dynlen(componentsToInstall);
+  if(componentsToInstallLen &lt;= 0){
+    return;
+  }
+  descFiles = getDynString(componentsToInstall, 3);
+  descFilesInfo = strjoin(descFiles, &quot;|&quot;);
+
+  for(int i=1;i&lt;=componentsToInstallLen;i++){
+    componentsInfo += componentsToInstall[i][1] + &quot;=&quot; + componentsToInstall[i][2];
+    if(i&lt;componentsToInstallLen){
+      componentsInfo += &quot;|&quot;;
+    }
+  }
+}
+
+void splitModeCB(string splitModeDpe, bool splitMode,
+                string splitModeActiveDp, bool splitActive,
+                string installInSplitDp, int installOnlyInSplit)
+{
+  int reduHostNum = fwInstallationRedu_myReduHostNum();
+
+  if(installOnlyInSplit == -1){ // special case for panel initialization
+    txRedundancy.text = &quot;Waiting for Framework Installation Tool to finish initialization&quot;;
+    gEnableReduButtons = false;
+  }
+  // disable buttons if it is only allowed to install in split mode and we are not in split mode passive
+  else if (installOnlyInSplit == 1)
+  {
+    gEnableReduButtons = false;
+    if (splitMode)
+    {
+      if (!splitActive)
+      {
+        // check whether the UI is opened with -event -data
+        int connectedToLocalEvent = fwInstallatinRedu_isConnectedToEventManager(reduHostNum);
+        int connectedToPairEvent = fwInstallatinRedu_isConnectedToEventManager(fwInstallationRedu_myPairReduHostNum(reduHostNum));
+        if (connectedToLocalEvent &amp;&amp; !connectedToPairEvent)
+        {
+          gEnableReduButtons = true;
+          string reduHost = fwInstallation_getHostname(myReduHost());
+          txRedundancy.text = &quot;Framework Installation Tool running on redundant host #&quot; + reduHostNum + &quot;: &quot; + reduHost;
+        }
+        else
+        {
+          // show a message that the UI should be opened with options -event -data
+          txRedundancy.text = &quot;Please start the Installation Tool panel with options: -event currentHost -data currentHost&quot;;
+        }
+      }
+      else
+      {
+        // show a message that components can be installed only in the split passive pair
+        txRedundancy.text = &quot;Components can only be installed in the split passive pair.&quot;;
+      }
+    }
+    else
+    {
+      // show a message that in order to install components split moe should be enabled
+      txRedundancy.text = &quot;Components can only be installed when the project is in split mode.&quot;;
+    }
+    //enableReduButtons(gEnableReduButtons);
+  }
+  else
+  {
+    if (splitMode)
+    {
+      gEnableReduButtons = false;
+      txRedundancy.text = &quot;Project is currently in split mode. Installation Tool installs only &quot; +
+                          &quot;in redu active peer. Change configuration in options.&quot;;
+    }
+    else
+    {
+      gEnableReduButtons = !fwInstallationRedu_isPassive();
+      if(gEnableReduButtons)
+      {
+        string reduHost = fwInstallation_getHostname(myReduHost());
+        txRedundancy.text = &quot;Framework Installation Tool running on redundant host #&quot; + reduHostNum + &quot;: &quot; + reduHost;
+      }
+      else
+      {
+        txRedundancy.text = &quot;Components can only be installed only in redu active peer.&quot;;
+      }
+    }
+  }
+  enableReduButtons(gEnableReduButtons);
+}
+
+void showInstallationInfo(bool visible)
+{
+  if(visible)
+    triggerEvent(refInstallationInfo.eventStartReporting);
+  else
+    triggerEvent(refInstallationInfo.eventStopReporting);
+
+  const int hDiff = 33;
+  dyn_int listPos = list.positionAsDyn();
+  dyn_int listSize = list.sizeAsDyn();
+  listPos[2] += visible?(hDiff):(-hDiff);
+  listSize[2] += visible?(-hDiff):(hDiff);
+  list.positionAsDyn = listPos;
+  list.sizeAsDyn = listSize;
+}
+
+void showExtendedPanel(bool bExtended)
+{
+  int reduHostNum;
+  string reduHost;
+
+  if(bExtended)
+  {
+    reduHostNum = fwInstallationRedu_myReduHostNum();
+    reduHost = fwInstallation_getHostname(myReduHost());
+
+    txRedundancy.visible = true;
+    redundancyInfoBg.visible = true;
+    txRedundancy.text = &quot;Framework Installation Tool running on redundant host #&quot; + reduHostNum + &quot;: &quot; + reduHost;
+    frmDelete.text = &quot;View / delete components on &quot; + strtoupper(reduHost) + &quot; (#&quot; + reduHostNum + &quot;, LOCAL)&quot;;
+
+    createSymbol(myModuleName(), // createSymbol preventing filling redu peer component table immediately, waiting for explicit init from parent
+                 myPanelName(),
+                 &quot;fwInstallation/fwInstallationReduPeer.pnl&quot;,
+                 &quot;ReduPeer&quot;,
+                 makeDynString(),
+                 850, 35, 0, 1, 1);
+
+    addSymbol(myModuleName(),
+              myPanelName(),
+              &quot;fwInstallation/fwInstallationReduOverview.pnl&quot;,
+              &quot;ReduOverview&quot;,
+              makeDynString(&quot;$host:&quot; + reduHost, &quot;$project:&quot; + PROJ),
+              850, 462, 0, 1, 1);
+
+
+    btnAdvanced.position(10, 765);
+    viewLogfiles.position(170, 765);
+    btnClose.position(1185, 765);
+
+    projNameLabel.position(285, 770);
+    hostNameLabel.position(515, 770);
+    tfProjName.position(335, 766);
+    tfHostName.position(551, 766);
+    tfHostName.size(400, 23);
+
+    txAgent.position(282, 769);
+    infoTextArrow.position(270, 770);
+
+    versionInfo.position(1214, 6);
+    btnHelp.position(1234, 2);
+    list.size(1250, 162);
+
+    setPanelSize(myModuleName(), myPanelName(), FALSE, 1269, 800);
+  }
+  else
+  {
+    txRedundancy.visible = false;
+    redundancyInfoBg.visible = false;
+
+    btnAdvanced.position(10, 732);
+    viewLogfiles.position(170, 732);
+    btnClose.position(765, 732);
+
+    projNameLabel.position(285, 737);
+    hostNameLabel.position(515, 737);
+    tfProjName.position(335, 733);
+    tfHostName.position(551, 733);
+    tfHostName.size(180, 23);
+
+    txAgent.position(282, 736);
+    infoTextArrow.position(270, 737);
+
+    versionInfo.position(795, 6);
+    btnHelp.position(815, 2);
+    list.size(830, 162);
+
+    setPanelSize(myModuleName(), myPanelName(), FALSE, 850, 767);
+  }
+}
+
+enableReduButtons(bool enabled)
+{
+  btnApplyInstall.enabled = enabled;
+  btnSync.enabled = enabled;
+  btnApplyDelete.enabled = enabled;
+}
+
+initPanel(string dp, anytype val)
+{
+  string sPath;
+  dyn_string ds;
+  dyn_float df;
+  string schemaVersion;
+  int projectId;
+  int error;
+  int restartProject;
+  bool isCentrallyManaged = false;
+
+  dbVisibility(false);
+  enablePanelControls(FALSE);
+
+  if(fwInstallationInit_isCleanupNeeded()){
+    fwInstallationInit_consolidationCleanup();
+  }
+
+  if(checkLibrariesVersionConsistency() != 0)
+  {
+    ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:Installation Tool files are corrupted (libraries version\nare inconsistent). Please reinstall the tool.&quot;));
+    btnClose.enabled = true;
+    return;
+  }
+
+  //FVR: 30/03/2006: Check user access rights to the para module
+  if (!getUserPermission(4))
+  {
+    DebugN(&quot;ERROR: You do not have sufficient rights on this system to run the FW Installation Tool.&quot;);
+    ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:You do not have sufficient rights\non this system to run the FW Installation Tool.&quot;));
+    btnClose.enabled = true;
+    return;
+  }
+
+  // Display project and host info
+  string projName = _fwInstallation_fileName(PROJ_PATH);
+  if(projName != PROJ){
+    projName += &quot; - &quot; + PROJ;
+  }
+  tfProjName.text = projName;
+  dyn_string eventHostList = eventHost();
+  if(dynlen(eventHostList) == 2){
+    string hostName = fwInstallation_getHostname(eventHostList[1]) +
+                      (eventHostList[2]!=&quot;&quot;?(&quot;$&quot; + fwInstallation_getHostname(eventHostList[2])):&quot;&quot;);
+    tfHostName.text = hostName;
+  }
+
+  // Global initialization function
+  if(fwInstallationInit_execute())
+  {
+    enablePanelControls(FALSE);
+    btnClose.enabled = true;
+    ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;Initialization ERROR&quot;, makeDynString(&quot;$1:Failed to initialize the FW Component Installation Tool.\nSee log-viewer for details.\nPlease, reinstall the tool.&quot;));
+    return;
+  }
+
+  dp = fwInstallation_getInstallationDp();
+  // ask for the installation directory
+  if(dpExists(dp + &quot;.installationDirectoryPath&quot;))
+    dpGet(dp + &quot;.installationDirectoryPath&quot;, sPath);
+  else
+  {
+    dpCreate(dp , FW_INSTALLATION_DPT_INFORMATION);
+    sPath = &quot;&quot;;
+  }
+
+  if(sPath == &quot;&quot;)
+  {
+    ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallationSelectDirectory.pnl&quot;,
+                                   &quot;fwInstallation_SelectDirectory&quot;, &quot;$msg:&quot;, df, ds);
+  }
+  else if(access(sPath, F_OK) &lt; 0)//the directory does not exist
+  {
+    ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallationSelectDirectory.pnl&quot;,
+                                   &quot;fwInstallation_SelectDirectory&quot;, &quot;$msg:Former installation directory does not exist. Please change it or \nclick OK to create it.&quot;, df, ds);
+  }
+
+  //Check if the db-connection parameters are initialized, otherwise offer the possibility to do it now.
+  if(!fwInstallationDB_getInitialized()){
+    // FWINS-2026 - remove db configuration pop-up at first start of fwInstallation
+    /*ChildPanelOnCentralReturn(&quot;fwInstallation/fwInstallation_messageInfo.pnl&quot;,
+                              &quot;FW Installation DB&quot;,
+                              makeDynString(&quot;$text:Would you like to set up connection to the\nFW System Configuration DB to be used by the\nFW Installation Tool?&quot;, &quot;$help:fwInstallation/fwInstallationDB.html&quot;),
+                              df, ds);*/
+    fwInstallationDB_setInitialized(true);
+    /*if(dynlen(df) &gt; 0 &amp;&amp; df[1] == 1.){
+      ChildPanelOnCentralReturn(&quot;fwInstallation/fwInstallationDB_connectionSetup.pnl&quot;, &quot;DB Connection Setup&quot;,makeDynString(&quot;&quot;), df, ds);
+    }*/
+  }
+
+
+  //Has the user defined that (s)he wants to use the system configuration DB
+  if(fwInstallationDB_getUseDB())
+  {
+    openProgressBar(&quot;DB Connection&quot;, &quot;copy.gif&quot;, &quot;Establishing connection to System Configuration DB&quot;, &quot;This may take a few seconds&quot;, &quot;Please, wait&quot;, 1);
+    if(fwInstallationDB_connect())
+    {
+      ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;DB Connection Error&quot;, makeDynString(&quot;$1:Connection error. DB connection has been disabled.\nPlease, \&quot;Advance Options\&quot; to re-enable it.\nCheck log-viewer for more details&quot;));
+      fwInstallationDB_setUseDB(FALSE);
+      closeProgressBar();
+      enablePanelControls(TRUE);
+      return;
+    }
+    closeProgressBar();
+
+    fwInstallationDB_getSchemaVersion(schemaVersion);
+
+    //do we have the right schema version?
+    if(!fwInstallationDB_compareSchemaVersion())
+    {
+      ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;DB ERROR&quot;, makeDynString(&quot;$1:Invalid DB schema version: &quot; + schemaVersion + &quot;. This tool requires version &quot; + FW_INSTALLATION_DB_REQUIRED_SCHEMA_VERSION + &quot;. Contact your central DCS team.&quot;));
+      fwInstallationDB_setUseDB(FALSE);
+    }
+    else
+    {
+      dbVisibility(true);
+
+      txSchema.text = &quot;Schema version: &quot; + schemaVersion;
+
+      dpConnect(&quot;overallProjectStatusCB&quot;, &quot;fwInstallation_agentParametrization.db.projectStatus&quot;, &quot;fwInstallation_agentParametrization.db.projectStatus:_original.._stime&quot;);
+      //Check if project registered in DB
+      fwInstallationDB_isProjectRegistered(projectId);
+      if(projectId &gt; 0)
+      {
+        openProgressBar(&quot;FW Component Installation&quot;, &quot;copy.gif&quot;, &quot;Checking DB-PVSS consistency. This may take a few seconds...&quot;,&quot;&quot;, &quot;Please wait...&quot;, 1);
+        isCentrallyManaged = fwInstallationDB_getCentrallyManaged();
+        if(fwInstallationDBAgent_checkIntegrity() != 0)
+        {
+          ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:DB contents consistency check failed. Please, check DB connection.&quot;));
+        }
+        closeProgressBar();
+        }
+      else
+      {
+        //check whether the project registration is enabled in the DB
+        int regEnabled;
+        fwInstallationDB_getProjectAutoregistration(regEnabled);
+        if (regEnabled == 1)
+        {
+          ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallationDB_question&quot;, &quot;INFO&quot;, makeDynString(&quot;$txt:Project: &quot; + PROJ + &quot; in computer: &quot; + getHostname() + &quot; not yet registered in DB\nWould you like to register it now?&quot;), df, ds);
+          if(dynlen(df) &amp;&amp; df[1] &gt;= 1.)
+          {
+            openProgressBar(&quot;FW Component Installation&quot;, &quot;copy.gif&quot;, &quot;Exporting project configuration to DB. This may take a few seconds...&quot;,&quot;&quot;, &quot;Please wait...&quot;, 1);
+            fwInstallationDBAgent_getSynchronizationLock();
+            error = fwInstallationDBAgent_synchronize(restartProject);
+            fwInstallationDBAgent_releaseSynchronizationLock();
+            if(error != 0)
+            {
+             ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:Failed to export project configuration to DB&quot;));
+            }else{
+              ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:Project configuration successfully exported to DB&quot;));
+            }
+            closeProgressBar();
+          }
+        }
+      }
+    }
+  }//end of use db
+
+  //Check if project is centrally managed:
+  if(isCentrallyManaged)
+  {
+    btnAdvanced.enabled = true;
+    setupDbButton.enabled = true;
+    btnClose.enabled = true;
+    btnRefresh.enabled = true;
+  }
+  else
+  {
+    enablePanelControls(TRUE);
+  }
+
+  // set alternating row colors
+  fwInstallation_ui_setTableAlternatingRowColors(TABLE_AVAILABLE_COMPONENTS_SHAPE);
+  fwInstallation_ui_setTableAlternatingRowColors(TABLE_INSTALLED_COMPONENTS_SHAPE);
+
+  // get all installed components and display it in a table
+  if(gUpdateComponentList){
+    fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                                 POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0));
+  }
+
+  dpConnect(&quot;agentLockCB&quot;, false, &quot;fwInstallation_agentParametrization.lock&quot;);
+}
+
+/** Checks version consistency between fwInstallation tool libraries and fwInstallationAgentDBConsistencyChecker script.
+  * @return 0 when libraries versions and version tags are consistent with script,
+  *        -1 when versions are the same but version tags differs,
+  *        -2 when versions are not consistent
+  */
+int checkLibrariesVersionConsistency(){
+  bool areVersionsConsistent =
+      (csFwInstallationToolVersion == csFwInstallationLibVersion  &amp;&amp;
+       csFwInstallationToolVersion == csFwInstallationInitLibVersion &amp;&amp;
+       csFwInstallationToolVersion == csFwInstallationDBLibVersion &amp;&amp;
+       csFwInstallationToolVersion == gFwInstallationAgentLibVersion &amp;&amp;
+       csFwInstallationToolVersion == csFwInstallationDBCacheLibVersion &amp;&amp;
+       csFwInstallationToolVersion == csFwInstallationManagerLibVersion &amp;&amp;
+       csFwInstallationToolVersion == csFwInstallationPackagerLibVersion &amp;&amp;
+       csFwInstallationToolVersion == csFwInstallationReduLibVersion &amp;&amp;
+       csFwInstallationToolVersion == csFwInstallationQtHelpLibVersion &amp;&amp;
+       csFwInstallationToolVersion == csFwInstallationXmlLibVersion);
+  bool areVersionTagsConsistent = (areVersionsConsistent &amp;&amp;
+       csFwInstallationToolTag == csFwInstallationInitLibTag &amp;&amp;
+       csFwInstallationToolTag == csFwInstallationDBLibTag &amp;&amp;
+       csFwInstallationToolTag == gFwInstallationAgentLibTag &amp;&amp;
+       csFwInstallationToolTag == csFwInstallationDBCacheLibTag &amp;&amp;
+       csFwInstallationToolTag == csFwInstallationManagerLibTag &amp;&amp;
+       csFwInstallationToolTag == csFwInstallationPackagerLibTag &amp;&amp;
+       csFwInstallationToolTag == csFwInstallationReduLibTag &amp;&amp;
+       csFwInstallationToolTag == csFwInstallationQtHelpLibTag &amp;&amp;
+       csFwInstallationToolTag == csFwInstallationXmlLibTag);
+  if(areVersionsConsistent &amp;&amp; areVersionTagsConsistent){
+    return 0;
+  }
+  if(!areVersionsConsistent){
+    fwInstallation_throw(&quot;Inconsistency between library versions of the FW Installation Tool. Reinstall the tool...&quot;);
+  }else{
+    fwInstallation_throw(&quot;Inconsistency between library version tags of the FW Installation Tool. Reinstall the tool...&quot;);
+  }
+  fwInstallation_throw(&quot;Tool is v.&quot; + fwInstallation_getVersionString(csFwInstallationToolVersion, csFwInstallationToolTag), &quot;INFO&quot;, 10);
+  fwInstallation_throw(&quot;fwInstallation.ctl is v.&quot; + fwInstallation_getVersionString(csFwInstallationLibVersion, csFwInstallationToolTag), &quot;INFO&quot;, 10);
+  fwInstallation_throw(&quot;fwInstallationInit.ctl is v.&quot; + fwInstallation_getVersionString(csFwInstallationInitLibVersion, csFwInstallationInitLibTag), &quot;INFO&quot;, 10);
+  fwInstallation_throw(&quot;fwInstallationDB.ctl is v.&quot; + fwInstallation_getVersionString(csFwInstallationDBLibVersion, csFwInstallationDBLibTag), &quot;INFO&quot;, 10);
+  fwInstallation_throw(&quot;fwInstallationDBAgent.ctl is v.&quot; + fwInstallation_getVersionString(gFwInstallationAgentLibVersion, gFwInstallationAgentLibTag), &quot;INFO&quot;, 10);
+  fwInstallation_throw(&quot;fwInstallationDBCache.ctl is v.&quot; + fwInstallation_getVersionString(csFwInstallationDBCacheLibVersion, csFwInstallationDBCacheLibTag), &quot;INFO&quot;, 10);
+  fwInstallation_throw(&quot;fwInstallationDBManager.ctl is v.&quot; + fwInstallation_getVersionString(csFwInstallationManagerLibVersion, csFwInstallationManagerLibTag), &quot;INFO&quot;, 10);
+  fwInstallation_throw(&quot;fwInstallationXml.ctl is v.&quot; + fwInstallation_getVersionString(csFwInstallationXmlLibVersion, csFwInstallationXmlLibTag), &quot;INFO&quot;, 10);
+  fwInstallation_throw(&quot;fwInstallationPackager.ctl is v.&quot; + fwInstallation_getVersionString(csFwInstallationPackagerLibVersion, csFwInstallationPackagerLibTag), &quot;INFO&quot;, 10);
+  fwInstallation_throw(&quot;fwInstallationRedu.ctl is v.&quot; + fwInstallation_getVersionString(csFwInstallationReduLibVersion, csFwInstallationReduLibTag), &quot;INFO&quot;, 10);
+  fwInstallation_throw(&quot;fwInstallationQtHelp.ctl is v.&quot; + fwInstallation_getVersionString(csFwInstallationQtHelpLibVersion, csFwInstallationQtHelpLibTag), &quot;INFO&quot;, 10);
+  return (areVersionsConsistent?-1:-2);
+}
+
+void agentLockCB(string lockDpe, int value)
+{
+  bool allOk = false;
+
+  if(value)
+  {
+    showAgentSyncInfo(true);
+    showProjectHostInfo(false);
+    btnApplyInstall.enabled = false;
+    btnApplyDelete.enabled = false;
+//    btnDB.enabled = false;
+  }
+  else
+  {
+    showAgentSyncInfo(false);
+    showProjectHostInfo(true);
+    if(fwInstallationDB_getUseDB() &amp;&amp; fwInstallationDB_compareSchemaVersion() &amp;&amp; fwInstallationDB_connect() == 0 &amp;&amp; fwInstallationDB_getCentrallyManaged())
+    {
+      allOk = true;
+      btnApplyInstall.enabled = false;
+      btnApplyDelete.enabled = false;
+    }else{
+      allOk = false;
+      btnApplyInstall.enabled = gEnableReduButtons;
+      btnApplyDelete.enabled = gEnableReduButtons;
+    }
+    //btnDB.enabled = true;
+
+/*
+    if(allOk &amp;&amp; fwInstallationDB_getCentrallyManaged())
+      btnDB.text = &quot;Import config from DB&quot;;
+    else
+      btnDB.text = &quot;Export config to DB&quot;;
+*/
+  }
+
+  return;
+}
+
+showProjectHostInfo(bool visible)
+{
+  tfProjName.visible = visible;
+  tfHostName.visible = visible;
+  projNameLabel.visible = visible;
+  hostNameLabel.visible = visible;
+}
+
+showAgentSyncInfo(bool visible)
+{
+  txAgent.visible = visible;
+  infoTextArrow.visible = visible;
+}
+
+
+enablePanelControls(bool bEnabled)
+{
+  txtSourceDir.enabled = bEnabled;
+  tblInstalledComponents.enabled = bEnabled;
+  tblAvailableComponents.enabled = bEnabled;
+  cbScanRecursively.enabled = bEnabled;
+  ShowSubComponents.enabled = bEnabled;
+  ShowHiddenComponents.enabled = bEnabled;
+  ShowInstalledSubComponents.enabled = bEnabled;
+
+  btnAdvanced.enabled = bEnabled;
+  setupDbButton.enabled = bEnabled;
+  btnClose.enabled = bEnabled;
+  btnRefresh.enabled = bEnabled;
+  btnSelectSourceDir.enabled = bEnabled;
+  refreshAvailableButton.enabled = bEnabled;
+
+  btnApplyInstall.enabled = gEnableReduButtons &amp;&amp; bEnabled;
+  btnApplyDelete.enabled = gEnableReduButtons &amp;&amp; bEnabled;
+
+  if(fwInstallationRedu_isRedundant())
+  {
+    btnSync.enabled = gEnableReduButtons &amp;&amp; bEnabled;
+  }
+  else
+  {
+    btnSync.enabled = FALSE;
+  }
+
+  if(shapeExists(&quot;btnDBDetails&quot;))
+  {
+    btnDBDetails.enabled = bEnabled;
+  }
+
+  if(shapeExists(&quot;btnCheck&quot;))
+  {
+    btnCheck.enabled = bEnabled;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+const string AVAILABLE_COMPONENT_STATUS_AVAILABLE = &quot;&quot;;
+const string AVAILABLE_COMPONENT_STATUS_INSTALL = &quot;Install&quot;;
+const string AVAILABLE_COMPONENT_STATUS_INSTALLED = &quot;Installed&quot;;
+const string AVAILABLE_COMPONENT_STATUS_REINSTALL = &quot;Re-Install&quot;;
+
+const mapping AVAILABLE_COMPONENT_STATUS_CHANGES = makeMapping( // note that the first status change is default (used if previous status not found in mapping keys)
+    AVAILABLE_COMPONENT_STATUS_AVAILABLE, AVAILABLE_COMPONENT_STATUS_INSTALL,
+    AVAILABLE_COMPONENT_STATUS_INSTALL, AVAILABLE_COMPONENT_STATUS_AVAILABLE,
+    AVAILABLE_COMPONENT_STATUS_INSTALLED, AVAILABLE_COMPONENT_STATUS_REINSTALL,
+    AVAILABLE_COMPONENT_STATUS_REINSTALL, AVAILABLE_COMPONENT_STATUS_INSTALLED
+    );
+
+const string INSTALLED_COMPONENT_STATUS_KEEP = &quot;&quot;;
+const string INSTALLED_COMPONENT_STATUS_DELETE = &quot;Delete&quot;;
+
+const mapping INSTALLED_COMPONENT_STATUS_CHANGES = makeMapping(
+    INSTALLED_COMPONENT_STATUS_KEEP, INSTALLED_COMPONENT_STATUS_DELETE,
+    INSTALLED_COMPONENT_STATUS_DELETE, INSTALLED_COMPONENT_STATUS_KEEP
+    );
+
+
+const string COMPONENTS_TABLE_STATUS_COLUMN = &quot;colStatus&quot;;
+
+changeComponentStatus(shape tableShape, int row, string currentStatus, const mapping &amp;statusChangesMapping)
+{
+  string newStatus;
+  if(mappingHasKey(statusChangesMapping, currentStatus)){
+    newStatus = statusChangesMapping[currentStatus];
+  }else{
+    newStatus = mappingGetKey(statusChangesMapping, 1);
+  }
+  tableShape.cellValueRC(row, COMPONENTS_TABLE_STATUS_COLUMN, newStatus);
+}
+
+changeMultipleComponentsStatus(shape tableShape, dyn_string statusesToChange, const mapping &amp;statusChangesMapping)
+{
+  int rowsNum = tableShape.lineCount();
+  for(int i=0;i&lt;rowsNum;i++){
+    string currentStatus = tableShape.cellValueRC(i, COMPONENTS_TABLE_STATUS_COLUMN);
+    if(dynContains(statusesToChange, currentStatus) &gt; 0){
+      changeComponentStatus(tableShape, i, currentStatus, statusChangesMapping);
+    }
+  }
+}
+
+
+// ------------------------------------------------------------------------------------------------
+
+dbVisibility(bool bVisible)
+{
+  int centrallyManaged;
+
+  enablePanelControls(FALSE);
+  showNoDbConnectionInfo(!bVisible);
+
+  if(shapeExists(&quot;DB_INFO_PANEL&quot;))
+  {
+    removeSymbol(myModuleName(), myPanelName(), &quot;DB_INFO_PANEL&quot;);
+  }
+
+  if(bVisible)
+  {
+    addSymbol(myModuleName(), myPanelName(), &quot;fwInstallation/fwInstallation_projectDbIntegrity.pnl&quot;, &quot;DB_INFO_PANEL&quot;, makeDynString(), 430, 462, 0, 1, 1);
+
+    if(fwInstallationDB_connect() == 0)
+    {
+      fwInstallationDB_getProjectManagementMode(centrallyManaged);
+      if(centrallyManaged)
+      {
+        txManagement.text = &quot;Centrally managed.&quot;;
+        txManagement.toolTipText(&quot;Database is master.&quot;);
+      }
+      else
+      {
+        txManagement.text = &quot;Locally managed.&quot;;
+        txManagement.toolTipText(&quot;Project is master.&quot;);
+      }
+    }
+  }
+
+  enablePanelControls(TRUE);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+showNoDbConnectionInfo(bool bVisible)
+{
+  noDbConnectionBg.visible = bVisible;
+  noDbConnectionText.visible = bVisible;
+  setupDbButton.visible = bVisible;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void overallProjectStatusCB(string dpe, dyn_int val, string dpe2, time tTimestamp)
+{
+  string sColor;
+  string sStatus;
+
+  if(val[FW_INSTALLATION_DB_STATUS_PVSS_INFO] &amp;&amp;
+     val[FW_INSTALLATION_DB_STATUS_PVSS_PATCH_INFO] &amp;&amp;
+     val[FW_INSTALLATION_DB_STATUS_HOST_INFO] &amp;&amp;
+     val[FW_INSTALLATION_DB_STATUS_PROJECT_INFO] &amp;&amp;
+     val[FW_INSTALLATION_DB_STATUS_PATH_INFO] &amp;&amp;
+     val[FW_INSTALLATION_DB_STATUS_MANAGER_INFO] &amp;&amp;
+     val[FW_INSTALLATION_DB_STATUS_COMPONENT_INFO] &amp;&amp;
+     val[FW_INSTALLATION_DB_STATUS_DIST_PEERS_INFO])
+  {
+    sColor = &quot;green&quot;;
+    sStatus = &quot;OK&quot;;
+  }
+  else
+  {
+    sColor = &quot;red&quot;;
+    sStatus = &quot;NOT OK&quot;;
+  }
+
+  txOverallStatus.text = sStatus + &quot; (&quot; + formatTime(&quot;%d/%m/%Y - %H:%M:%S&quot;, tTimestamp) + &quot;)&quot;;;
+  overallStatus.backCol = sColor;
+
+  if(shapeExists(&quot;tblInstalledComponents&quot;) &amp;&amp; gUpdateComponentList)
+  {
+    fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                                 POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0));
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+/**
+ * Check if the WinCC OA help assistant is open, and offers to close it.
+ * @param continueWithoutClosingAllowed If true, allow to continue without closing, if false abort when user decide not to close help.
+ * @return False when user choose not to close help and flag to continue without closing is set to false, otherwise True.
+ */
+bool askToCloseHelpIfOpen(bool continueWithoutClosingAllowed = true)
+{
+  if(fwInstallationQtHelp_isAssistantOpen())
+  {
+    string message, okLabel, cancelLabel, icon;
+    if(continueWithoutClosingAllowed){
+      message = &quot;WinCC OA Help for this project is open. It it strongly advised to close it before continuing.\n&quot; +
+                &quot;The help viewer may not work correctly when help files are being modified or removed from installation directory.&quot;;
+      okLabel = &quot;Close Help and Continue&quot;;
+      cancelLabel = &quot;Continue&quot;;
+      icon = &quot;INFO&quot;;
+    }else{
+      message = &quot;WinCC OA Help for this project is open. It must be closed in order to remove help files from installation directory.\n\n&quot; +
+                &quot;Please note however, that other local or remote applications may still use help files, preventing them from being removed.\n&quot; +
+                &quot;If this is the case, please manually remove the *.qch files later.&quot;;
+      okLabel = &quot;Close Help and Continue&quot;;
+      cancelLabel = &quot;Cancel&quot;;
+      icon = &quot;WARNING&quot;;
+    }
+    dyn_float dreturnf;
+    dyn_string dreturns;
+    ChildPanelOnCentralReturn(&quot;fwInstallation/fwInstallation_messageInfo.pnl&quot;,
+                              &quot;CloseHelpPanel&quot;,
+                              makeDynString(&quot;$text:&quot; + message, &quot;$icon:&quot; + icon, &quot;$okLabel:&quot; + okLabel, &quot;$cancelLabel:&quot; + cancelLabel),
+                              dreturnf,
+                              dreturns);
+    if(dynlen(dreturns) &gt; 0 &amp;&amp; dreturns[1] == &quot;OK&quot;){
+      fwInstallationQtHelp_closeAssistant();
+    }else if(!continueWithoutClosingAllowed){
+      return false;
+    }
+  }
+  return true;
+}
+
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  // dummy to prevent panel from closing
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[#uses &quot;fwInstallation/fwInstallation.ctl&quot;
+#uses &quot;fwInstallation/fwInstallationDBAgent.ctl&quot;
+
+main()
+{
+  //Establish access control callback if AC is installed:
+  dyn_string exception;
+  string acVer, reduManagerDp, paramDp;
+  bool bRedundant = fwInstallationRedu_isRedundant();
+  int reduHostNum = fwInstallationRedu_myReduHostNum();
+
+  showInstallationInfo(false);
+  showExtendedPanel(bRedundant);
+  if(bRedundant)
+  {
+    splitModeCB(&quot;&quot;, false, &quot;&quot;, false, &quot;&quot;, -1); // put panel appearance in init mode (-1) before proper callback can be established
+  }
+
+  if(isFunctionDefined(&quot;fwAccessControl_setupPanel&quot;))
+  {
+    fwAccessControl_setupPanel(&quot;initPanel&quot;, exception);
+    if(dynlen(exception))
+    {
+      ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:&quot;+exception));
+    }
+  }
+  else
+  {
+    //force update list of components at the end of the installation
+    gUpdateComponentList = true;
+    initPanel(&quot;&quot;, &quot;&quot;);
+  }
+
+  if(bRedundant)
+  {
+    startSymbol(self, &quot;ReduPeer&quot;);
+    reduManagerDp = reduHostNum == 1? &quot;_ReduManager&quot;:&quot;_ReduManager_2&quot;;
+    paramDp = fwInstallation_getAgentDp();
+    dpConnect(&quot;splitModeCB&quot;, reduManagerDp + &quot;.SplitMode&quot;, reduManagerDp + &quot;.SplitActive&quot;, paramDp + &quot;.redundancy.installOnlyInSplit&quot;);
+  }
+
+  //setup callback on pending postInstallFiles dpe to know when installed components list should be refreshed (when user after installation choose &quot;Run Post-install scripts&quot; instead of project restart)
+  dpConnect(&quot;updateComponentsListWhenPostInstallsDoneCB&quot;, fwInstallation_getInstallationPendingActionsDp() + &quot;.postInstallFiles&quot;);
+}
+
+
+
+
+
+
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="redundancyInfoBg" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">117</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 650</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{255,102,102}</prop>
+    <prop name="BackColor">{255,102,102}</prop>
+    <prop name="TabOrder">51</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 1 0 0</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">0 732</prop>
+    <prop name="Size">1270 23</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">104</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">47</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="frmDelete" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">400 475</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 0.9474726923474043 29.99999999999996 -2.89890769389617</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">View / delete components</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">400 40</prop>
+    <prop name="Size">410 440</prop>
+   </properties>
+  </shape>
+  <shape Name="filePathLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">19 55</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">21 57</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">File path:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmInstall" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 480</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.10840108401084 0 0 1.170842824601371 -1.0840108401084 -11.83371298405481</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Install components</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">370 440</prop>
+   </properties>
+  </shape>
+  <shape Name="availableComponentsLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 109</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 111</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Available components:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="versionInfo" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">795 6</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="HoverForeCol">Darkgrey</prop>
+    <prop name="HoverBackCol">{255,255,255,165}</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">795 6</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Version</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  fwInstallation_ui_openReleaseNotes();
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  string fwInstVersion;
+  fwInstallation_getToolVersionLocal(fwInstVersion);
+  this.text = &quot;Version &quot; + fwInstVersion;
+  this.toolTipText = &quot;Installation Tool version &quot; + fwInstVersion +
+                     &quot;\nClick here to open Relase Notes.&quot;;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="installedComponentsLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">439 55</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">441 57</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Installed components:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="tblAvailableComponents" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-120 -75.91795580110499</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Shift+:</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 155</prop>
+    <prop name="Size">389 348</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">componentName</prop>
+     <prop name="Width">210</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Subcomponents are shown with a leading underscore.</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">isSubcomponent</prop>
+     <prop name="Width">10</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">isSubcomponent</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">isHidden</prop>
+     <prop name="Width">10</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">isHidden</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">componentVersion</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Version</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">colStatus</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Install</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Click to set action</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">descFile</prop>
+     <prop name="Width">70</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">descFile</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[/** if the user  clicks on the Status column
+the column value is changed ( Install -&gt; &quot;&quot; , or &quot;&quot; -&gt; Install
+*/
+main(int row, string column, string value)
+{
+  // if user clicked on colStatus column
+  if(column == &quot;colStatus&quot;){
+    changeComponentStatus(TABLE_AVAILABLE_COMPONENTS_SHAPE, row, value, AVAILABLE_COMPONENT_STATUS_CHANGES);
+  }
+}
+
+]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[/**  if the user double clicks on the Status column
+the panel with the component details is shown
+*/
+main()
+{
+
+  int xpos;
+  string columnName;
+  int columnNr;
+  string componentName;
+  string descFile;
+  string directoryInfo;
+  string typeOfDescription = &quot;xml&quot;;
+
+  // get the coordinates of the current cell
+  getValue(TABLE_AVAILABLE_COMPONENTS_SHAPE, &quot;currentCell&quot;, xpos, columnNr);
+  columnName = TABLE_AVAILABLE_COMPONENTS_SHAPE.currentColumn();
+
+  // check the column name
+   if((columnName == &quot;componentName&quot;) || (columnName == &quot;componentVersion&quot;))
+   {
+
+    // get the component name
+    componentName = TABLE_AVAILABLE_COMPONENTS_SHAPE.cellValueRC(xpos, &quot;componentName&quot;);
+
+    // get the description file name - it is stored in a hidden column
+    descFile = TABLE_AVAILABLE_COMPONENTS_SHAPE.cellValueRC(xpos, &quot;descFile&quot;);
+
+      // open the panel with details of a component
+       ChildPanelOnCentral(&quot;fwInstallation/fwInstallationComponentDetails.pnl&quot;, &quot;Details of &quot; + componentName,
+       makeDynString(&quot;$componentName:&quot; + componentName, &quot;$descFile:&quot; + descFile , &quot;$typeOfDescription:&quot; + typeOfDescription));
+  }
+}
+
+
+]]></script>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  fwInstallation_ui_componentsTableRightClickPopupMenu(getShape(&quot;&quot;), row, column);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnApplyInstall" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">319 514</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Shift+I</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">319 514</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Install ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[// Install the components
+main()
+{
+  dyn_string descFiles;
+  string componentsInfo;
+  string descFilesInfo;
+  dyn_float dreturnf;
+  dyn_string dreturns;
+  string dontRestartProject = &quot;no&quot;;
+
+  // Close WinCC OA Help (Qt Help Assistant)
+  if(!askToCloseHelpIfOpen())
+  {
+    fwInstallation_showMessage(makeDynString(&quot;Install component operation aborted by the user&quot;));
+    return;
+  }
+
+  //check destination directory:
+  string destinationDir = checkInstallationDirectory();
+  if(destinationDir == &quot;&quot;)
+  {
+    ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;Invalid path&quot;, makeDynString(&quot;Invalid installation path...&quot;));
+    return;
+  }
+  destinationDir += &quot;/&quot;;
+
+  enablePanelControls(FALSE);
+
+  //read components to be installed
+  getComponentsMarkedForInstallation(componentsInfo, descFilesInfo, descFiles);
+
+  if(dynlen(descFiles) &lt;=0)
+  {
+    enablePanelControls(true);
+    return; //nothing to be done
+  }
+
+  //force update list of components at the end of the installation
+  gUpdateComponentList = true;
+
+  //show info to the user
+  fwInstallation_showMessage(fwInstallation_timestampString() + &quot; Starting installation&quot;);
+  string sourceDir = txtSourceDir.text;
+  ChildPanelOnCentralReturn(&quot;fwInstallation/fwInstallationToInstall.pnl&quot;, &quot;fwInstallation_ToInstall&quot;,
+                            makeDynString(&quot;$componentsInfo:&quot; + componentsInfo , &quot;$descFilesInfo:&quot; + descFilesInfo, &quot;$sourceDir:&quot; + sourceDir), dreturnf, dreturns);
+
+  if(dreturns[1] != &quot;Install&quot;){
+    fwInstallation_showMessage(makeDynString(&quot;Installation aborted by the user&quot;));
+    enablePanelControls(true);
+    return;
+  }
+  //install components if choosen by the user:
+
+  showInstallationInfo(true);
+
+  int retVal = fwInstallation_installComponentSet(descFiles, dontRestartProject);
+  if(retVal == -2 || retVal == -3){
+    string errMsg = (retVal == -2)?&quot;Detected cyclic dependencies in components, installation aborted.&quot;:
+                    &quot;Failed to back up project config file, installation aborted.&quot;;
+    ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:&quot; + errMsg));
+    enablePanelControls(TRUE);
+    updateAvailableComponentsInstallationStatus();
+    showInstallationInfo(false);
+    return;
+  }else if(retVal == -1){
+    updateAvailableComponentsInstallationStatus();
+    if(gUpdateComponentList){
+      fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                                   POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0));
+    }
+    ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallation_messageInfo.pnl&quot;, &quot;Installation errors occured&quot;,
+                                   makeDynString(&quot;$text:Not all components were installed correctly.\nIt is still possible to proceed to post-install scripts execution, &quot;
+                                                 &quot;yet it is advised to stop here and check the installation logs for errors.\nDo you want to continue anyway?&quot;,
+                                                 &quot;$okLabel:Yes&quot;, &quot;$cancelLabel:No&quot;, &quot;$icon:WARNING&quot;), dreturnf, dreturns);
+    if(dynlen(dreturns) &lt;= 0 || dreturns[1] != &quot;OK&quot;){
+      enablePanelControls(TRUE);
+      return;
+    }
+  }
+
+  //Re-sync unicos ows files if needed:
+  if(isFunctionDefined(&quot;unConfigGenericFunctions_Create_Config_ows&quot;))
+  {
+    unConfigGenericFunctions_Create_Config_ows(&quot;config_ows&quot;);
+  }
+
+  //refresh the UI:
+  updateAvailableComponentsInstallationStatus();
+  if(gUpdateComponentList){
+    fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                                 POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0));
+  }
+
+  //updateSysDB
+  updateSysDB();
+
+  //restart-project or run post-installs
+  if(dontRestartProject == &quot;no&quot;)
+  {
+    // show the restart panel
+    ChildPanelOnCentral(&quot;fwInstallation/fwInstallationRestart.pnl&quot;, &quot;fwInstallationRestart&quot;,
+                        makeDynString(&quot;$action:&quot; + &quot;install&quot;));
+  }
+  else
+  {
+    //execute PostInstallation Scripts by restarting the fwScripts control manager:
+    if(fwInstallation_managerCommand(&quot;START&quot;, fwInstallation_getWCCOAExecutable(&quot;ctrl&quot;), FW_INSTALLATION_SCRIPTS_MANAGER_CMD) != 0)
+    {
+      ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:Failed to launch the execution of post-installation scripts.\nYou must restart your project.&quot;));
+      if(gUpdateComponentList){
+        fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                                     POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0));
+      }
+    }
+  }
+
+  fwInstallation_showMessage(fwInstallation_timestampString() + &quot;Finishing installation&quot;);
+  fwInstallation_showMessage(fwInstallation_timestampString() + &quot;Please find the log file for this installation operation in: &quot; +
+                             getPath(LOG_REL_PATH) + FW_INSTALLATION_LOG_FILE);
+
+  showInstallationInfo(false);
+
+  enablePanelControls(TRUE);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="tblInstalledComponents" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">305.0000000000001 -46.4285714285714</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">441 77</prop>
+    <prop name="Size">388 303</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">AlwaysOff</prop>
+    <prop name="Column">
+     <prop name="Name">componentName</prop>
+     <prop name="Width">148</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Subcomponents are shown with a leading underscore.</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">componentVersion</prop>
+     <prop name="Width">60</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Version</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">helpFile</prop>
+     <prop name="Width">35</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Help</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8">Click to show component help</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">filesIssuesCount</prop>
+     <prop name="Width">78</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Files issues</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">colStatus</prop>
+     <prop name="Width">49</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Delete</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">filesIssues</prop>
+     <prop name="Width">0</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Files with issues</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">isSubcomponent</prop>
+     <prop name="Width">0</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">isSubcomponent</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[/** if the user  clicks on the Status column
+the column value is changed ( Delete -&gt; &quot;&quot; , or &quot;&quot; -&gt; Delete
+*/
+main(int row, string column, string value)
+{
+  if(column == &quot;helpFile&quot;){
+    if(this.cellFillRC(row, &quot;helpFile&quot;) == &quot;&quot;){
+      return; // Component help not available, exit
+    }
+    string componentName = this.cellValueRC(row, &quot;componentName&quot;);
+    if(this.cellValueRC(row, &quot;isSubcomponent&quot;)){
+      componentName = substr(componentName, 1);
+    }
+    fwInstallation_showHelpFile(componentName);
+    return;
+  }
+  bool centrallyManaged;
+
+  if(fwInstallationDB_getUseDB())
+  {
+    fwInstallationDB_getProjectManagementMode(centrallyManaged);
+    if(centrallyManaged)
+      return; //Don't allow users to select components to be installed.
+  }
+
+  // check the name of column where the user clicked
+  if (column == &quot;colStatus&quot;){
+    changeComponentStatus(TABLE_INSTALLED_COMPONENTS_SHAPE, row, value, INSTALLED_COMPONENT_STATUS_CHANGES);
+  }
+}
+
+
+]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[/**  if the user double clicks on the componentName column
+the panel with the component details is shown
+if double click on overparameterized files, show list of overparameterized files
+*/
+main()
+{
+  int xpos;
+  string columnName;
+  int columnNr;
+  string componentName;
+  string descFile = &quot;&quot;;
+  string typeOfDescription = &quot;PVSSDB&quot;;
+
+  // get the coordinates of current cell
+  getValue(TABLE_INSTALLED_COMPONENTS_SHAPE, &quot;currentCell&quot;, xpos, columnNr);
+
+  // get the column name
+  columnName = TABLE_INSTALLED_COMPONENTS_SHAPE.currentColumn();
+
+   if((columnName == &quot;componentName&quot;) || (columnName == &quot;componentVersion&quot;))
+   {
+      // get the name of a component
+      componentName += TABLE_INSTALLED_COMPONENTS_SHAPE.cellValueRC(xpos, &quot;componentName&quot;);
+    if(patternMatch(&quot;_*&quot;, componentName))
+      componentName = strltrim(componentName, &quot;_&quot;);
+        // display the panel with component details
+         ChildPanelOnCentral(&quot;fwInstallation/fwInstallationComponentDetails.pnl&quot;, &quot;Details of &quot; + componentName,
+         makeDynString(&quot;$componentName:&quot; + componentName, &quot;$descFile:&quot; + descFile , &quot;$typeOfDescription:&quot; + typeOfDescription, &quot;$reduHostNum:&quot;+fwInstallationRedu_myReduHostNum()));
+  }
+  else if(columnName == &quot;filesIssuesCount&quot;)
+  {
+    string filesIssues = TABLE_INSTALLED_COMPONENTS_SHAPE.cellValueRC(xpos, &quot;filesIssues&quot;);
+
+    if(filesIssues != &quot;&quot;)
+    {
+        componentName = TABLE_INSTALLED_COMPONENTS_SHAPE.cellValueRC(xpos, &quot;componentName&quot;);
+         ChildPanelOnCentral(&quot;fwInstallation/fwInstallation_filesIssues.pnl&quot;,
+                          &quot;fwInstallation_filesIssues:&quot; + componentName,
+                          makeDynString(&quot;$componentName:&quot; + componentName,
+                                        &quot;$filesIssues:&quot; + filesIssues));
+
+    }
+
+  }
+}
+
+
+
+]]></script>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  fwInstallation_ui_componentsTableRightClickPopupMenu(getShape(&quot;&quot;), row, column);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">766 765</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">766 765</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  if(fwInstallationDB_getUseDB())
+  {
+    openProgressBar(&quot;Closing DB Connection&quot;, &quot;delay.gif&quot;, &quot;Closing connection to FW System Configuration DB&quot;, &quot;Please wait...&quot;, &quot;&quot;, 1);
+    int err = fwInstallationDB_closeDBConnection();
+    closeProgressBar();
+  }
+
+  ModuleOff(myModuleName());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="ShowInstalledSubComponents" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">645 55</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">676 55</prop>
+    <prop name="Size">158 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show sub-components</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  // get all installed components and display it in a table
+  fwInstallation_ui_filterComponentsTable(TABLE_INSTALLED_COMPONENTS_SHAPE, state, true);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="ShowSubComponents" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-50.99999999999999 176</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">111.1656050955414 131</prop>
+    <prop name="Size">135 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Sub-components</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  fwInstallation_ui_filterComponentsTable(TABLE_AVAILABLE_COMPONENTS_SHAPE, state, ShowHiddenComponents.state(0));
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnRefresh" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">440 389</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">440 389</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/refresh_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  // refresh the  table widget
+  TABLE_INSTALLED_COMPONENTS_SHAPE.deleteAllLines(); // delete lines beforehand to create &quot;flickering&quot; effect on the panel so that the user knows that table was refreshed.
+  fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                               POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0));
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="list" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 593.0000000000001</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 593</prop>
+    <prop name="Size">830 129</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+  </shape>
+  <shape Name="btnAdvanced" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 765</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 765</prop>
+    <prop name="Size">150 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Advanced options ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  showAdvancedOptions();
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="refreshAvailableButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 513</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Refresh list</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 513</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/refresh_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sourceDir = txtSourceDir.text();
+  if(!isdir(sourceDir))
+  {
+    sourceDir = &quot;&quot;;
+  }
+
+  enablePanelControls(FALSE);
+  // refresh the  table widget
+  fwInstallation_ui_displayAvailableComponents(TABLE_AVAILABLE_COMPONENTS_SHAPE, sourceDir,
+                                               cbScanRecursively.state(0), ShowSubComponents.state(0),
+                                               ShowHiddenComponents.state(0));
+  enablePanelControls(TRUE);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnHelp" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">815 2</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="HoverBackCol">{255,255,255,110}</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Click here to show Installation Tool panel help</prop>
+    </prop>
+    <prop name="Hotkey">F1</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">815 2</prop>
+    <prop name="Size">25 25</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">help_2.xpm</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwInstallation_showHelpForPanel(&quot;fwInstallation/fwInstallation.html&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnApplyDelete" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">739 390</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Shift+D</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">739 390</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Delete ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[// Delete the components
+main()
+{
+  // Close WinCC OA Help (Qt Help Assistant)
+  bool canContinueWithHelpOpened = _UNIX;
+  if(!askToCloseHelpIfOpen(canContinueWithHelpOpened))
+  {
+    fwInstallation_showMessage(makeDynString(&quot;Delete component operation aborted by the user&quot;));
+    return;
+  }
+
+  enablePanelControls(FALSE);
+  //force update list of components at the end of the installation
+  gUpdateComponentList = true;
+
+  dyn_dyn_mixed componentsToDelete;
+  dyn_string columns;
+  columns[1] = &quot;componentName&quot;;
+  columns[2] = &quot;isSubcomponent&quot;;
+  fwInstallation_ui_getMarkedComponentsData(TABLE_INSTALLED_COMPONENTS_SHAPE, makeDynString(&quot;Delete&quot;), columns, componentsToDelete);
+
+  int componentsToDeleteLen = dynlen(componentsToDelete);
+  if(componentsToDeleteLen &lt;= 0)
+  {
+    enablePanelControls(true);
+    return; //nothing to be done
+  }
+
+  for(int i=1;i&lt;=componentsToDeleteLen;i++){
+    if(componentsToDelete[i][2]){
+      componentsToDelete[i][1] = substr(componentsToDelete[i][1], 1); // remove subcomponent prefix (&quot;_&quot;)
+    }
+  }
+  dyn_string dynComponentsNames = getDynString(componentsToDelete, 1);
+  string strComponentsNames = strjoin(dynComponentsNames, &quot;|&quot;);
+
+  dyn_string dreturns;
+  dyn_float dreturnf;
+  // show the panel that informs user about the components to be deleted
+  ChildPanelOnCentralReturn(&quot;fwInstallation/fwInstallationToDelete.pnl&quot;, &quot;fwInstallation_ToDelete&quot;,
+                            makeDynString(&quot;$componentsNames:&quot; + strComponentsNames) , dreturnf, dreturns);
+
+  if((dreturns[1] != &quot;Delete&quot;) &amp;&amp; (dreturns[1] != &quot;DeleteNoFiles&quot;)){
+    fwInstallation_showMessage(fwInstallation_timestampString() + &quot; Component deletion aborted by the user.&quot;);
+    enablePanelControls(TRUE);
+    return;
+  }
+
+  bool deleteFiles = true;
+  if(dreturns[1] == &quot;DeleteNoFiles&quot;){
+    deleteFiles = false;
+  }
+  fwInstallation_deleteComponentSet(dynComponentsNames, deleteFiles);
+
+  //Re-sync unicos ows files if needed:
+  if(isFunctionDefined(&quot;unConfigGenericFunctions_Create_Config_ows&quot;))
+  {
+    unConfigGenericFunctions_Create_Config_ows(&quot;config_ows&quot;);
+  }
+
+  //update database
+  updateSysDB();
+
+  //Refresh the UI:
+  updateAvailableComponentsInstallationStatus();
+  fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                               POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0));
+
+  //run postdelete scripts:
+  if(fwInstallationManager_command(&quot;START&quot;, fwInstallation_getWCCOAExecutable(&quot;ctrl&quot;), FW_INSTALLATION_SCRIPTS_MANAGER_CMD) != 0)
+  {
+    ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:Failed to launch the execution of post-installation scripts.\nPlease restart the project.&quot;));
+  }
+  else
+  {
+    fwInstallation_showMessage(fwInstallation_timestampString() + &quot; Component successfully deleted.&quot;);
+  }
+  enablePanelControls(TRUE);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="txtSourceDir" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 110.4545454545455</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 77</prop>
+    <prop name="Size">359 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[main()
+{
+  string sourceDir = txtSourceDir.text();
+
+  enablePanelControls(FALSE);
+
+  if(sourceDir != &quot;&quot; &amp;&amp; fwInstallation_normalizePath(sourceDir, true) == 0 &amp;&amp; isdir(sourceDir))
+  {
+    storeSourceDir(sourceDir);
+  }
+  else
+  {
+    sourceDir = &quot;&quot;;
+  }
+
+  fwInstallation_ui_displayAvailableComponents(TABLE_AVAILABLE_COMPONENTS_SHAPE, sourceDir,
+                                               cbScanRecursively.state(0), ShowSubComponents.state(0),
+                                               ShowHiddenComponents.state(0));
+  enablePanelControls(TRUE);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnSelectSourceDir" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">39</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">383 75</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Shift+O</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">383 75</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Open_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sourceDir = getLastSourcePath();
+  int retVal = folderSelector(sourceDir); // Note that it always returns 1, even when user click Cancel
+
+  if(sourceDir == &quot;&quot;){
+    return;
+  }
+
+  enablePanelControls(FALSE);
+
+  if(retVal == 1 &amp;&amp; fwInstallation_normalizePath(sourceDir, true) == 0)
+  { // Correct path, update displayed source directory and the one stored in datapoint
+    storeSourceDir(sourceDir);
+  }
+
+  fwInstallation_ui_displayAvailableComponents(TABLE_AVAILABLE_COMPONENTS_SHAPE, sourceDir,
+                                               cbScanRecursively.state(0), ShowSubComponents.state(0),
+                                               ShowHiddenComponents.state(0));
+  enablePanelControls(TRUE);
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cbScanRecursively" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">79 82</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">257 55</prop>
+    <prop name="Size">121 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Scan recursively</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  string sourceDir = txtSourceDir.text;
+
+  enablePanelControls(FALSE);
+  fwInstallation_ui_displayAvailableComponents(TABLE_AVAILABLE_COMPONENTS_SHAPE, sourceDir,
+                                               state, ShowSubComponents.state(0),
+                                               ShowHiddenComponents.state(0));
+  enablePanelControls(TRUE);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="txRedundancy" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">71</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 735</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">41</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 735</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Redundancy information is displayed here in case it is enabled.</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btnSync" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">82</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">470 390</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">43</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Synchronize locally installed components with redundant peer's</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">470 390</prop>
+    <prop name="Size">151 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Import from redu peer ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string ds;
+  dyn_float df;
+  string componentsToBeInstalledStr;
+  string componentsToBeRemovedStr;
+
+  bool isOk = false;
+  dyn_dyn_mixed componentsToBeInstalled, componentsToBeRemoved;
+  string dontRestartProject = &quot;no&quot;;
+
+  //force update list of components at the end of the installation
+  gUpdateComponentList = true;
+
+  fwInstallationRedu_checkComponents(isOk, componentsToBeInstalled, componentsToBeRemoved);
+
+  if(isOk) return;
+
+  enablePanelControls(FALSE);
+
+  //Prepare componetns to be passed as $params:
+  for(int i = 1; i &lt;= dynlen(componentsToBeInstalled); i++)
+  {
+    componentsToBeInstalledStr += componentsToBeInstalled[i] + &quot;%&quot;;
+  }
+
+  for(int i = 1; i &lt;= dynlen(componentsToBeRemoved); i++)
+  {
+    componentsToBeRemovedStr += componentsToBeRemoved[i] + &quot;%&quot;;
+  }
+
+  ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallation_reduSynchronization.pnl&quot;,
+                                 &quot;Redundancy synchronization&quot;,
+                                 makeDynString(&quot;$componentsToBeInstalled:&quot; + componentsToBeInstalledStr, &quot;$componentsToBeRemoved:&quot; + componentsToBeRemovedStr),
+                                 df, ds);
+
+  //sync components if told to do so:
+  if(dynlen(df) &amp;&amp; df[1] == 1.)
+  {
+    fwInstallation_throw(&quot;Forcing component synchronization with redundant partner now...&quot;, &quot;INFO&quot;, 10);
+    if(fwInstallationRedu_synchronize(df[2], dontRestartProject, ds))
+    {
+      fwInstallation_throw(&quot;Failed to synchronize list of installed components with redundant partner: &quot; + fwInstallationRedu_getPair());
+      enablePanelControls(TRUE);
+
+      return;
+    }
+
+
+    //updateDB()
+    updateSysDB();
+
+    // refresh the Main Panel
+    updateAvailableComponentsInstallationStatus();
+    fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                                 POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0));
+
+    //restart-project or run post-installs
+    if(dontRestartProject == &quot;no&quot;)
+    {
+      // show the restart panel
+      ChildPanelOnCentral(&quot;fwInstallation/fwInstallationRestart.pnl&quot;, &quot;fwInstallationRestart&quot;, makeDynString(&quot;$action:&quot; + &quot;install&quot;));
+    }
+    else
+    {
+      //execute PostInstallation Scripts by restarting the fwScripts control manager:
+      if(fwInstallation_managerCommand(&quot;START&quot;, fwInstallation_getWCCOAExecutable(&quot;ctrl&quot;), FW_INSTALLATION_SCRIPTS_MANAGER_CMD) != 0)
+      {
+        ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:Failed to launch the execution of post-installation scripts.\nYou must restart your project.&quot;));
+      }
+    }
+    fwInstallation_ui_displayInstalledComponents(TABLE_INSTALLED_COMPONENTS_SHAPE, LABEL_FILE_ISSUE_FEEDBACK_SHAPE,
+                                                 POLYGON_FILE_ISSUE_FEEDBACK_SHAPE, ShowInstalledSubComponents.state(0));
+  }
+  else
+  {
+//      fwInstallation_showMessage(makeDynString(&quot;Component synchronization with redu peer aborted by the user&quot;));
+      fwInstallation_showMessage(fwInstallation_timestampString() + &quot; Component synchronization with redu peer aborted by the user&quot;);
+  }
+
+  enablePanelControls(TRUE);
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">105</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">7.999999999999986 2</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">48</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">9.999999999999986 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Framework Installation Tool</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="fileIssueFeedbackText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">132</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">451.9999999999999 387</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">58</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">451.9999999999999 425</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">File issue feedback</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="fileIssueFeedbackArrow" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">133</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">59</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.7259259259259259 0 0 0.6825000000000002 432.7407407407408 -99.5250000000002</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+     <prop name="Location">20 780</prop>
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="noDbConnectionBg" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">142</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 48</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">60</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_WindowAlternate</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 0.9885057471264368 0 30.02298850574712</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">430 437</prop>
+    <prop name="Size">410 88</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="noDbConnectionText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">143</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">588 493</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">61</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">590 495</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">No DB connection.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="setupDbButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">144</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">683 494</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">62</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">683 494</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Setup ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  showAdvancedOptions();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">145</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">630 390</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">63</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">630 390</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Check Files</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[// Check component file issues
+main()
+{
+  dyn_dyn_mixed componentsInfo;
+  fwInstallation_getInstalledComponents(componentsInfo);
+  openProgressBar(&quot;Looking for file issues&quot;, &quot;copy.gif&quot;, &quot;Looking for file modified or multiple instances of component files&quot;, &quot;This may take a while&quot;, &quot;Please, be patient&quot;, 2);
+  for(int i = 1; i &lt;= dynlen(componentsInfo); i++)
+  {
+    showProgressBar(&quot;Analysing files for component: &quot; + componentsInfo[i][1], &quot;Looking for file modified or multiple instances of component files&quot;, &quot;This may take a while&quot;, &quot;Please, be patient&quot;, i/dynlen(componentsInfo)*100.);
+    fwInstallation_showFileIssues(componentsInfo[i][1], componentsInfo[i][8]);
+  }
+  closeProgressBar();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="refInstallationInfo" referenceId="0">
+   <properties>
+    <prop name="FileName">fwInstallation/fwInstallation_installationInfo.pnl</prop>
+    <prop name="Location">3.145156962647519 549.9208428246031</prop>
+    <prop name="Geometry">1 0 0 1 2 13</prop>
+    <prop name="TabOrder">71</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.visible(false);
+}]]></script>
+    <extended>
+     <script name="eventStopReporting" isEscaped="1"><![CDATA[void eventStopReporting()
+{
+  this.visible(false);
+}
+]]></script>
+     <script name="eventStartReporting" isEscaped="1"><![CDATA[void eventStartReporting()
+{
+  this.visible(true);
+}
+]]></script>
+    </extended>
+   </properties>
+  </reference>
+  <shape Name="showAlsoLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">152</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">22 133</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">72</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 133</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Show also:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="ShowHiddenComponents" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">153</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">74.26114649681527 176</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">73</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">256.9999999999999 131</prop>
+    <prop name="Size">152 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Hidden components</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  fwInstallation_ui_filterComponentsTable(TABLE_AVAILABLE_COMPONENTS_SHAPE, ShowSubComponents.state(0), state);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="tfProjName" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">160</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">334.9999999999999 765</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">74</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Project name. If panel is opened on remote host with OWS project, then original project name and OWS project name are shown, delimited by ' - '.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">335 765</prop>
+    <prop name="Size">151 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="tfHostName" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">161</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">551 765</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">75</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Hostname of project event manager. In case of redundant project, both peers are displayed, delimited with "$'.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">551 765</prop>
+    <prop name="Size">180 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="projNameLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">162</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">285 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">76</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">285 769.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Project:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="hostNameLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">163</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">515 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">77</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">515 769.5</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Host:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btnHkSelectAllAvailableToInstall" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">170</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">856 117</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">78</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Shift+F5</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">880 90</prop>
+    <prop name="Size">150 50</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select All Available To Install
+Ctrl + Shift + F5</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  dyn_string statusesToChange = makeDynString(AVAILABLE_COMPONENT_STATUS_AVAILABLE, AVAILABLE_COMPONENT_STATUS_INSTALLED);
+  changeMultipleComponentsStatus(TABLE_AVAILABLE_COMPONENTS_SHAPE, statusesToChange, AVAILABLE_COMPONENT_STATUS_CHANGES);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnHkSelectAllInstalledToRemove" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">171</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">853 167</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">79</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Shift+F7</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">880 190</prop>
+    <prop name="Size">150 50</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select All Installed To Delete
+Ctrl + Shift + F7</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  dyn_string statusesToChange = makeDynString(INSTALLED_COMPONENT_STATUS_KEEP);
+  changeMultipleComponentsStatus(TABLE_INSTALLED_COMPONENTS_SHAPE, statusesToChange, INSTALLED_COMPONENT_STATUS_CHANGES);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">172</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">855 61</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">80</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.481012658227848 0 0 1 -387.3037974683545 5.5</prop>
+    <prop name="Location">855 61</prop>
+    <prop name="Size">76 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Hotkey action buttons</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btnHkSelectNotInstalledToInstall" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">174</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">853 117</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">82</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Shift+F6</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">880 140</prop>
+    <prop name="Size">150 50</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select Not Installed To Install
+Ctrl + Shift + F6</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  dyn_string statusesToChange = makeDynString(AVAILABLE_COMPONENT_STATUS_AVAILABLE);
+  changeMultipleComponentsStatus(TABLE_AVAILABLE_COMPONENTS_SHAPE, statusesToChange, AVAILABLE_COMPONENT_STATUS_CHANGES);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnHkClearAllSelectedActions" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">175</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">853 217</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">83</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Shift+F8</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">880 240</prop>
+    <prop name="Size">150 50</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Clear All Selected Actions
+Ctrl + Shift + F8</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  dyn_string statusesToChange = makeDynString(INSTALLED_COMPONENT_STATUS_DELETE);
+  changeMultipleComponentsStatus(TABLE_INSTALLED_COMPONENTS_SHAPE, statusesToChange, INSTALLED_COMPONENT_STATUS_CHANGES);
+
+  statusesToChange = makeDynString(AVAILABLE_COMPONENT_STATUS_INSTALL, AVAILABLE_COMPONENT_STATUS_REINSTALL);
+  changeMultipleComponentsStatus(TABLE_AVAILABLE_COMPONENTS_SHAPE, statusesToChange, AVAILABLE_COMPONENT_STATUS_CHANGES);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="viewLogfiles" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">183</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">170 765</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">84</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">170 765</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">View log</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">fwInstallation log</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">2</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">ASCII import log</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+  string logFileToView;
+  switch(id){
+    case &quot;1&quot;: logFileToView = getPath(LOG_REL_PATH) + FW_INSTALLATION_LOG_FILE; break;
+    case &quot;2&quot;: logFileToView = fwInstallation_getAsciiImportLogFilePath(); break;
+  }
+  if(access(logFileToView, R_OK) != 0){
+    fwInstallation_throw(&quot;Cannot display log file. '&quot; + logFileToView + &quot;' is not accessible&quot;, &quot;WARNING&quot;);
+    return;
+  }
+  fileEditor(logFileToView, true);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="infoTextArrow" shapeType="POLYGON" layerId="1">
+   <properties>
+    <prop name="serialId">116</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,102,102}</prop>
+    <prop name="BackColor">{255,102,102}</prop>
+    <prop name="TabOrder">50</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.7259259259259259 0 0 0.6825000000000002 262.7407407407408 244.4749999999998</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+     <prop name="Location">20 780</prop>
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="txAgent" shapeType="PRIMITIVE_TEXT" layerId="1">
+   <properties>
+    <prop name="serialId">49</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">282 769</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,102,102}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">282 769</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Agent synchronization with System Configuration DB in progress. Please wait ...</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

@@ -1,0 +1,1216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">1269 935</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+const bool g_alertRow = false;
+
+string FW_ALARM_GENERIC_ALARM_CLASS;
+
+// Keep the frame titles in memory to quick change them when reducing/expanding
+string fwAlarmScreenGeneric_sHeaderFrameTitle;
+string fwAlarmScreenGeneric_sInfoFrameTitle;
+string fwAlarmScreenGeneric_sTableFilterFrameTitle;
+string fwAlarmScreenGeneric_sAlarmFilterFrameTitle;
+
+// Store column sizes when busy DP changes state.
+// Busy state change resets the columns so this variable will be used to overwrite as soon as they are reset.
+dyn_int diColumnsSize;
+
+// State of the panel: full screen (bExpanded = true) or normal reduced screen (bExpanded = false). 
+bool bExpanded;
+
+// Indicates whether or not the user has sufficient rights to write any datapoint.
+bool bUserHasRights;
+
+// The user that is currently logged in.
+// Used only if fwAccessControl is installed.
+string sCurrentUser;]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  // If $params are not used in the panel but only in the library there is no way to configure them from the GEDI.
+  // This dummy variable will do the trick.
+  dyn_string dynStringForDollarParams = makeDynString(
+    $sAlertFilterPanel,
+    $sAlertFilterTitle,
+    $sHeaderPanel,
+    $sHeaderTitle,
+    $sInfoPanel,
+    $sInfoTitle,
+    $sTableFilterPanel,
+    $sTableFilterTitle,
+    $sWindowTitle,
+    $sAlarmType,      
+    $bHideMainFrame
+  );
+
+
+  FW_ALARM_GENERIC_ALARM_CLASS = $sAlarmType;
+  fwAlarmScreenGenericAlarmClass.text(FW_ALARM_GENERIC_ALARM_CLASS);
+
+  fwAlarmScreenGeneric_initScreen();
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="frameHeader" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">1249 23</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="frameInfo" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">50</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 70</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">36</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 70</prop>
+    <prop name="Size">1249 23</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="frameTableFilter" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">86</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 160</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">white</prop>
+    <prop name="TabOrder">56</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 1 0 -60</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 160</prop>
+    <prop name="Size">1249 23</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="frameAlertFilter" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">87</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 160</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">white</prop>
+    <prop name="TabOrder">57</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 1 0 -30</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 160</prop>
+    <prop name="Size">1249 23</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="frameHeaderHighlight" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,200,255,15}</prop>
+    <prop name="BackColor">{0,200,255,15}</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">1249 23</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameHeader.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameInfoHighlight" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">51</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,200,255,15}</prop>
+    <prop name="BackColor">{0,200,255,15}</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 70</prop>
+    <prop name="Size">1249 23</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameInfo.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameTableFilterHighlight" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">84</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,200,255,15}</prop>
+    <prop name="BackColor">{0,200,255,15}</prop>
+    <prop name="TabOrder">54</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 1 0 -60</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 160</prop>
+    <prop name="Size">1249 23</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameTableFilter.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameAlertFilterHighlight" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">85</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 160</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,200,255,15}</prop>
+    <prop name="BackColor">{0,200,255,15}</prop>
+    <prop name="TabOrder">55</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 1 0 -30</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 160</prop>
+    <prop name="Size">1249 23</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameAlertFilter.name());
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="REF_AES_TABLE" referenceId="1">
+   <properties>
+    <prop name="FileName">vision/aes/AEScreen.pnl</prop>
+    <prop name="Location">10 100</prop>
+    <prop name="Geometry">1.165384755751963 0 0 1.094458438287155 62.55385850617275 1427.554156171285</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$ACTION</prop>
+      <prop name="Value">$ACTION</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$FILENAME</prop>
+      <prop name="Value">$FILENAME</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$SCREENTYPE</prop>
+      <prop name="Value">$SCREENTYPE</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+   <shape GroupPath="" RefShapeSerial="26" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="27" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="0" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 23.34657015470385 69.21681101027292</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="1" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="onLosingFocus" isEscaped="1"><![CDATA[main()
+{
+  _fwAlarmScreenGeneric_saveColumnsSize();
+}]]></script>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+     <script type="CTRL_ONLY" name="rightClick" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  fwAlarmScreenGeneric_onTableRightClick(row, column);
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="17" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="19" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+     <prop type="BOOL" name="visible">False</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="20" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+     <prop type="BOOL" name="visible">False</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="21" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+     <prop type="BOOL" name="visible">False</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="25" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -2.822006696758153 73.8956102918704</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="11" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="12" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="15" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="14" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="16" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="0" RefShapeSerial="0" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="0" RefShapeSerial="1" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="TRANSFORM" name="transform">1.060278207109737 0 0 1.03337041156841 -0.2119899066876366 -31.3676124885491</prop>
+    </properties>
+   </shape>
+  </reference>
+  <shape Name="pushButtonExpand" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1233 2</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="HoverBackCol">{255,255,255,110}</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Expand</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1233 2</prop>
+    <prop name="Size">25 25</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">expand.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expand();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="fwAlarmScreenReadyCheck" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1110 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">black</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1040 0</prop>
+    <prop name="Size">23 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="pushButtonGenericSettings" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1201 2</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="HoverBackCol">{255,255,255,110}</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Settings</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1201 2</prop>
+    <prop name="Size">25 25</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">settings.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_config_openConfigPanel();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="backgroundRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-1 -1</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1271 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="alarmTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 4</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Alarm List</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lineTopLimit" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">150 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">150 30</prop>
+    <prop name="End">1020 30</prop>
+   </properties>
+  </shape>
+  <shape Name="lineBottomLimit" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">180 900</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">180 900</prop>
+    <prop name="End">1050 900</prop>
+   </properties>
+  </shape>
+  <shape Name="lineRightLimit" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1269 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">1269 120</prop>
+    <prop name="End">1269 580</prop>
+   </properties>
+  </shape>
+  <shape Name="fwAlarmScreenGenericAlarmClass" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1080 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">black</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1010 0</prop>
+    <prop name="Size">23 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="rectangleBusyBar" shapeType="PROGRESS_BAR" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 880</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 880</prop>
+    <prop name="Size">1249 10</prop>
+    <extended>
+     <prop type="ENUM" name="layoutDirection">0</prop>
+     <prop type="ENUM" name="textDirection">0</prop>
+     <prop type="ENUM" name="alignment">1</prop>
+     <prop type="ENUM" name="contextMenuPolicy">1</prop>
+     <prop type="ENUM" name="inputMethodHints">0</prop>
+     <prop type="ENUM" name="orientation">0</prop>
+    </extended>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.progress(0);
+  this.percentageVisible(FALSE);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameHeaderTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">45 44</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">45 44</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">General</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{ 
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameHeader.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameHeaderReduced" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 100</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[tile,any,pictures/arrow_single_right_16.png]]</prop>
+    <prop name="Geometry">1 0 0 1 0 -57</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 100</prop>
+    <prop name="Size">18 18</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameHeader.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameHeaderExpanded" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 100</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[tile,any,pictures/arrow_single_bottom_16.png]]</prop>
+    <prop name="Geometry">1 0 0 1 0 -57</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 100</prop>
+    <prop name="Size">18 18</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameHeader.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameInfoReduced" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">53</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 100</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">39</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[tile,any,pictures/arrow_single_right_16.png]]</prop>
+    <prop name="Geometry">1 0 0 1 0 -27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 100</prop>
+    <prop name="Size">18 18</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameInfo.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameInfoExpanded" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">54</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 100</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">40</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[tile,any,pictures/arrow_single_bottom_16.png]]</prop>
+    <prop name="Geometry">1 0 0 1 0 -27</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 100</prop>
+    <prop name="Size">18 18</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameInfo.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameTableFilterTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">57</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">45 104</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">43</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">45 104</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Table filter</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{ 
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameTableFilter.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameTableFilterExpanded" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">59</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 100</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">45</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[tile,any,pictures/arrow_single_bottom_16.png]]</prop>
+    <prop name="Geometry">1 0 0 1 0 3</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 100</prop>
+    <prop name="Size">18 18</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameTableFilter.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameAlertFilterTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">62</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">45 134</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">48</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">45 134</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Alarm filter</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{ 
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameAlertFilter.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameAlertFilterReduced" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">63</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 100</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">49</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[tile,any,pictures/arrow_single_right_16.png]]</prop>
+    <prop name="Geometry">1 0 0 1 0 33</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 100</prop>
+    <prop name="Size">18 18</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameAlertFilter.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameAlertFilterExpanded" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">64</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 100</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">50</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[tile,any,pictures/arrow_single_bottom_16.png]]</prop>
+    <prop name="Geometry">1 0 0 1 0 33</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 100</prop>
+    <prop name="Size">18 18</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameAlertFilter.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameInfoTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">52</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">45 74</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">38</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">45 74</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Info</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{ 
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameInfo.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="frameTableFilterReduced" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">58</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 100</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">44</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[tile,any,pictures/arrow_single_right_16.png]]</prop>
+    <prop name="Geometry">1 0 0 1 0 3</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 100</prop>
+    <prop name="Size">18 18</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameTableFilter.name());
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="alarmInfoWidget" referenceId="2">
+   <properties>
+    <prop name="FileName">fwAlarmHandling/fwAlarmScreenGenericAlarmInfo.pnl</prop>
+    <prop name="Location">12 910</prop>
+    <prop name="Geometry">1 0 0 1 -2 -10</prop>
+    <prop name="TabOrder">58</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="isExpandedCheckbox" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">109</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">670 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">58</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">860 0</prop>
+    <prop name="Size">140 80</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">frameHeader expanded</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">frameInfo expanded</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">frameTableFilter expanded</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">frameAlarmFilter expanded</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="fwAlarmScreenGeneric_refSystemInfo" referenceId="3">
+   <properties>
+    <prop name="FileName">fwAlarmHandling/fwAlarmScreenGenericSystemInfo.pnl</prop>
+    <prop name="Location">560 900</prop>
+    <prop name="Geometry">1 0 0 1 208 1</prop>
+    <prop name="TabOrder">61</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+ </shapes>
+</panel>

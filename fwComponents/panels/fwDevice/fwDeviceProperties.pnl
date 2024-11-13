@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">1200 600</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">30 20</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[const string CONFIG_DEFINED = &quot;Yes&quot;;
+const string CONFIG_NOT_DEFINED = &quot;No&quot;;
+dyn_string configs, configColumns, configPanels;
+
+initializeGlobals()
+{
+	configs = makeDynString(&quot;address&quot;, &quot;alert_hdl&quot;, &quot;archive&quot;, &quot;pv_range&quot;, &quot;msg_conv&quot;, &quot;cmd_conv&quot;, &quot;smooth&quot;);
+	configColumns = makeDynString(&quot;Address&quot;, &quot;Alarm&quot;, &quot;Archive&quot;, &quot;Range&quot;, &quot;Message Conversion&quot;, &quot;Command Conversion&quot;, &quot;Smoothing&quot;);
+	configPanels = makeDynString(	&quot;fwConfigs/fwPeriphAddressPopup.pnl&quot;, 
+									&quot;fwConfigs/fwAlertConfigPopup.pnl&quot;,
+									&quot;fwConfigs/fwArchiveConfigPopup.pnl&quot;,
+									&quot;fwConfigs/fwPvRangeConfigPopup.pnl&quot;,
+									&quot;fwConfigs/fwConversionConfigPopup.pnl&quot;,
+									&quot;fwConfigs/fwConversionConfigPopup.pnl&quot;,
+									&quot;fwConfigs/fwSmoothingConfigPopup.pnl&quot;);
+}
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int j;
+	string dpe, model;
+	dyn_string 	dpes, exceptionInfo, configMessages;
+	dyn_anytype configTypes;
+	dyn_dyn_string elements;
+  	
+	initializeGlobals();
+  	
+	fwDevice_getModel(makeDynString($sDpName), model, exceptionInfo);
+	fwDevice_getConfigElements(dpTypeName($sDpName), fwDevice_ALL, elements, exceptionInfo, model);
+  
+  Table1.columnFormat(&quot;Address&quot;,&quot;[,,,ALIGNMENT_CENTER,]&quot;);
+  Table1.columnFormat(&quot;Alarm&quot;,&quot;[,,,ALIGNMENT_CENTER,]&quot;);
+  Table1.columnFormat(&quot;Archive&quot;,&quot;[,,,ALIGNMENT_CENTER,]&quot;);
+  Table1.columnFormat(&quot;Range&quot;,&quot;[,,,ALIGNMENT_CENTER,]&quot;);
+  Table1.columnFormat(&quot;Message Conversion&quot;,&quot;[,,,ALIGNMENT_CENTER,]&quot;);
+  Table1.columnFormat(&quot;Command Conversion&quot;,&quot;[,,,ALIGNMENT_CENTER,]&quot;);
+  Table1.columnFormat(&quot;Smoothing&quot;,&quot;[,,,ALIGNMENT_CENTER,]&quot;);
+  	
+	for(int elementIndex = 1; elementIndex &lt;= dynlen(elements[1]); elementIndex++)
+	{
+		// build list of datapoint elements attributes to be read
+		dpe = $sDpName + elements[1][elementIndex];
+		for(j = 1; j &lt;= dynlen(configs); j++)
+		{
+			dpes[j] = dpe + &quot;:_&quot; + configs[j] + &quot;.._type&quot;;
+		}
+  		
+		// check which configs are there
+    configTypes = makeDynAnytype();
+		dpGet(dpes, configTypes);
+
+		// build messages depending on each config availability
+		for(j = 1; j &lt;= dynlen(configTypes); j++)
+		{
+			configMessages[j] = configTypes[j] == 0 ? CONFIG_NOT_DEFINED : CONFIG_DEFINED;
+		}
+			
+		Table1.appendLine(	&quot;Property&quot;, elements[2][elementIndex], 
+							&quot;DPE&quot;, elements[1][elementIndex],
+							&quot;Address&quot;, configMessages[1],
+							&quot;Alarm&quot;, configMessages[2],
+							&quot;Archive&quot;, configMessages[3],
+							&quot;Range&quot;, configMessages[4],
+							&quot;Message Conversion&quot;, configMessages[5],
+							&quot;Command Conversion&quot;, configMessages[6],
+							&quot;Smoothing&quot;, configMessages[7]);
+    
+    Table1.cellBackColRC(elementIndex-1, &quot;Address&quot;, configMessages[1]==&quot;Yes&quot;?&quot;green&quot;:&quot;lightgrey&quot;);
+    Table1.cellBackColRC(elementIndex-1, &quot;Alarm&quot;, configMessages[2]==&quot;Yes&quot;?&quot;green&quot;:&quot;lightgrey&quot;);
+    Table1.cellBackColRC(elementIndex-1, &quot;Archive&quot;, configMessages[3]==&quot;Yes&quot;?&quot;green&quot;:&quot;lightgrey&quot;);
+    Table1.cellBackColRC(elementIndex-1, &quot;Range&quot;, configMessages[4]==&quot;Yes&quot;?&quot;green&quot;:&quot;lightgrey&quot;);
+    Table1.cellBackColRC(elementIndex-1, &quot;Message Conversion&quot;, configMessages[5]==&quot;Yes&quot;?&quot;green&quot;:&quot;lightgrey&quot;);
+    Table1.cellBackColRC(elementIndex-1, &quot;Command Conversion&quot;, configMessages[6]==&quot;Yes&quot;?&quot;green&quot;:&quot;lightgrey&quot;);
+    Table1.cellBackColRC(elementIndex-1, &quot;Smoothing&quot;, configMessages[7]==&quot;Yes&quot;?&quot;green&quot;:&quot;lightgrey&quot;);
+	}
+    
+	Table1.lineVisible(0);
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 19</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Device Properties Overview</prop>
+     <prop name="en_US.iso88591">Device Properties Overview</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Table1" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9.999999999999998 73</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 73</prop>
+    <prop name="Size">1180 472</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">Property</prop>
+     <prop name="Width">275</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Property</prop>
+      <prop name="en_US.iso88591">Property</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">DPE</prop>
+     <prop name="Width">275</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">DPE</prop>
+      <prop name="en_US.iso88591">DPE</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">Address</prop>
+     <prop name="Width">70</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Address</prop>
+      <prop name="en_US.iso88591">Address</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">Alarm</prop>
+     <prop name="Width">60</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Alarm</prop>
+      <prop name="en_US.iso88591">Alarm</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">Archive</prop>
+     <prop name="Width">65</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Archive</prop>
+      <prop name="en_US.iso88591">Archive</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">Range</prop>
+     <prop name="Width">60</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Range</prop>
+      <prop name="en_US.iso88591">Range</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">Message Conversion</prop>
+     <prop name="Width">135</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Message conversion</prop>
+      <prop name="en_US.iso88591">Message conversion</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">Command Conversion</prop>
+     <prop name="Width">140</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Command conversion</prop>
+      <prop name="en_US.iso88591">Command conversion</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">Smoothing</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Smoothing</prop>
+      <prop name="en_US.iso88591">Smoothing</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+
+	int index, configType;
+	string dpe;
+	dyn_float returnedValues;
+	dyn_string exceptionInfo, returnedText, dollarParams;
+	dyn_anytype line;
+	
+	line = Table1.getLineN(row);
+//	DebugN(&quot;line &quot; + line);
+	index = dynContains(configColumns, column);
+	dpe = $sDpName + line[2];
+	
+	dollarParams = makeDynString(&quot;$sDpName:&quot; + $sDpName, &quot;$sDpe:&quot; + dpe);
+	
+	// for alarms an extra dollar parameter is required
+	if(column == &quot;Alarm&quot;)
+	{
+		dynAppend(dollarParams, &quot;$sSummaryDpe:.&quot;);	
+	}
+	
+	// if valid config, open panel to configure it and update cell
+	if (index &gt; 0)
+	{
+		ChildPanelOnCentralModalReturn(	configPanels[index],
+										column + &quot; Configuration for &quot; + $sDpName + value,
+										dollarParams,
+										returnedValues,
+										returnedText);
+		
+		dpGet(dpe + &quot;:_&quot; + configs[index] + &quot;.._type&quot;, configType);					
+//		DebugN(&quot;configs[index] &quot; + configs[index] + &quot; &quot; + index + &quot; &quot; + configType);
+
+		if(configType == DPCONFIG_NONE)
+    {
+			setValue(&quot;&quot;, &quot;cellValueRC&quot;, row, column, CONFIG_NOT_DEFINED);
+      setValue(&quot;&quot;, &quot;cellBackColRC&quot;, row, column, &quot;lightgrey&quot;);
+    }
+		else
+    {
+			setValue(&quot;&quot;, &quot;cellValueRC&quot;, row, column, CONFIG_DEFINED);	
+      setValue(&quot;&quot;, &quot;cellBackColRC&quot;, row, column, &quot;green&quot;);
+    }	
+	}
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.deleteAllLines();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1115 565</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1115 565</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="dpname" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Device name</prop>
+     <prop name="en_US.iso88591">Device name</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">1180 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	this.text = $sDpName;
+}
+]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="refHelpButton" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">1165 3</prop>
+    <prop name="Geometry">1 0 0 1 0 -1</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwDevice/fwDeviceProperties</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+   </properties>
+  </reference>
+ </shapes>
+</panel>

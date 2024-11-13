@@ -1,0 +1,709 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">1269 935</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+
+bool g_watchUser = true;
+const bool g_alertRow = false;  
+int g_stoppedTimeThread = -1;
+dyn_string g_missingSystems;
+dyn_string g_monitoredSystems;
+
+string sPropertiesDp = aes_getPropDpName(AES_DPTYPE_PROPERTIES, true, AESTAB_TOP, false, false); ]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  _fwAlarmScreenGeneric_saveColumnsSize();
+  PanelOff();
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{  
+  // Wait for the UI to be ready before doing anything.
+  while (!fwAlarmScreenGeneric_screenReady())
+  {
+    delay(0, 200);
+  }
+  
+  fwAlarmScreen_initUIElements();
+  fwAlarmScreen_initAES();
+}]]></script>
+ </events>
+ <shapes>
+  <reference parentSerial="-1" Name="PANEL_REF0" referenceId="0">
+   <properties>
+    <prop name="FileName">fwAlarmHandling/fwAlarmScreenGeneric.pnl</prop>
+    <prop name="Location">27 5</prop>
+    <prop name="Geometry">0.9999999999999967 0 0 1.000208968569006 -26.99999999999996 -5.000671188074607</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$ACTION</prop>
+      <prop name="Value">AES_ACTION_INTERACT</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$FILENAME</prop>
+      <prop name="Value">fwAES</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$SCREENTYPE</prop>
+      <prop name="Value">fwAES</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$bHideMainFrame</prop>
+      <prop name="Value">0</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sAlarmType</prop>
+      <prop name="Value">fwAlarmScreen</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sAlertFilterPanel</prop>
+      <prop name="Value">fwAlarmHandling/fwAlarmScreenAlertFilter.pnl</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sAlertFilterTitle</prop>
+      <prop name="Value">"Alarm filter"</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sHeaderPanel</prop>
+      <prop name="Value"></prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sHeaderTitle</prop>
+      <prop name="Value"></prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sInfoPanel</prop>
+      <prop name="Value"></prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sInfoTitle</prop>
+      <prop name="Value"></prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sTableFilterPanel</prop>
+      <prop name="Value">fwAlarmHandling/fwAlarmScreenTableFilter.pnl</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sTableFilterTitle</prop>
+      <prop name="Value">"Alarm groups"</prop>
+     </prop>
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sWindowTitle</prop>
+      <prop name="Value">"Alarms"</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+   <shape GroupPath="" RefShapeSerial="29" shapeType="RefShape" layerId="0">
+    <properties/>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="50" shapeType="RefShape" layerId="0">
+    <properties/>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="86" shapeType="RefShape" layerId="0">
+    <properties/>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="87" shapeType="RefShape" layerId="0">
+    <properties/>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="33" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameHeader.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="51" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameInfo.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="84" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameTableFilter.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="85" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameAlertFilter.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="19" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  int iLinesBefore = fwAlarmScreen_groups_countLines();
+  
+  fwAlarmScreenGeneric_expand();
+  
+  fwAlarmScreen_groups_adjustTableSize();
+  
+  int iLinesAfter = fwAlarmScreen_groups_countLines();
+  if (iLinesBefore != iLinesAfter)
+  {
+    fwAlarmScreen_groups_remove();
+    fwAlarmScreen_groups_show();    
+  }
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="22" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="COLOR" name="backCol">FwAlarmTitleBG</prop>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="24" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(this.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="26" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(this.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="27" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(this.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="30" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{ 
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameHeader.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="31" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameHeader.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="32" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameHeader.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="53" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameInfo.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="54" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameInfo.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="57" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{ 
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameTableFilter.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="59" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameTableFilter.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="62" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{ 
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameAlertFilter.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="63" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameAlertFilter.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="64" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameAlertFilter.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="52" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{ 
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameInfo.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="" RefShapeSerial="58" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreenGeneric_expandOrReduceFrame(frameTableFilter.name());
+  
+  fwAlarmScreen_groups_adjustTableSize();
+}]]></script>
+    </properties>
+   </shape>
+   <shape GroupPath="2" RefShapeSerial="17" shapeType="RefShape" layerId="0">
+    <properties>
+     <script type="CTRL_ONLY" name="leftClick" isEscaped="1"><![CDATA[main()
+{
+  fwAlarmScreen_groups_clearGroupAlarms();
+}]]></script>
+     <prop type="LANG_TEXT" name="toolTipText">
+      <prop name="en_US.utf8">Click to unselect group filter</prop>
+     </prop>
+    </properties>
+   </shape>
+   <shape GroupPath="3" RefShapeSerial="3" shapeType="RefShape" layerId="0">
+    <properties>
+     <prop type="BOOL" name="visible">True</prop>
+    </properties>
+   </shape>
+  </reference>
+  <shape Name="tableGroupAlarms" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">600 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">600 0</prop>
+    <prop name="Size">46 46</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">13</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int row, string column, string value)
+{
+  fwAlarmScreen_groups_groupTableClick(row, column, value);
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.tableMode(TABLE_SELECT_BROWSE);
+  this.selectByClick(TABLE_SELECT_LINE);
+}]]></script>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  fwAlarmScreenGeneric_onTableRightClick(row, column);
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="pushButtonHelp" referenceId="1">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">604 10</prop>
+    <prop name="Geometry">1.001602564102564 0 0 1.001602564102564 564.0320512820513 -8.016025641025641</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwAlarmHandling/fwAlarmHandlingScreen</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="printButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">90</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1138 900</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Print alarm table</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1138 900</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">printer.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	aes_as_printTable(sPropertiesDp, AES_TABLENAME_TOP, true);
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  shapeWithFocus.text(this.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="unselectRow" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">98</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1028 900</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1028 900</prop>
+    <prop name="Size">100 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Deselect rows</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_int lines;
+  
+  getValue(AES_TABLENAME_TOP, &quot;getSelectedLines&quot;, lines);
+  setValue(AES_TABLENAME_TOP, &quot;removeSelectLines&quot;, lines);
+  
+  tableGroupAlarms.deleteSelection();
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  shapeWithFocus.text(this.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="shapeWithFocus" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">166</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">750 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">750 0</prop>
+    <prop name="Size">23 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="inClosedMode" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">199</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">690 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">690 0</prop>
+    <prop name="Size">23 23</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="showDistDetails" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">200</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">660 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">660 0</prop>
+    <prop name="Size">23 23</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="currentUser" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">201</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">720 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">720 0</prop>
+    <prop name="Size">23 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text(&quot;-1&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="acNotAvailable" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">249</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">970 2.000000000000007</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">970 2</prop>
+    <prop name="Size">189 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.text = &quot;Access Control not available&quot;;
+}]]></script>
+    <script name="KeyboardFocusIn" isEscaped="1"><![CDATA[main()
+{
+  shapeWithFocus.text(this.name());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">302</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1184 900</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1184 900</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  _fwAlarmScreenGeneric_saveColumnsSize();
+  PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="fwAlarmScreen_watchUser" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">362</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">780 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">780 0</prop>
+    <prop name="Size">23 23</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

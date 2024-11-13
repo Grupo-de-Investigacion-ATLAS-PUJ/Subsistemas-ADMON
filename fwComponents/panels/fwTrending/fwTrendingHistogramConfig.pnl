@@ -1,0 +1,2810 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">PlotConfPanel</prop>
+   <prop name="en_US.iso88591">PlotConfPanel</prop>
+  </prop>
+  <prop name="Size">730 560</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+
+global string plotName, Command;
+int tableRowSelected;
+string customDPSelector;
+dyn_string exceptionInfo;
+string g_AccessRightsRequired = &quot;&quot;;
+
+// ------------------------------------------------------------------------------------------------
+
+checkHasSaveRights(string dp, string user)
+{
+  bool isAllowed=TRUE;
+  dyn_string exceptionInfo;
+
+  if(g_AccessRightsRequired!=&quot;&quot;)
+    fwAccessControl_isGranted(g_AccessRightsRequired, isAllowed, exceptionInfo);
+
+  ButtonOK.enabled = (isAllowed || (Command == &quot;onlineedit&quot;));
+  ButtonApply.enabled = isAllowed;
+  saveAsButton.enabled = isAllowed;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+fwShowAcOptions(bool shouldShow)
+{
+  acFrame.visible = shouldShow;
+  saveRights.visible = shouldShow;
+  saveRightsText.visible = shouldShow;
+  saveRightsSelect.visible = shouldShow;
+  accessControlOn.visible = shouldShow;
+  accessControlOnText.visible = shouldShow; 
+}
+
+// ------------------------------------------------------------------------------------------------
+
+fwEnableAcOptions(bool shouldEnable)
+{
+  saveRights.enabled = shouldEnable;
+  saveRightsSelect.enabled = shouldEnable;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+bool lighter(string _color, int _than) {
+  dyn_int colVals;
+  dyn_string colors;
+  int i, j;
+
+  // stupid fallback, in case of named color
+  if(strlen(_color) &lt; 7 || _color[0] != '{')
+    return TRUE;
+    
+  _color = strltrim(_color, &quot;{&quot;);
+  _color = strrtrim(_color, &quot;}&quot;);
+  colors = strsplit(_color, &quot;,&quot;);
+  for(i = 1; i &lt;= 3; i++) {
+    for(j = 0; j &lt; strlen(colors[i]); j++) {
+      switch (colors[i][j]) {
+        case '0': colVals[i] = colVals[i] * 10; break;
+        case '1': colVals[i] = colVals[i] * 10 + 1; break;
+        case '2': colVals[i] = colVals[i] * 10 + 2; break;
+        case '3': colVals[i] = colVals[i] * 10 + 3; break;
+        case '4': colVals[i] = colVals[i] * 10 + 4; break;
+        case '5': colVals[i] = colVals[i] * 10 + 5; break;
+        case '6': colVals[i] = colVals[i] * 10 + 6; break;
+        case '7': colVals[i] = colVals[i] * 10 + 7; break;
+        case '8': colVals[i] = colVals[i] * 10 + 8; break;
+        case '9': colVals[i] = colVals[i] * 10 + 9; break;
+      }
+    }
+  }
+  if(colVals[1] + colVals[2] + colVals[3] &gt; _than)
+    return TRUE;
+  else
+    return FALSE;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void dpeTextFieldCommand(int _num) 
+{
+  string dpe, _dpe, unit, comment;
+  int archive;
+  bool tempBool;
+
+  _dpe = getDpeFromTextField(&quot;DPTextField&quot; + _num);
+
+  fwTrending_getPlotDataDpeData(_dpe, dpe, unit, comment);
+  fwTrending_checkCurveName(dpSubStr(dpe, DPSUB_DP), tempBool, exceptionInfo);
+    
+  if(tempBool)
+  {
+    setValue(&quot;DPTextField&quot; + _num, &quot;toolTipText&quot;, dpe);
+  } 
+  else 
+  {
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The entered dpe name is not legal&quot;, &quot;&quot;);
+    fwExceptionHandling_display(exceptionInfo);
+    setValue(&quot;DPTextField&quot; + _num, &quot;toolTipText&quot;, &quot;Illegal dpe name&quot;);  
+  }
+  
+  if(dynlen(exceptionInfo) &gt; 0)
+  {
+    fwExceptionHandling_display(exceptionInfo);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void dpeButtonClick(int _num) {
+  string dpe = &quot;&quot;, legend = &quot;&quot;, rangeMinMax = &quot;&quot;;
+  float rangeMin, rangeMax;
+  dyn_string ranges;
+  int archive;
+  
+  dpSelector(dpe, FALSE);
+  if(dpe != &quot;&quot;) {
+      dpe = fwTrending_cleanAliasRepresentation(dpe);
+      setValue(&quot;DPTextField&quot; + _num, &quot;text&quot;, dpe);
+  }
+
+  legendTextFieldCommand(_num);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void legendTextFieldCommand(int _num) 
+{
+  string legend;
+    getValue(&quot;LegendTextField&quot; + _num, &quot;text&quot;, legend);
+    setValue(&quot;LegendTextField&quot; + _num, &quot;toolTipText&quot;, legend);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void colorButtonClick(int _num) {
+  dyn_int pos;
+  string color;
+  
+  getValue(&quot;ColorButton&quot; + _num, &quot;backCol&quot;, color);
+
+  colorEditor(color);
+  if(color != &quot;&quot;) {
+    setValue(&quot;ColorButton&quot; + _num, &quot;backCol&quot;, color);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void rangeMinTextFieldCommand(int _num) {
+    autoRangeCheckButtonUpdate(_num);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void rangeMaxTextFieldCommand(int _num) {
+    autoRangeCheckButtonUpdate(_num);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void autoRangeCheckButtonUpdate(int _num) {
+  string min, max;
+  getValue(&quot;RangeMinTextField&quot; + _num, &quot;text&quot;, min);
+  getValue(&quot;RangeMaxTextField&quot; + _num, &quot;text&quot;, max);
+  if((float)max &lt;= (float)min)
+    setValue(&quot;AutoRangeCheckButton&quot; + _num, &quot;state&quot;, 0, TRUE);
+  else
+    setValue(&quot;AutoRangeCheckButton&quot; + _num, &quot;state&quot;, 0, FALSE);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void autoRangeCheckButtonClick(int _num, bool _state) {
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void legendTextFieldFillByDP(int _num) 
+{
+  string dp;
+
+  dp = getDpeFromTextField(&quot;DPTextField&quot; + _num);
+  if(dpExists(dp)) 
+  {
+    string legend, comment, legendText;
+    getValue(&quot;LegendTextField&quot; + _num, &quot;text&quot;, legendText);
+    legend = dpGetAlias(dp);
+    legend += &quot;&quot; + dpGetComment(dp);
+    if(legendText == &quot;&quot;) 
+      setValue(&quot;LegendTextField&quot; + _num, &quot;text&quot;, legend);
+    legendTextFieldCommand(_num);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+string CheckInput(dyn_string &amp;exceptionInfo)
+{
+  bool tempBool;
+  string tempString, okStr = &quot;OK&quot;;
+
+  tempString = TextFieldTitle.text;
+  strreplace(tempString, fwTrending_TEMPLATE_OPEN, &quot;&quot;);
+  strreplace(tempString, fwTrending_TEMPLATE_CLOSE, &quot;&quot;);
+
+  if(!_fwTrending_isUnicosEnvironment(exceptionInfo))
+    strreplace(tempString, &quot; &quot;, &quot;&quot;);
+
+  tempBool = dpIsLegalName(tempString);
+   if((!tempBool) || (tempString == &quot;&quot;))
+  {
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The entered plot title is not legal&quot;, &quot;&quot;);
+    okStr = &quot;NoReturn&quot;;
+  }
+  
+  return okStr;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+ReadInput(dyn_dyn_string &amp;plotData, dyn_string &amp;exceptionInfo)
+{
+  bool tempBool;
+  string tempString;
+  int i, selectedPos;
+  dyn_string _dpesVal, _legendVal, _colorsVal, _rangeMinVal, _rangeMaxVal, _rangeMinValX, _rangeMaxValX;
+  dyn_bool _axiiVal,_hiddenVal;
+
+  _dpesVal = makeDynString(&quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;);
+  _legendVal = makeDynString(&quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;);
+  _colorsVal = makeDynString(&quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;);
+  _rangeMinVal = makeDynString(&quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;);
+  _rangeMaxVal = makeDynString(&quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;);
+
+  tempString = TextFieldTitle.text;
+  plotData[fwTrending_PLOT_OBJECT_MODEL][1] = fwTrending_HISTOGRAM_PLOT_MODEL;
+  plotData[fwTrending_PLOT_OBJECT_TITLE][1] = tempString;
+  plotData[fwTrending_PLOT_OBJECT_BACK_COLOR][1] = ButtonBackgroundColor.backCol;
+  plotData[fwTrending_PLOT_OBJECT_FORE_COLOR][1] = ButtonForegroundColor.backCol;
+
+  getValue(&quot;LegendCheckButton&quot;, &quot;state&quot;, 0, plotData[fwTrending_PLOT_OBJECT_LEGEND_ON][1]);
+  plotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC][1] = FALSE;
+  getValue(&quot;GridButton&quot;, &quot;state&quot;, 0, plotData[fwTrending_PLOT_OBJECT_GRID][1]);
+        plotData[fwTrending_PLOT_OBJECT_ACCESS_CONTROL_SAVE][1] = accessControlOn.state(0)?saveRights.text:&quot;&quot;;
+              
+  for( i = 1; i &lt;= 1; i++)
+  {    
+    _dpesVal[i] = getDpeFromTextField(&quot;DPTextField&quot; + i);
+    getValue(&quot;LegendTextField&quot; + i, &quot;text&quot;, _legendVal[i]);
+    getValue(&quot;ColorButton&quot; + i, &quot;backCol&quot;, _colorsVal[i]);
+    getValue(&quot;AutoRangeCheckButton&quot; + i, &quot;state&quot;, 0, tempBool);
+
+    if(tempBool)
+    {
+      setValue(&quot;RangeMinTextField&quot; + i, &quot;text&quot;, &quot;0&quot;);
+      setValue(&quot;RangeMaxTextField&quot; + i, &quot;text&quot;, &quot;0&quot;);
+    }
+    getValue(&quot;AutoRangeCheckButton&quot; + (i+1), &quot;state&quot;, 0, tempBool);
+    if(tempBool)
+    {
+      setValue(&quot;RangeMinTextField&quot; + (i+1), &quot;text&quot;, &quot;0&quot;);
+      setValue(&quot;RangeMaxTextField&quot; + (i+1), &quot;text&quot;, &quot;0&quot;);
+    }
+
+    getValue(&quot;RangeMinTextField&quot; + i, &quot;text&quot;, _rangeMinVal[i]);
+    getValue(&quot;RangeMaxTextField&quot; + i, &quot;text&quot;, _rangeMaxVal[i]);
+    plotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE][i] = _rangeMinVal[i] + fwTrending_AXIS_LIMITS_DIVIDER + _rangeMaxVal[i];
+    getValue(&quot;RangeMinTextField&quot; + (i+1), &quot;text&quot;, _rangeMinValX[i]);
+    getValue(&quot;RangeMaxTextField&quot; + (i+1), &quot;text&quot;, _rangeMaxValX[i]);
+    plotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE_X][i] = _rangeMinValX[i] + fwTrending_AXIS_LIMITS_DIVIDER + _rangeMaxValX[i];
+  }
+
+  plotData[fwTrending_PLOT_OBJECT_DPES] = _dpesVal;
+  plotData[fwTrending_PLOT_OBJECT_LEGENDS] = _legendVal;
+  plotData[fwTrending_PLOT_OBJECT_COLORS] = _colorsVal;
+  plotData[fwTrending_PLOT_OBJECT_RANGES_MIN] = _rangeMinVal;
+  plotData[fwTrending_PLOT_OBJECT_RANGES_MAX] = _rangeMaxVal;
+  plotData[fwTrending_PLOT_OBJECT_RANGES_MIN_X] = _rangeMinValX;
+  plotData[fwTrending_PLOT_OBJECT_RANGES_MAX_X] = _rangeMaxValX;
+  
+  plotData[fwTrending_PLOT_OBJECT_IS_TEMPLATE] = FALSE;
+  plotData[fwTrending_PLOT_OBJECT_TEMPLATE_NAME] = &quot;&quot;;
+  plotData[fwTrending_PLOT_OBJECT_TYPE] = 0;
+  plotData[fwTrending_PLOT_OBJECT_TIME_RANGE] = 0;
+  plotData[fwTrending_PLOT_OBJECT_MARKER_TYPE] = 0;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+ApplyCancelOKButtonClick(string button)
+{
+  string okStr = &quot;OK&quot;;
+  bool granted;
+  dyn_string priviledgeList, domainList, tempPlotData;
+  int i;
+  string tempString, tempString2, sDescription;
+  int tempInt, selectedPos, previousType;
+  bool tempBool, tempBool2, isConnected;
+  dyn_dyn_string plotData;
+  
+  if(button != &quot;Cancel&quot;)
+  {
+    okStr = CheckInput(exceptionInfo);
+  
+    if(dynlen(exceptionInfo) &gt; 0)
+      fwExceptionHandling_display(exceptionInfo);
+  }
+            
+  if((button != &quot;Cancel&quot;) &amp;&amp; (okStr != &quot;NoReturn&quot;))
+  {
+//DebugN(&quot;plotName:&quot;,plotName,&quot;System:&quot;,dpSubStr(plotName,DPSUB_SYS));
+    switch(Command) 
+    {
+      case &quot;copy&quot;:
+      case &quot;new&quot;: 
+      {
+        plotName = TextFieldName.text;
+
+        if(plotName == &quot;&quot;) 
+        {
+          fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;You did not enter a plot name&quot;, &quot;&quot;);
+          fwExceptionHandling_display(exceptionInfo);
+          okStr = &quot;NoReturn&quot;;
+        } 
+        else 
+        {
+          tempBool = dpIsLegalName(plotName);
+          if(tempBool)
+            if(!dpExists(plotName))
+             {
+          fwTrending_newPlot(plotName);
+          if(!dpExists(plotName))
+          {
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The plot could not be created&quot;, &quot;&quot;);
+                fwExceptionHandling_display(exceptionInfo);
+                okStr = &quot;NoReturn&quot;;
+          }
+         }
+            else
+            {
+              fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The entered plot name is already in use&quot;, &quot;&quot;);
+              fwExceptionHandling_display(exceptionInfo);
+              okStr = &quot;NoReturn&quot;;
+            }            
+          else 
+          {
+            fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The entered plot name is not legal&quot;, &quot;&quot;);
+            tempString = TextFieldTitle.text;
+//            tempBool = dpIsLegalName(tempString);
+            tempBool = TRUE;
+              if(!tempBool)
+              fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The entered plot title is not legal&quot;, &quot;&quot;);
+            fwExceptionHandling_display(exceptionInfo);
+            okStr = &quot;NoReturn&quot;;
+          }
+          if(okStr != &quot;NoReturn&quot;)
+          {
+//SMS now the device exists, so the fw functions need it WITH system name!
+//            plotName = getSystemName() + plotName;
+          }
+        }
+      }
+      case &quot;edit&quot;: 
+      case &quot;onlineedit&quot;:       
+      if(okStr != &quot;NoReturn&quot;)
+      {
+        TextFieldName.editable = FALSE;
+        TextFieldName.enabled = FALSE;
+        //change mode to edit once to config has been saved once
+        if(Command == &quot;new&quot;)
+          Command = &quot;edit&quot;;
+        
+        if(Command == &quot;onlineedit&quot;)
+        {
+          plotData = strsplit(getDollarValue(&quot;$dsPlotData&quot;), &quot;|&quot;);
+          for(i=1; i&lt;=fwTrending_SIZE_PLOT_OBJECT; i++)
+          {
+            plotData[i][1] = strltrim(plotData[i][1], &quot; &quot;);
+            plotData[i][1] = strrtrim(plotData[i][1], &quot; &quot;);
+            plotData[i] = strsplit(plotData[i][1], fwTrending_CONTENT_DIVIDER);
+          }
+        }
+        else
+          fwTrending_getPlot(plotName, plotData, exceptionInfo);
+
+        ReadInput(plotData, exceptionInfo);
+        if(Command != &quot;onlineedit&quot;)
+        {
+          _fwTrending_isSystemForDpeConnected(plotName, isConnected, exceptionInfo);
+          if(isConnected)
+                                        {
+                                          bool isAllowed;
+            if(g_AccessRightsRequired != &quot;&quot;)
+                                          {
+                                             fwAccessControl_isGranted(g_AccessRightsRequired, isAllowed, exceptionInfo);
+                                             if(!isAllowed)
+                                             {
+                                               fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The current access right for saving this page configuration is: &quot; + g_AccessRightsRequired
+                                                                  + &quot;. You do not have sufficient rights to continue.  Your changes have not been saved&quot;, &quot;&quot;);
+                                             }
+                                          }
+
+            if(plotData[fwTrending_PLOT_OBJECT_ACCESS_CONTROL_SAVE] != &quot;&quot;)
+                                          {
+                                            fwAccessControl_isGranted(plotData[fwTrending_PLOT_OBJECT_ACCESS_CONTROL_SAVE], isAllowed, exceptionInfo);
+                                            if(!isAllowed)
+                                            {
+                                               fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The proposed access control settings would mean you could no longer modify this page configuration. &quot; 
+                                                                  + &quot;You do not have the \&quot;&quot; + saveRights.text + &quot;\&quot; access right. &quot;
+                                                                  + &quot;Please modify your configuration.&quot;, &quot;&quot;);
+                                            }
+                                          }
+                                          
+                                          if(dynlen(exceptionInfo) == 0)
+                                          {
+                                            g_AccessRightsRequired = plotData[fwTrending_PLOT_OBJECT_ACCESS_CONTROL_SAVE];
+                                            fwTrending_setPlot(plotName, plotData, exceptionInfo);
+                                          }
+                                        }
+                                        else
+            fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The configuration can not be saved because \&quot;&quot; + plotName +
+                              &quot;\&quot; is from a remote system which is currently unavailable&quot;, &quot;&quot;);
+        }
+        else
+        {
+          for(i=1; i&lt;=fwTrending_MAX_NUM_CURVES; i++)
+          {
+            if(plotData[fwTrending_PLOT_OBJECT_DPES][i] != &quot;&quot;)
+            {
+              fwTrending_getPlotDataDpeData(plotData[fwTrending_PLOT_OBJECT_DPES][i], plotData[fwTrending_PLOT_OBJECT_DPES][i], plotData[fwTrending_PLOT_OBJECT_EXT_UNITS][i], sDescription);
+              plotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS][i] = plotData[fwTrending_PLOT_OBJECT_DPES][i] + &quot; [&quot; + plotData[fwTrending_PLOT_OBJECT_EXT_UNITS][i] + &quot;] &quot; + sDescription;
+            }
+          }
+        
+          for(i=1; i&lt;=fwTrending_SIZE_PLOT_OBJECT; i++)
+          {
+            fwTrending_convertDynToString(plotData[i], tempPlotData[i], exceptionInfo);
+            plotData[i] = makeDynString(tempPlotData[i]);
+          }
+        }
+
+      }
+      break;
+    }
+  
+  /* added by Herve */
+    if(button == &quot;Apply&quot;) {
+      if(isFunctionDefined(&quot;unTrendTree_deviceConfiguration_postExecution&quot;)) {
+        execScript(&quot;main()&quot;+
+                    &quot;{&quot;+
+                    &quot;    unTrendTree_deviceConfiguration_postExecution();&quot;+
+                    &quot;}&quot;, makeDynString());
+      }
+    }
+  /* end added by Herve */
+
+    if(dynlen(exceptionInfo) &gt; 0)
+      fwExceptionHandling_display(exceptionInfo);
+    else
+      if((button == &quot;OK&quot;) &amp;&amp; (okStr != &quot;NoReturn&quot;))
+        PanelOffReturn(makeDynFloat(0.0), makeDynString(okStr, TextFieldName.text, plotData));
+  } else
+    if(okStr != &quot;NoReturn&quot;) 
+      PanelOffReturn(makeDynFloat(0.0), makeDynString(&quot;Cancel&quot;, TextFieldName.text));
+}
+
+// ------------------------------------------------------------------------------------------------
+
+string getDpeFromTextField(string textField)
+{
+  string sText, sDpe;
+  
+  getValue(textField, &quot;text&quot;, sText);
+  
+  if(fwTrending_isAlias(sText))
+  {
+    sDpe = fwTrending_createAliasRepresentation(sText);
+  }
+  else
+  {
+    sDpe = sText;
+  }
+
+  return sDpe;
+}
+
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main() 
+{
+  int i;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="TextTitle" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">12 82</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">14 84</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Plot Title (Text)</prop>
+     <prop name="en_US.iso88591">Plot Title (Text)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="TextName" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">12 52</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">14 54</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Plot Name (DP)</prop>
+     <prop name="en_US.iso88591">Plot Name (DP)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text2" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 8</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,69,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,69,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Histogram Configuration</prop>
+     <prop name="en_US.iso88591">Histogram Configuration</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int iRes, i;
+  dyn_string exceptionInfo;
+
+  string tempString, originalData, sShowButtons;
+  int tempInt, selectedPos, position;
+  bool tempBool, showAcOptions = FALSE, isConnected = TRUE;
+  dyn_string buttons, _dpesVal, _legendVal, _colorsVal, _rangeMinVal, _rangeMaxVal, _rangeMinValX, _rangeMaxValX;
+  dyn_dyn_string plotData;
+  dyn_bool _axiiVal,_hiddenVal;
+  dyn_int curveTypes;
+  string sDpeName;
+  
+  sDpeName = &quot;TrendingConfiguration.customDPSelector&quot;;
+
+  while(!isFunctionDefined(&quot;ApplyCancelOKButtonClick&quot;));
+
+  plotName = $sDpName;
+  
+  if(isDollarDefined(&quot;$Command&quot;))
+  {
+    Command = strtolower($Command);
+    if(Command == &quot;&quot;) Command = &quot;edit&quot;;
+  }
+  else {
+    if(plotName == &quot;&quot;)
+      Command = &quot;new&quot;;
+    else
+      Command = &quot;edit&quot;;      
+  }
+
+  if(Command==&quot;new&quot;)
+    plotName = &quot;&quot;;
+
+  if((Command==&quot;copy&quot;) &amp;&amp; isDollarDefined(&quot;$sOriginalPlot&quot;))
+    plotName = getDollarValue(&quot;$sOriginalPlot&quot;);
+
+  //get configuration from DP
+// added by Herve
+// origanlly
+//  dpGet(&quot;TrendingConfiguration.customDPSelector:_online.._value&quot;, customDPSelector);  
+// now
+  if( (sDpeName != &quot;&quot;) &amp;&amp; (dpExists(sDpeName)) )
+  {
+    dpConnect(&quot;customDpSelectorCB&quot;, sDpeName);
+  }
+  else
+  {
+    DebugTN(&quot;Error in &quot; + myPanelName() + &quot;-&gt; main() -&gt; sDpeName = &quot; + sDpeName + &quot;, doesn't exist&quot;);
+    return;
+  }
+// end added by Herve
+  //get settings from DP and fill them into the fields
+  //en-/disable appropriate functions
+
+  if(isDollarDefined(&quot;$dsShowButtons&quot;))
+  {
+    sShowButtons = $dsShowButtons;
+    strreplace(sShowButtons, &quot; &quot;, &quot;&quot;);
+    sShowButtons = strtolower(sShowButtons);
+    buttons = strsplit(sShowButtons, &quot;|&quot;);
+    
+    if(dynContains(buttons, &quot;all&quot;) &gt; 0)
+    {
+      ButtonOK.visible = TRUE;
+      ButtonApply.visible = TRUE;
+      ButtonCancel.visible = TRUE;
+    }
+    else
+    {
+      if(dynContains(buttons, &quot;ok&quot;) &gt; 0)
+        ButtonOK.visible = TRUE;
+  
+      if(dynContains(buttons, &quot;apply&quot;) &gt; 0)
+        ButtonApply.visible = TRUE;
+  
+      if(dynContains(buttons, &quot;cancel&quot;) &gt; 0)
+        ButtonCancel.visible = TRUE;    
+    }
+  }
+  else
+  {
+    ButtonOK.visible = TRUE;
+    ButtonApply.visible = TRUE;
+    ButtonCancel.visible = TRUE;
+  }
+
+  if((Command == &quot;edit&quot;) || (Command == &quot;onlineedit&quot;))
+  {
+    TextFieldName.text = plotName;
+    TextFieldName.editable = FALSE;
+    TextFieldName.enabled = FALSE;
+    TextFieldTitle.editable = TRUE;
+    TextFieldTitle.enabled = TRUE;
+  }
+  else {
+    TextFieldName.editable = TRUE;
+    TextFieldName.enabled = TRUE;
+    TextFieldTitle.editable = TRUE;
+    TextFieldTitle.enabled = TRUE;
+  }  
+
+        if(Command == &quot;new&quot;)
+                showAcOptions = TRUE;
+        
+  if((Command == &quot;edit&quot;) || (Command == &quot;copy&quot;))
+  {
+                showAcOptions = TRUE;
+    _fwTrending_isSystemForDpeConnected(plotName, isConnected, exceptionInfo);
+    fwTrending_getPlot(plotName, plotData, exceptionInfo);
+  }
+
+  if(Command == &quot;onlineedit&quot;)
+  {
+    originalData = getDollarValue(&quot;$dsPlotData&quot;);
+    strreplace(originalData, &quot; | &quot;, &quot;|&quot;);
+    plotData = strsplit(originalData, &quot;|&quot;);
+    
+    for(i=1; i&lt;=fwTrending_SIZE_PLOT_OBJECT; i++)
+    {
+      fwTrending_convertStringToDyn(plotData[i][1], plotData[i], exceptionInfo);
+    }
+  }
+  
+  if((Command == &quot;edit&quot;) || (Command == &quot;onlineedit&quot;) || (Command == &quot;copy&quot;))
+  {
+    if(_fwTrending_isUnicosEnvironment(exceptionInfo))
+      strreplace(plotData[fwTrending_PLOT_OBJECT_TITLE][1], &quot; &quot;, &quot;&quot;);
+
+    TextFieldTitle.text = plotData[fwTrending_PLOT_OBJECT_TITLE][1];
+    
+    if(plotData[fwTrending_PLOT_OBJECT_TEMPLATE_NAME][1] != &quot;&quot;)
+    {
+      TextFieldTemplate.text = plotData[fwTrending_PLOT_OBJECT_TEMPLATE_NAME][1];
+      TextFieldTemplate.visible = TRUE;
+      TextTemplate.visible = TRUE;
+    } else {
+      TextFieldTemplate.visible = FALSE;
+      TextTemplate.visible = FALSE;
+    }
+  
+    if(plotData[fwTrending_PLOT_OBJECT_BACK_COLOR][1] == &quot;&quot;)
+    {
+      ButtonBackgroundColor.backCol = &quot;FwTrendingTrendBackground&quot;;
+    } else {
+      ButtonBackgroundColor.backCol = plotData[fwTrending_PLOT_OBJECT_BACK_COLOR][1];
+    }
+    
+    if(plotData[fwTrending_PLOT_OBJECT_FORE_COLOR][1] == &quot;&quot;)
+    {
+      ButtonForegroundColor.backCol = &quot;FwTrendingTrendForeground&quot;;
+    } else {
+      ButtonForegroundColor.backCol = plotData[fwTrending_PLOT_OBJECT_FORE_COLOR][1];
+    }
+      
+    setValue(&quot;LegendCheckButton&quot;, &quot;state&quot;, 0, plotData[fwTrending_PLOT_OBJECT_LEGEND_ON][1]);
+    setValue(&quot;LogScaleButton&quot;, &quot;state&quot;, 0, plotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC][1]);
+    setValue(&quot;GridButton&quot;, &quot;state&quot;, 0, plotData[fwTrending_PLOT_OBJECT_GRID][1]);
+  
+    g_AccessRightsRequired = plotData[fwTrending_PLOT_OBJECT_ACCESS_CONTROL_SAVE][1];
+    setValue(&quot;saveRights&quot;, &quot;text&quot;, g_AccessRightsRequired);
+    setValue(&quot;accessControlOn&quot;, &quot;state&quot;, 0, (g_AccessRightsRequired==&quot;&quot;)?FALSE:TRUE);
+    fwEnableAcOptions(g_AccessRightsRequired!=&quot;&quot;);
+                
+    _dpesVal = plotData[fwTrending_PLOT_OBJECT_DPES];
+    _legendVal = plotData[fwTrending_PLOT_OBJECT_LEGENDS];
+    _colorsVal = plotData[fwTrending_PLOT_OBJECT_COLORS];
+    _axiiVal = plotData[fwTrending_PLOT_OBJECT_AXII];
+    _hiddenVal = plotData[fwTrending_PLOT_OBJECT_CURVES_HIDDEN];
+    _rangeMinVal = plotData[fwTrending_PLOT_OBJECT_RANGES_MIN];
+    _rangeMaxVal = plotData[fwTrending_PLOT_OBJECT_RANGES_MAX];
+    _rangeMinValX = plotData[fwTrending_PLOT_OBJECT_RANGES_MIN_X];
+    _rangeMaxValX = plotData[fwTrending_PLOT_OBJECT_RANGES_MAX_X];
+    curveTypes = plotData[fwTrending_PLOT_OBJECT_CURVE_TYPES];
+    
+    for( i = 1; (i &lt;= 1) &amp;&amp; (i &lt;= dynlen(_dpesVal)); i++)
+    {
+      // dpes
+      if(dynlen(_dpesVal) &gt;= i &amp;&amp; _dpesVal[i] != &quot;&quot;) 
+      {
+        position = strpos(_dpesVal[i], fwTrending_ON_VAL);
+        if(position &gt;= 0)
+          _dpesVal[i] = substr(_dpesVal[i], 0, position);
+        _dpesVal[i] = fwTrending_cleanAliasRepresentation(_dpesVal[i]);
+        setValue(&quot;DPTextField&quot; + i, &quot;text&quot;, _dpesVal[i]);
+      } else {
+        setValue(&quot;DPTextField&quot; + i, &quot;text&quot;, &quot;&quot;);
+        _hiddenVal[i] = FALSE;
+      }
+      dpeTextFieldCommand(i);
+      
+      // legend
+      if(dynlen(_legendVal) &gt;= i) 
+        setValue(&quot;LegendTextField&quot; + i, &quot;text&quot;, _legendVal[i]);
+      else
+        setValue(&quot;LegendTextField&quot; + i, &quot;text&quot;, &quot;&quot;);
+      legendTextFieldCommand(i);
+      
+      // colors
+      if(dynlen(_colorsVal) &gt;= i &amp;&amp; _colorsVal[i] != &quot;&quot;) 
+      {
+        setValue(&quot;ColorButton&quot; + i, &quot;backCol&quot;, _colorsVal[i]);
+        if(lighter(_colorsVal[i], 300))
+          setValue(&quot;ColorButton&quot; + i, &quot;foreCol&quot;, &quot;{0,0,0}&quot;);
+        else
+          setValue(&quot;ColorButton&quot; + i, &quot;foreCol&quot;, &quot;{255,255,255}&quot;);
+      }
+      else 
+      {
+        setValue(&quot;ColorButton&quot; + i, &quot;foreCol&quot;, &quot;{0,0,0}&quot;);
+      }
+              
+      if(dynlen(_rangeMinVal) &gt;= i)
+        setValue(&quot;RangeMinTextField&quot; + i, &quot;text&quot;, _rangeMinVal[i]);
+      else
+        setValue(&quot;RangeMinTextField&quot; + i, &quot;text&quot;, 0);
+      if(dynlen(_rangeMaxVal) &gt;= i)
+        setValue(&quot;RangeMaxTextField&quot; + i, &quot;text&quot;, _rangeMaxVal[i]);
+      else
+        setValue(&quot;RangeMaxTextField&quot; + i, &quot;text&quot;, 0);
+        
+      autoRangeCheckButtonUpdate(i);
+      if(dynlen(_rangeMinValX) &gt;= i)
+        setValue(&quot;RangeMinTextField&quot; + (i+1), &quot;text&quot;, _rangeMinValX[i]);
+      else
+        setValue(&quot;RangeMinTextField&quot; + (i+1), &quot;text&quot;, 0);
+      if(dynlen(_rangeMaxValX) &gt;= i)
+        setValue(&quot;RangeMaxTextField&quot; + (i+1), &quot;text&quot;, _rangeMaxValX[i]);
+      else
+        setValue(&quot;RangeMaxTextField&quot; + (i+1), &quot;text&quot;, 0);
+        
+      autoRangeCheckButtonUpdate((i+1));
+    }
+  }
+
+        if(isFunctionDefined(&quot;fwAccessControl_setupPanel&quot;))
+          fwShowAcOptions(showAcOptions);
+        
+  if(isConnected)
+  {
+    // Access Control
+    if(isFunctionDefined(&quot;unGenericDpFunctionsHMI_setCallBack_user&quot;))
+    {
+      unGenericDpFunctionsHMI_setCallBack_user(&quot;unGenericButtonFunctionsHMI_TrendingHistogramConfigselectCB&quot;, iRes, exceptionInfo);
+    }
+                else if(isFunctionDefined(&quot;fwAccessControl_setupPanel&quot;))
+                {
+                  fwAccessControl_setupPanel(&quot;checkHasSaveRights&quot;, exceptionInfo);
+                }                 
+  }
+  else
+  {
+    ButtonOK.enabled = FALSE;
+    ButtonApply.enabled = FALSE;
+    saveAsButton.enabled = FALSE;
+
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The data point \&quot;&quot; + plotName +
+                      &quot;\&quot; can not be edited because it is from a remote system which is currently unavailable&quot;, &quot;&quot;);
+  }
+  
+  if(dynlen(exceptionInfo)&gt;0)
+    fwExceptionHandling_display(exceptionInfo);
+}
+
+// added by Herve
+customDpSelectorCB(string sDpe, string sCustomDpSelector)
+{
+  customDPSelector = sCustomDpSelector;
+}
+// end added by Herve
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="Text1" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">132</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">401 105</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">392 55</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Background Color</prop>
+     <prop name="en_US.iso88591">Background Color</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text3" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">42</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 182</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Data Source DP Element</prop>
+     <prop name="en_US.iso88591">Data Source DP Element</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text4" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">43</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">328 540</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">327 182</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Legend Text</prop>
+     <prop name="en_US.iso88591">Legend Text</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text5" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">44</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">570 900</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">531 182</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Color</prop>
+     <prop name="en_US.iso88591">Color</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="TemplateText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">213</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">207 576</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">93</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 472</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Plot Template</prop>
+     <prop name="en_US.iso88591">Plot Template</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="TextTemplate" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">260</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">395 105</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">115</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">392 54</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Based on</prop>
+     <prop name="en_US.iso88591">Based on</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Frame1" shapeType="FRAME">
+   <properties>
+    <prop name="serialId">265</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 105</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">120</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.22222222222222 0 -7.11111111111111</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 32</prop>
+    <prop name="Size">715 73</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="ApplyToAllText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">272</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1542 1010</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">127</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">372 472</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply changes to all plots 
+based on this one.</prop>
+     <prop name="en_US.iso88591">Apply changes to all plots 
+based on this one.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text18" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">347</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">577 105</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">197</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">572 55</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Foreground Color</prop>
+     <prop name="en_US.iso88591">Foreground Color</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Frame2" shapeType="FRAME">
+   <properties>
+    <prop name="serialId">371</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 240</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">213</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.39240506329114 0 -62.7848101265823</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Histogram Data</prop>
+     <prop name="en_US.iso88591">Histogram Data</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 160</prop>
+    <prop name="Size">710 80</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="LegendCheckButton" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">212</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">6490 266</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">253</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">390 86</prop>
+    <prop name="Size">101 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show Legend</prop>
+       <prop name="en_US.iso88591">Show Legend</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="ButtonBackgroundColor" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">131</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">633 192</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">FwTrendingTrendBackground</prop>
+    <prop name="TabOrder">251</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">500 52</prop>
+    <prop name="Size">31 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{
+  string color;
+  color = this.backCol;
+  colorEditor(color);
+  this.backCol = color;
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="TextFieldTitle" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">110 82</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">250</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">110 82</prop>
+    <prop name="Size">271 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="TextFieldName" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">110 52</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">249</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">110 52</prop>
+    <prop name="Size">271 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="DPTextField1" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 204</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">256</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 204</prop>
+    <prop name="Size">261 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[const int NUM = 1;
+
+main() {
+  dpeTextFieldCommand(NUM);
+  legendTextFieldFillByDP(NUM);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[const int NUM = 1;
+
+main() {
+  dpeTextFieldCommand(NUM);
+  legendTextFieldFillByDP(NUM);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="DPEButton1" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">520 564</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">257</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">285 204</prop>
+    <prop name="Size">21 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">...</prop>
+     <prop name="en_US.iso88591">...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[const int NUM = 1;
+
+main() {
+  dpeButtonClick(NUM);
+  legendTextFieldFillByDP(NUM);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="LegendTextField1" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">332 580</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">258</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">325 204</prop>
+    <prop name="Size">186 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[const int NUM = 1;
+
+main() {
+  legendTextFieldCommand(NUM);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[const int NUM = 1;
+
+main() {
+  legendTextFieldCommand(NUM);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ColorButton1" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">537 204</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">FwTrendingCurve1</prop>
+    <prop name="TabOrder">259</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">537 204</prop>
+    <prop name="Size">21 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[const int NUM = 1;
+
+main() {
+  colorButtonClick(NUM);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ButtonOK" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">430 520</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">270</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">430 520</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{
+  ApplyCancelOKButtonClick(&quot;OK&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ButtonCancel" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">630 520</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">272</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Hotkey">Esc</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">630 520</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  ApplyCancelOKButtonClick(&quot;Cancel&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="TemplateCheckButton" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">214</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1100 760</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">273</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Courier New,-1,12,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Courier New,-1,12,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">100 470</prop>
+    <prop name="Size">11 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">CheckButton1</prop>
+       <prop name="en_US.iso88591">CheckButton1</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  dpSet(plotName + fwTrending_PLOT_IS_TEMPLATE + fwTrending_ORIG_VAL, state);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="TextFieldTemplate" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">259</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">542 132</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">274</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">460 52</prop>
+    <prop name="Size">251 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="ApplyToAllCheckButton" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">269</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">530 470</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">275</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">530 470</prop>
+    <prop name="Size">11 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">CheckButton2</prop>
+       <prop name="en_US.iso88591">CheckButton2</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="LogScaleButton" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">284</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">636 86</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">255</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">636 86</prop>
+    <prop name="Size">81 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Log scale</prop>
+       <prop name="en_US.iso88591">Log scale</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="ButtonForegroundColor" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">348</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">813 192</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">FwTrendingTrendForeground</prop>
+    <prop name="TabOrder">252</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">680 52</prop>
+    <prop name="Size">31 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{
+  string color;
+  color = this.backCol;
+  colorEditor(color);
+  this.backCol = color;
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ButtonApply" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">359</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">530 520</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">271</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">530 520</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+     <prop name="en_US.iso88591">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{
+  ApplyCancelOKButtonClick(&quot;Apply&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="GridButton" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">365</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">523 86</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">254</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">523 86</prop>
+    <prop name="Size">81 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Show Grid</prop>
+       <prop name="en_US.iso88591">Show Grid</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="saveAsButton" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">369</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 520</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">269</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 520</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Save as...</prop>
+     <prop name="en_US.iso88591">Save as...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{
+  bool isFromDp, newDp = FALSE;
+  string proposedName, sDpName;
+  dyn_float df;
+  dyn_string ds, exceptionInfo;
+  dyn_dyn_string plotData;
+
+  CheckInput(exceptionInfo);
+  if(dynlen(exceptionInfo)&gt;0)
+  {
+    fwExceptionHandling_display(exceptionInfo);
+    return;
+  }
+
+  sDpName = TextFieldName.text;
+  proposedName = dpGetAlias(sDpName + &quot;.&quot;);
+  if(proposedName == &quot;&quot;)
+    proposedName = dpSubStr(sDpName, DPSUB_DP);
+  ChildPanelOnCentralReturn(&quot;fwTrending/fwTrendingSaveAsSelector.pnl&quot;, &quot;Save plot settings as...&quot;,
+                              makeDynString(&quot;$sDpType:&quot; + fwTrending_PLOT, &quot;$sProposedName:&quot; + proposedName), df, ds);
+  if(ds[1] == &quot;ok&quot;)
+  {
+    ReadInput(plotData, exceptionInfo);
+    if(!dpExists(ds[2]))
+    {
+      fwTrending_createPlot(ds[2], exceptionInfo);
+      newDp = TRUE;
+    }
+    fwTrending_setPlot(ds[2], plotData, exceptionInfo);
+
+    isFromDp = !((TextFieldName.enabled) || (TextFieldName.text == &quot;&quot;));
+//DebugN(&quot;Call UNICOS&quot;, newDp, isFromDp);
+
+    if(isFunctionDefined(&quot;unTrendTree_savePlotAs&quot;))
+    {
+      unTrendTree_savePlotAs(ds[2], newDp, isFromDp, exceptionInfo);
+    }
+  }
+
+  if(dynlen(exceptionInfo)&gt;0)
+  {
+    fwExceptionHandling_display(exceptionInfo);
+    return;
+  }
+}]]></script>
+   </events>
+  </shape>
+  <reference referenceId="0" Name="Group2" parentSerial="-1">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">364 10</prop>
+    <prop name="Geometry">1 0 0 1 332 -3</prop>
+    <prop name="TabOrder">276</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwTrending/fwTrendingHistogramConfig</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape layerId="0" Name="acNotAvailable" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">373</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">480 9</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">277</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">480 9</prop>
+    <prop name="Size">189 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int x, y;
+  
+  getValue(&quot;&quot;, &quot;position&quot;, x, y);
+  
+  for(int i=1 ; i&lt;7 ; i++)
+  {
+    if(!strlen(Command))
+      delay(0,100);
+    else
+      break;
+  }
+  if(Command!=&quot;onlineedit&quot;) 
+  {
+    if(getPath(PANELS_REL_PATH, &quot;objects/fwAccessControl/fwAccessControl_CurrentUser.pnl&quot;) != &quot;&quot;)
+      addSymbol(myModuleName(), myPanelName(), &quot;objects/fwAccessControl/fwAccessControl_CurrentUser.pnl&quot;, &quot;currentUser&quot;, makeDynString(), x, y-16, 0, 1, 1);
+    else
+    {
+      this.visible = TRUE;
+      this.text = &quot;Access Control not available&quot;;
+    }
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="accessControlOn" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">374</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 312</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">266</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 312</prop>
+    <prop name="Size">21 31</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  fwEnableAcOptions(state);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="accessControlOnText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">375</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 312</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">219</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">50 312</prop>
+    <prop name="Size">131 31</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Protect configuration
+with access control</prop>
+     <prop name="en_US.iso88591">Protect configuration
+with access control</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="saveRights" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">376</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">290 318</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">267</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">290 318</prop>
+    <prop name="Size">181 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="saveRightsSelect" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">377</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">480 314</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">268</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Leave filter unchanged</prop>
+     <prop name="en_US.iso88591">Leave filter unchanged</prop>
+    </prop>
+    <prop name="Hotkey">Esc</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">480 314</prop>
+    <prop name="Size">71 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Choose</prop>
+     <prop name="en_US.iso88591">Choose</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string privileges, exceptionInfo;
+    
+  privileges[1] = saveRights.text;
+  if(isFunctionDefined(&quot;fwAccessControl_selectPrivileges&quot;))
+  {
+    fwAccessControl_selectPrivileges(privileges, &quot;Please choose access right&quot;);
+    if(dynlen(privileges))
+      saveRights.text = privileges[1];    
+  }
+  else
+  {
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The access control component is not installed.&quot;, &quot;&quot;);
+    fwExceptionHandling_display(exceptionInfo); 
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="saveRightsText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">378</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">191 322</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">225</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">191 322</prop>
+    <prop name="Size">91 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Required Right:</prop>
+     <prop name="en_US.iso88591">Required Right:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="acFrame" shapeType="FRAME">
+   <properties>
+    <prop name="serialId">379</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 470</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">227</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.4125636672326 0 -307.514431239389</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Global Settings for this plot</prop>
+     <prop name="en_US.iso88591">Global Settings for this plot</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 423</prop>
+    <prop name="Size">715 47</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="InstructionsText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">382</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">4165 722</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">230</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 472</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Template parameters can be defined in the plot title, dp elements and legends using {} brackets
+e.g. System:{datapoint}.value  The template parameter values are passed to the plot when it is displayed.</prop>
+     <prop name="en_US.iso88591">Template parameters can be defined in the plot title, dp elements and legends using {} brackets
+e.g. System:{datapoint}.value  The template parameter values are passed to the plot when it is displayed.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text8" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">384</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">591 510</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">232</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">590 182</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Min</prop>
+     <prop name="en_US.iso88591">Min</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text9" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">385</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">757 650</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">234</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">640 182</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Max</prop>
+     <prop name="en_US.iso88591">Max</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text11" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">386</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1527 850</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">236</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">678 182</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Auto</prop>
+     <prop name="en_US.iso88591">Auto</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="RangeMinTextField1" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">387</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">584 204</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">260</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">584 204</prop>
+    <prop name="Size">46 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[const int NUM = 1;
+main()
+{
+  rangeMinTextFieldCommand(NUM);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[const int NUM = 1;
+main()
+{
+  rangeMinTextFieldCommand(NUM);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="RangeMaxTextField1" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">388</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1670 414</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">261</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">635 204</prop>
+    <prop name="Size">46 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[const int NUM = 1;
+main()
+{
+  rangeMaxTextFieldCommand(NUM);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[const int NUM = 1;
+main()
+{
+  rangeMaxTextFieldCommand(NUM);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="AutoRangeCheckButton1" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">389</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">7327 2721</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">262</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Courier New,-1,12,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Courier New,-1,12,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">687 204</prop>
+    <prop name="Size">11 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">CheckButton1</prop>
+       <prop name="en_US.iso88591">CheckButton1</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[const int NUM = 1;
+main(int button, bool state)
+{
+  autoRangeCheckButtonClick(NUM, state);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="RangeMinTextField2" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">390</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">584 234</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">263</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">584 234</prop>
+    <prop name="Size">46 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[const int NUM = 2;
+main()
+{
+  rangeMinTextFieldCommand(NUM);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[const int NUM = 2;
+main()
+{
+  rangeMinTextFieldCommand(NUM);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="RangeMaxTextField2" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">391</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1670 440.410256410256</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">264</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">635 234</prop>
+    <prop name="Size">46 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[const int NUM = 2;
+main()
+{
+  rangeMaxTextFieldCommand(NUM);
+}]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[const int NUM = 2;
+main()
+{
+  rangeMaxTextFieldCommand(NUM);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="AutoRangeCheckButton2" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">392</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">7327 2707.97435897436</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">265</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Courier New,-1,12,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Courier New,-1,12,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">687 234</prop>
+    <prop name="Size">11 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">CheckButton1</prop>
+       <prop name="en_US.iso88591">CheckButton1</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[const int NUM = 1;
+main(int button, bool state)
+{
+  autoRangeCheckButtonClick(NUM, state);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT7" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">393</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">593 559.2956076155723</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">250</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">572 240.0341880341881</prop>
+    <prop name="Size">8 18</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">X</prop>
+     <prop name="en_US.iso88591">X</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PRIMITIVE_TEXT8" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">394</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">572 538</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">252</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">571 210</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Y</prop>
+     <prop name="en_US.iso88591">Y</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

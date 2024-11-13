@@ -1,0 +1,572 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">269 129</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">20 60</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[bool pnlGetElmbName(string sDpName,
+										string &amp;sElmbName)
+{
+// Local Variables
+// ---------------
+	bool bStatus = false;
+	
+	dyn_string dsTemp;
+	
+// Executable Code
+// ---------------
+	// Get the name of the ELMB from the DP
+	dsTemp = strsplit(sDpName, fwDevice_HIERARCHY_SEPARATOR);
+	
+	if (dynlen(dsTemp) &gt; 2) {
+		sElmbName = dsTemp[1] + fwDevice_HIERARCHY_SEPARATOR + dsTemp[2] + fwDevice_HIERARCHY_SEPARATOR + dsTemp[3];
+		
+		// Check this DP exists and that it is of the correct type
+		if (dpExists(sElmbName)) {
+			if (dpTypeName(sElmbName) == ELMB_TYPE_NAME)
+				bStatus = true;
+		}
+	}
+
+	// Return to calling routine
+	return (bStatus);
+}
+
+void pnlIntToString(int src, string &amp;str)
+{
+// Local Variables
+// ---------------
+	char cTemp;
+	
+	int i, iTemp;
+	
+	string sTemp;
+	string sChar;
+	
+	dyn_string dsTemp;
+	
+// Executable Code
+// ---------------
+	// Convert decimal value to hex
+	sprintf(sTemp, &quot;%x&quot;, src);
+
+	// Loop through hex 'string', obtaining individual bytes (i.e. pairs of two hex digits)
+	for (i = 0; i &lt; strlen(sTemp); i += 2) {
+		sChar = substr(sTemp, i, 2);
+		dynAppend(dsTemp, sChar);
+	} 
+	
+	// Loop through the 'bytes', converting values to integers, then casting to ASCII characters
+	for (i = 1; i &lt;= dynlen(dsTemp); i++) {
+		sscanf(dsTemp[i], &quot;%x&quot;, iTemp);
+		
+		// Cast to ascii
+		cTemp = iTemp;
+		dsTemp[i] = cTemp;
+	}
+	
+	// Concatenate each character to create the final string
+	for (i = 1; i &lt;= dynlen(dsTemp); i++) 
+		str += dsTemp[dynlen(dsTemp) - (i - 1)];
+
+	// Return to calling routine
+	return;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="lblHwVer" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 60</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 62</prop>
+    <prop name="Size">107 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Hardware version:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblSwVer" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 32</prop>
+    <prop name="Size">107 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Software version:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmFirmware" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Firmware</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Size">250 110</prop>
+   </properties>
+  </shape>
+  <shape Name="lblDash" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">180 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">182 32</prop>
+    <prop name="Size">17 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">-</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblSerialNumber" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 92</prop>
+    <prop name="Size">87 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Serial Number:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtSwVer" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">130 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 30</prop>
+    <prop name="Size">51 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+  string sElmbName;
+
+// Executable Code
+// ---------------
+  if (pnlGetElmbName($sDpName, sElmbName)) {
+
+    // Connect to the SW version information
+    dpConnect(&quot;cbkSWVersion&quot;, false,
+              sElmbName + &quot;.swVersion&quot;);
+  }
+	
+  // Return to calling routine
+  return;
+}
+
+void cbkSWVersion(string sSWVersionDpe, unsigned uSWVersion)
+{
+// Local Variables
+// ---------------
+  bool bSNValid = false;
+  bool bSubVersionValid = false;
+	
+  int iSWVersion;
+	
+  string sSwVersion;
+  string sTemp;
+
+// Executable Code
+// ---------------
+  pnlIntToString(uSWVersion, sSwVersion);
+  txtSwVer.text = sSwVersion;
+	
+  if (strlen(sSwVersion) == 4) {
+    sTemp = substr(sSwVersion, 2, 2);
+    iSWVersion = sTemp;
+		
+    // Check if we expect a serial number to exist (only after MA36)
+    if ((substr(sSwVersion, 0, 2) == &quot;MA&quot;) &amp;&amp; (iSWVersion &gt; 36))
+      bSNValid = true;
+			
+    // Check if a software minor version should exist (only after MA41)
+    if ((substr(sSwVersion, 0, 2) == &quot;MA&quot;) &amp;&amp; (iSWVersion &gt; 41))
+      bSubVersionValid = true;
+  }
+	
+  // Set controls depending on SW version
+  if (!bSNValid)
+    txtSerialNumber.text = &quot;N/A&quot;;
+		
+  if (bSubVersionValid) {
+    lblDash.visible = true;
+    txtSwSubVer.visible = true;
+  } else {
+    lblDash.visible = false;
+    txtSwSubVer.visible = false;
+  }
+
+  // Return to calling routine
+  return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="txtHwVer" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">130 60</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 60</prop>
+    <prop name="Size">51 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+  string sElmbName;
+
+// Executable Code
+// ---------------
+  if (pnlGetElmbName($sDpName, sElmbName)) {
+	
+    // Connect to the SW version information
+    dpConnect(&quot;cbkHWVersion&quot;, false,
+              sElmbName + &quot;.hwVersion&quot;);
+  }
+	
+  // Return to calling routine
+  return;			  
+}
+
+void cbkHWVersion(string sHWVersionDpe, unsigned uHWVersion)
+{
+// Local Variables
+// ---------------
+  string sHwVersion;
+
+// Executable Code
+// ---------------
+  pnlIntToString(uHWVersion, sHwVersion);
+  txtHwVer.text = sHwVersion;
+
+  // Return to calling routine
+  return;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="txtSwSubVer" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">200 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 30</prop>
+    <prop name="Size">51 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+  string sElmbName;
+
+// Executable Code
+// ---------------
+  if (pnlGetElmbName($sDpName, sElmbName)) {
+	
+    // Connect to the SW version information
+    dpConnect(&quot;cbkSWSubVersion&quot;, false,
+              sElmbName + &quot;.swMinorVersion&quot;);
+  }
+
+  // Return to calling routine
+  return;
+}
+
+void cbkSWSubVersion(string sSWSubVersionDpe, unsigned uSWSubVersion)
+{
+// Local Variables
+// ---------------
+  string sSwSubVersion;
+
+// Executable Code
+// ---------------
+  pnlIntToString(uSWSubVersion, sSwSubVersion);
+  txtSwSubVer.text = sSwSubVersion;
+
+  // Return to calling routine
+  return;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="txtSerialNumber" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">130 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 90</prop>
+    <prop name="Size">51 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	string sElmbName;
+
+// Executable Code
+// ---------------
+	if (pnlGetElmbName($sDpName, sElmbName)) {
+	
+		// Connect to the SW version information
+		dpConnect(&quot;cbkSerialNumber&quot;, false,
+						  sElmbName + &quot;.serialNumber&quot;);
+	}
+
+	// Return to calling routine
+	return;
+}
+
+void cbkSerialNumber(string sSerialNumberDpe, unsigned uSerialNumber)
+{
+// Local Variables
+// ---------------
+	string sSN;
+
+// Executable Code
+// ---------------
+	// Get any text from the SW version field
+	pnlIntToString(uSerialNumber, sSN);
+	txtSerialNumber.text = sSN;
+
+	// Return to calling routine
+	return;
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

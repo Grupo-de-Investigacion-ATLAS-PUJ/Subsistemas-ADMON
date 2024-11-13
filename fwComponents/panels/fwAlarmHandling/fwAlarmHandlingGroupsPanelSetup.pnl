@@ -1,0 +1,871 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">706 414</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[/* 
+   @author Marco Boccioli
+*/
+
+#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+int g_oldW, g_oldH;
+
+saveSettings()
+{ 
+  dyn_string exceptionInfo;
+  //save sound settings
+  if(dpExists(fwAlarmHandlingGroups_SOUNDENABLED_DP))
+  {
+    dpSetWait(fwAlarmHandlingGroups_SOUNDENABLED_DP, ckEnabled.state(0),
+              fwAlarmHandlingGroups_SOUNDFILE_DP, lblPathW.text,
+              fwAlarmHandlingGroups_SOUNDSOURCE_DP, radioSource.number,
+              fwAlarmHandlingGroups_SOUNDINHIBIT_DP, spnInhibit.text);
+  }   
+  //save geometry settings  
+  if(spW.text != g_oldW || spH.text != g_oldH)
+  {
+     string fname=getPath(PANELS_REL_PATH, &quot;fwAlarmHandling/fwAlarmHandlingGroupsScreen.pnl&quot;);
+     string st,line;
+     string fnewname = fname + &quot;.tmp&quot;;
+     dyn_string spl; 
+     dyn_string panelAscii; 
+     file f, newF; 
+     int ret, i, settingLineNumber; 
+     bool lineFound;
+     i=access(fname,W_OK); // panel writeable? 
+     if (i==0) // yes
+     { 
+        f=fopen(fname,&quot;r+&quot;); // Create a new panel 
+        for (i=1 ; i&lt;=20 &amp;&amp; !lineFound ; i++)
+        {
+          fgets(line, 99999, f);
+          lineFound=(strpos(line, &quot;PANEL,&quot;)==0 &amp;&amp; strpos(line, &quot; N \&quot;&quot;)&gt;13);
+          if(lineFound) settingLineNumber=i;
+        }
+        if(lineFound)
+        {
+          spl = strsplit(line,&quot; &quot;);
+          if(dynlen(spl) == 7)
+          {
+            if(spl[3] != spW.text || spl[4] != spH.text)
+            {
+              spl[3] = spW.text;
+              spl[4] = spH.text;
+              fwGeneral_dynStringToString(spl, line, &quot; &quot;);
+              rewind(f); // Back to the beginning 
+              while (feof(f)==0) // so long as it is not at the end
+              {
+                fgets(st, 99999999, f);
+                dynAppend(panelAscii, st);
+              }
+              panelAscii[settingLineNumber] = line;
+              fclose(f);
+              //delete files hanging from last time
+              if(isfile(fnewname))
+                remove(fnewname);
+              delay(0,100);
+              f=fopen(fnewname,&quot;w+&quot;); // Create a new file 
+              for(i=1 ; i&lt;=dynlen(panelAscii) ; i++)
+                fputs(panelAscii[i],f);
+              fclose(f);
+              //if the new panel could be saved, replace the old panel with it
+              if(isfile(fnewname) &amp;&amp; 
+                 getFileSize(fname) + 2000 &gt; getFileSize(fnewname) &amp;&amp; 
+                 getFileSize(fname) - 2000 &lt; getFileSize(fnewname))
+              {
+                if(isfile(fname+&quot;.bak&quot;))
+                  remove(fname+&quot;.bak&quot;);
+                delay(0,100);
+                ret+=rename(fname, fname+&quot;.bak&quot;);
+                ret+=rename(fnewname, fname);
+                if(ret&lt;0)
+                   fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;fwAlarmHandlingGroupsPanelSetup.pnl - could not rename the new panel file &quot;+fnewname+&quot; to &quot;+fname,&quot;&quot;);                  
+              }
+              //save settings
+              if(dpExists(fwAlarmHandlingGroups_GEOMETRYW_DP))
+              {
+                dpSetWait(fwAlarmHandlingGroups_GEOMETRYW_DP, spW.text,
+                          fwAlarmHandlingGroups_GEOMETRYH_DP, spH.text); 
+              }    
+            }
+          }
+          else
+          {
+             fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;fwAlarmHandlingGroupsPanelSetup.pnl - unexpected file format: the file &quot;+fname+&quot; has a format different from the PVSS 3.8 format (v11).&quot;,&quot;&quot;);
+          }
+        }
+        else
+        {
+           fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;fwAlarmHandlingGroupsPanelSetup.pnl - unexpected file format: the file &quot;+fname+&quot; has a format different from the PVSS 3.8 format (v11).&quot;,&quot;&quot;);
+        }
+     }
+     else
+     {
+       fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;fwAlarmHandlingGroupsPanelSetup.pnl - could not set the panel size: the file &quot;+fname+&quot; is not accessible.&quot;,&quot;&quot;);
+     }
+   }  
+
+  exceptionInfo = getLastError();
+  if(dynlen(exceptionInfo))
+    fwExceptionHandling_display(exceptionInfo);
+}
+
+
+enableButtons(bool enable)
+{
+  lblPathW.enabled = enable;
+  cmOpen.enabled = enable;
+  cmPlay.enabled =  enable;  
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Size">496 26</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Alarm Screen Groups Panel Setup</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PUSH_BUTTON3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">590 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">590 370</prop>
+    <prop name="Size">107 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOff();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON7" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">430 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">430 370</prop>
+    <prop name="Size">107 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Ok</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  saveSettings();
+  PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="spW" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">90 270</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 270</prop>
+    <prop name="Size">101 21</prop>
+    <prop name="MinimumID">600</prop>
+    <prop name="MaximumID">1000000</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">1040</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int value;
+  if(dpExists(fwAlarmHandlingGroups_SETUP_DP))
+  {
+    dpGet(fwAlarmHandlingGroups_GEOMETRYW_DP, value);
+    if(value&lt;600) value = fwAlarmHandlingGroups_GEOMETRYW_DEFAULT;
+    this.text = value;
+    g_oldW=value;
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">42 272</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">42 272</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Width</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="spH" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">90 300</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 300</prop>
+    <prop name="Size">101 21</prop>
+    <prop name="MinimumID">500</prop>
+    <prop name="MaximumID">10000000</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">875</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int value;
+  if(dpExists(fwAlarmHandlingGroups_SETUP_DP))
+  {
+    dpGet(fwAlarmHandlingGroups_GEOMETRYH_DP, value);
+    if(value&lt;500) value = fwAlarmHandlingGroups_GEOMETRYH_DEFAULT;
+    this.text = value;
+    g_oldH=value;
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">42 302</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">42 302</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Height</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="cmScreen" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">200 270</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Set the panel size as the primary screen size</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 270</prop>
+    <prop name="Size">81 51</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Fit to
+screen size</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int w,h,x,y;
+  getScreenSize(w,h,x,y,1);
+  spW.text = w;
+  spH.text = h-32;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="FRAME1" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 42</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.8285714285714286 0 0 1 10 198</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Panel Size</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 42</prop>
+    <prop name="Size">351 99</prop>
+   </properties>
+  </shape>
+  <shape Name="cmOpen" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">640 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select wav file</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">640 140</prop>
+    <prop name="Size">21 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">openpanel.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string s_wPath;
+  fileSelector(s_wPath,&quot;&quot;, true, &quot;*.wav&quot;);
+  if(strlen(s_wPath))
+      lblPathW.text = s_wPath;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="lblPathW" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">130 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 140</prop>
+    <prop name="Size">503 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[// SimpleCtrlScriptStart {invalid}
+main()
+{
+  EP_textFieldIn();
+}
+
+EP_textFieldIn()
+{
+dyn_errClass err;
+
+  if( !dpExists( fwAlarmHandlingGroups_SOUNDFILE_DP))
+  {
+    setValue(&quot;&quot;, &quot;color&quot;, &quot;_dpdoesnotexist&quot;);
+    return;
+  }
+
+  dpConnect(&quot;EP_textFieldInCB&quot;,
+            fwAlarmHandlingGroups_SOUNDFILE_DP);
+  err = getLastError();
+  if (dynlen(err) &gt; 0)
+    setValue(&quot;&quot;, &quot;color&quot;, &quot;_dpdoesnotexist&quot;);
+
+}
+
+
+EP_textFieldInCB(string dp, string sNewValue)
+{
+  if(strlen(sNewValue))
+    this.text = dpValToString(dp, sNewValue, TRUE);
+  else
+    this.text = fwAlarmHandlingScreenGroups_getDefaultSoundPath();
+}
+
+// SimpleCtrlScript {EP_textFieldIn}
+// DP {dcs_ui:aliDcs_alertsSounds.sounds.warning}
+// DPConfig {:_online.._value}
+// DPType {string}
+// UseDPUnit {TRUE}
+// UseDPFormat {TRUE}
+// SimpleCtrlScriptEnd {EP_textFieldIn}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmPlay" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">660 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Play sound</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">660 140</prop>
+    <prop name="Size">21 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">start_en.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  startSound(lblPathW.text);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="spnInhibit" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">200 180</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">200 180</prop>
+    <prop name="Size">71 21</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">3600</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int enabled;
+  if(dpExists(fwAlarmHandlingGroups_SETUP_DP))
+  {
+    dpGet(fwAlarmHandlingGroups_SOUNDINHIBIT_DP, enabled);
+    this.text = enabled;
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT5" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">42 182</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">42 182</prop>
+    <prop name="Size">153 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Don't re-play sound during</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT6" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">272 182</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">272 182</prop>
+    <prop name="Size">16 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">s</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="ckEnabled" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 70.00000000000003</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 70</prop>
+    <prop name="Size">81 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Enabled</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  radioSource.enabled = state;
+  spnInhibit.enabled = state;
+  enableButtons(state &amp;&amp; radioSource.number);
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  bool enabled;
+  if(dpExists(fwAlarmHandlingGroups_SETUP_DP))
+  {
+    dpGet(fwAlarmHandlingGroups_SOUNDENABLED_DP, enabled);
+    this.state(0, enabled);
+    radioSource.enabled = enabled;
+    spnInhibit.enabled = enabled;
+    enableButtons(enabled &amp;&amp; radioSource.number);
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="radioSource" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-8.000000000000028 73.33333333333337</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">40 100</prop>
+    <prop name="Size">91 71</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">PC speaker</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Sound file</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  enableButtons(button);
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int iOrderMode;
+  if(dpExists(fwAlarmHandlingGroups_SOUNDSOURCE_DP))
+  {
+      dpGet(fwAlarmHandlingGroups_SOUNDSOURCE_DP,iOrderMode);
+      setValue(&quot;&quot;,&quot;number&quot;,iOrderMode);
+  }  
+  enableButtons(iOrderMode);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="FRAME2" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 42</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.942857142857143 0 0 1.73469387755102 10 -22.85714285714285</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Sound for New Alert</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 42</prop>
+    <prop name="Size">351 99</prop>
+   </properties>
+  </shape>
+  <shape Name="cmDefault" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 370</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Reset to default settings</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 370</prop>
+    <prop name="Size">131 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Restore to Default</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  spnInhibit.text = 0;
+  lblPathW.text = fwAlarmHandlingScreenGroups_getDefaultSoundPath();
+  ckEnabled.state(0,false);
+  spW.text = fwAlarmHandlingGroups_GEOMETRYW_DEFAULT;
+  spH.text = fwAlarmHandlingGroups_GEOMETRYH_DEFAULT;
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

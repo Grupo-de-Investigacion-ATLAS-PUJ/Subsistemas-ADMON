@@ -1,0 +1,400 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">481 95</prop>
+  <prop name="BackColor">FwTrendingViewBackground</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+
+int REFRESH_DELAY = 100;
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="StopButton" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">51 22</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Freeze</prop>
+     <prop name="en_US.iso88591">Freeze</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+	string buttonState = this.text;
+	string ref = $sRefName;
+	
+/*	if($sRefName != &quot;&quot;)
+	{
+		//refName = strrtrim(refName, &quot;.&quot;);
+		ref = ref + &quot;trend.&quot;;
+	}
+	else
+		ref = &quot;trend.&quot;;
+*/
+	if(buttonState == &quot;Run&quot;) { // in stop-&gt;run
+		fwTrending_trendRun(ref, TRUE, ref + &quot;.&quot;);
+	} else { // in Run -&gt; stop
+		fwTrending_trendRun(ref, FALSE, ref + &quot;.&quot;);
+	}
+}
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="saveSettings" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 0</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Save configuration to plot data point</prop>
+     <prop name="en_US.iso88591">Save configuration to plot data point</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+R</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 0</prop>
+    <prop name="Size">51 22</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Save</prop>
+     <prop name="en_US.iso88591">Save</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string ref = $sRefName;
+
+	setValue(ref+&quot;trend.refreshTrend&quot;, &quot;text&quot;, &quot;FALSE&quot;);
+	this.enabled = FALSE;
+
+	fwTrending_pageSavePlotSettings(ref);
+
+	delay(0,REFRESH_DELAY);
+	setValue(ref+&quot;trend.refreshTrend&quot;, &quot;text&quot;, &quot;TRUE&quot;);
+	this.enabled = TRUE;
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="OtherCascadeButton" shapeType="CASCADE_BUTTON">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-180.72972972973 10.5</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">100 0</prop>
+    <prop name="Size">48 22</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Other</prop>
+     <prop name="en_US.iso88591">Other</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">zoom</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Zoomed Window</prop>
+       <prop name="en_US.iso88591">Zoomed Window</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">export</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Export plot to CSV...</prop>
+       <prop name="en_US.iso88591">Export plot to CSV...</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">print</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Print plot</prop>
+       <prop name="en_US.iso88591">Print plot</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">___</prop>
+       <prop name="en_US.iso88591">___</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">legend</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Legend</prop>
+       <prop name="en_US.iso88591">Legend</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">grid</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Grid</prop>
+       <prop name="en_US.iso88591">Grid</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">2</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">___</prop>
+       <prop name="en_US.iso88591">___</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">plotConf</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Plot configuration</prop>
+       <prop name="en_US.iso88591">Plot configuration</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">saveas</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Save plot settings as...</prop>
+       <prop name="en_US.iso88591">Save plot settings as...</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+	bool enabledState;
+	int i;
+	string sDpName, currentParameterValues, proposedName, trendRunning, tempString, ref = $sRefName;
+	dyn_string ds, dsParameters, plotShapes, plotData, modifiedPlotData, panelsList, exceptionInfo;
+	dyn_dyn_string extendedPlotData;
+	dyn_float df;
+	shape histogram;
+	
+	this.enabled = FALSE;
+
+	fwTrending_getRuntimePlotDataWithStrings(ref, trendRunning, plotShapes, plotData, exceptionInfo, FALSE);
+	histogram = getShape(plotShapes[fwTrending_ACTIVE_TREND_NAME]);
+	
+	switch(id)
+	{
+		case &quot;zoom&quot;:
+			dynAppend(dsParameters, &quot;$dsCurveDPE:&quot;+plotData[fwTrending_PLOT_OBJECT_DPES]);
+			dynAppend(dsParameters, &quot;$dsCurveLegend:&quot;+plotData[fwTrending_PLOT_OBJECT_LEGENDS]);
+			dynAppend(dsParameters, &quot;$dsCurveToolTipText:&quot;+plotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS]);
+			dynAppend(dsParameters, &quot;$dsCurveRange:&quot;+plotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE]);
+			dynAppend(dsParameters, &quot;$dsCurveRangeX:&quot;+plotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE_X]);
+			dynAppend(dsParameters, &quot;$dsCurveColor:&quot;+plotData[fwTrending_PLOT_OBJECT_COLORS]);
+			dynAppend(dsParameters, &quot;$sForeColor:&quot;+plotData[fwTrending_PLOT_OBJECT_FORE_COLOR]);
+			dynAppend(dsParameters, &quot;$sBackColor:&quot;+plotData[fwTrending_PLOT_OBJECT_BACK_COLOR]);
+			dynAppend(dsParameters, &quot;$bShowGrid:&quot;+plotData[fwTrending_PLOT_OBJECT_GRID]);
+			dynAppend(dsParameters, &quot;$bShowLegend:&quot;+plotData[fwTrending_PLOT_OBJECT_LEGEND_ON]);
+			dynAppend(dsParameters, &quot;$sRefName:&quot;);
+
+// $sDpName is set to &quot;&quot;, no possibility to configure or save the trend settings
+			getValue(ref+&quot;trend.dpNameText&quot;, &quot;text&quot;, sDpName);
+			dynAppend(dsParameters, &quot;$sDpName:&quot;);// + sDpName);
+			
+// get the zoom window title
+			strreplace(plotData[fwTrending_PLOT_OBJECT_TITLE], &quot;\\_&quot;, &quot; &quot;);
+			if(plotData[fwTrending_PLOT_OBJECT_TITLE]==&quot;&quot;)
+			{ 
+				plotData[fwTrending_PLOT_OBJECT_TITLE] = &quot;Histogram Zoom&quot;;
+			}
+			dynAppend(dsParameters, &quot;$ZoomWindowTitle:&quot;+plotData[fwTrending_PLOT_OBJECT_TITLE]);
+
+			getValue(ref+&quot;trend.parameterValues&quot;, &quot;text&quot;, currentParameterValues);
+			dynAppend(dsParameters, &quot;$templateParameters:&quot;+currentParameterValues);
+
+// open the zoomed window
+			ChildPanelOnCentral(&quot;fwTrending/fwTrendingHistogramZoomedWindow.pnl&quot;, &quot;Zoomed Window: &quot; + plotData[fwTrending_PLOT_OBJECT_TITLE], 
+				dsParameters
+			);
+			break;
+		case &quot;export&quot;:
+			break;
+		case &quot;print&quot;:
+			printPanel(myModuleName(), myPanelName());
+			break;
+		case &quot;legend&quot;:
+			tempString = plotData[fwTrending_PLOT_OBJECT_LEGEND_ON];
+			if((tempString == &quot;TRUE&quot;) || (tempString == TRUE))
+			{
+				fwTrending_legendOnOff(ref, FALSE, ref + &quot;.&quot;, exceptionInfo);
+			}
+			else
+			{
+				fwTrending_legendOnOff(ref, TRUE, ref + &quot;.&quot;, exceptionInfo);
+			}
+			histogram.flush();
+			break;
+		case &quot;grid&quot;:
+			tempString = plotData[fwTrending_PLOT_OBJECT_GRID];
+			if((tempString == &quot;TRUE&quot;) || (tempString == TRUE))
+			{
+				fwTrending_gridOnOff(ref, FALSE, ref + &quot;.&quot;, exceptionInfo);
+			}
+			else
+			{
+				fwTrending_gridOnOff(ref, TRUE, ref + &quot;.&quot;, exceptionInfo);
+			}
+			histogram.flush();
+			break;
+		case &quot;plotConf&quot;:
+			getValue(ref+&quot;trend.dpNameText&quot;, &quot;text&quot;, sDpName);
+			fwDevice_getDefaultConfigurationPanels(fwTrending_PLOT, panelsList, exceptionInfo);
+//DebugN(&quot;SORT IT OUT: Panel in CTRL, use dev defs&quot;);
+panelsList[1] = &quot;fwTrending/fwTrendingHistogramConfig&quot;;
+			ChildPanelOnModalReturn(panelsList[1] + &quot;.pnl&quot;,&quot;Plot Configuration&quot;,
+				makeDynString(&quot;$Command:onlineedit&quot;, &quot;$sDpName:&quot; + sDpName,
+											&quot;$dsPlotData:&quot; + plotData, &quot;$dsShowButtons:&quot; + makeDynString(&quot;ok&quot;, &quot;cancel&quot;)),0,0, df, ds);
+
+			if(ds[1] != &quot;Cancel&quot;)
+			{
+				strreplace(ds[3], &quot; | &quot;, &quot;|&quot;);
+				modifiedPlotData = strsplit(ds[3], &quot;|&quot;);
+				for(i=1; i&lt;=fwTrending_SIZE_PLOT_OBJECT; i++)
+				{
+					modifiedPlotData[i] = strltrim(modifiedPlotData[i], &quot; &quot;);
+					modifiedPlotData[i] = strrtrim(modifiedPlotData[i], &quot; &quot;);
+				}
+
+				setValue(ref+&quot;trend.trendInfo&quot;, &quot;items&quot;, modifiedPlotData);
+
+				fwTrending_getRuntimePlotDataWithExtendedObject(ref, trendRunning, plotShapes, extendedPlotData, exceptionInfo, FALSE);
+				histogram = getShape(plotShapes[fwTrending_ACTIVE_TREND_NAME]);
+														
+				getValue(ref+&quot;trend.parameterValues&quot;, &quot;text&quot;, currentParameterValues);
+				fwTrending_checkAndGetAllTemplateParameters(ref, extendedPlotData, fwTrending_PLOT, currentParameterValues, exceptionInfo, TRUE);
+				setValue(ref+&quot;trend.parameterValues&quot;, &quot;text&quot;, currentParameterValues);
+
+				_fwTrending_evaluateTemplate(currentParameterValues, extendedPlotData[fwTrending_PLOT_OBJECT_DPES], exceptionInfo);    
+				_fwTrending_evaluateTemplate(currentParameterValues, extendedPlotData[fwTrending_PLOT_OBJECT_LEGENDS], exceptionInfo);    
+				_fwTrending_evaluateTemplate(currentParameterValues, extendedPlotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS], exceptionInfo);    
+	
+				fwTrending_convertUnicosDpeListToPvssDpeList(extendedPlotData[fwTrending_PLOT_OBJECT_DPES], extendedPlotData[fwTrending_PLOT_OBJECT_DPES], exceptionInfo);
+
+				getValue(&quot;saveSettings&quot;, &quot;enabled&quot;, enabledState);
+				fwTrending_initHistogramWithObject(ref, plotShapes[fwTrending_ACTIVE_TREND_NAME], extendedPlotData, trendRunning, exceptionInfo);
+				fwTrending_initControlHistogramButtons(ref, sDpName, extendedPlotData, trendRunning, exceptionInfo, false);
+				setValue(&quot;saveSettings&quot;, &quot;enabled&quot;, enabledState);
+			}				
+			break;
+		case &quot;saveas&quot;:
+			setValue(ref+&quot;trend.refreshTrend&quot;, &quot;text&quot;, &quot;FALSE&quot;);
+			getValue(ref+&quot;trend.dpNameText&quot;, &quot;text&quot;, sDpName);
+			proposedName = dpGetAlias(sDpName + &quot;.&quot;);
+			if(proposedName == &quot;&quot;)
+				proposedName = dpSubStr(sDpName, DPSUB_DP);
+			if(proposedName == &quot;&quot;)
+				proposedName = plotData[fwTrending_PLOT_OBJECT_TITLE];
+
+			ChildPanelOnCentralReturn(&quot;fwTrending/fwTrendingSaveAsSelector.pnl&quot;, &quot;Save plot settings as...&quot;,
+																	makeDynString(&quot;$sDpType:&quot; + fwTrending_PLOT, &quot;$sProposedName:&quot; + proposedName), df, ds);
+			if(ds[1] == &quot;ok&quot;)
+				fwTrending_saveCurrentSettings(ref, ds[2], fwTrending_PLOT, TRUE, TRUE, exceptionInfo, TRUE);		
+
+			delay(0,REFRESH_DELAY);
+			setValue(ref+&quot;trend.refreshTrend&quot;, &quot;text&quot;, &quot;TRUE&quot;);
+			break;
+			break;
+	}
+	
+	if(dynlen(exceptionInfo)&gt;0)
+		fwExceptionHandling_display(exceptionInfo);		
+	this.enabled= TRUE;
+}
+
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

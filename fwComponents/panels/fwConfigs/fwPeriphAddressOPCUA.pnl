@@ -1,0 +1,2457 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">fwPeriphAddressOPCUA</prop>
+   <prop name="en_US.iso88591">fwPeriphAddressOPCUA</prop>
+  </prop>
+  <prop name="Size">638 317</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwConfigs/fwPeriphAddressOPCUA.ctl&quot;
+
+string dpe; // the DPE(s) that we're working with
+bool   isMultiDpes; // Is there multiple DPEs selected?
+global int fwPeriphAddressOPCUA_panelMode; // panel mode - used in the the panel functions, so must be global 
+
+// FWCORE-3534: invoked dynamically from the fwPeriphAddress.pnl
+public void initPanel(string sDpe, dyn_string &amp;exceptionInfo, bool bInMultiDpes = FALSE, int iInPanelMode = -1)
+{
+  DebugFTN(&quot;FW_INFO&quot;, __FILE__+&quot;:&quot;+__FUNCTION__+&quot;(&quot; + sDpe + &quot;, &quot; + bInMultiDpes + &quot;, &quot; + iInPanelMode + &quot;)&quot;);
+  dpe                            = sDpe;
+  isMultiDpes                    = bInMultiDpes;
+  fwPeriphAddressOPCUA_panelMode = iInPanelMode;
+
+//  if ( iInPanelMode != fwPeriphAddress_PANEL_MODE_OBJECT )
+//  {
+//    fwPeriphAddressOPCUA_panel_updateSubscriptions();
+//  }
+
+  fwPeriphAddressOPCUA_panel_update();
+}
+
+
+void Initialize_buGetItemId()
+{
+  if( dpSubStr($sDpe, DPSUB_SYS) == getSystemName() )
+  {
+    buGetItemId.enabled = TRUE;
+  }
+  else
+  {
+    buGetItemId.enabled = FALSE;
+  }
+
+}
+
+
+void Initialize_cmbPollGroup()
+{
+  int iLoop;
+  dyn_string dsPollGroups, ds;
+
+
+  dsPollGroups = dpNames(dpSubStr($sDpe, DPSUB_SYS) + &quot;*&quot;, &quot;_PollGroup&quot;);
+  for( iLoop = dynlen(dsPollGroups) ; iLoop &gt; 0 ; iLoop-- )
+  {
+    // don't display redundant datapoints
+    if ( (iLoop &gt; 1)                                                            &amp;&amp;
+         (strpos(dsPollGroups[iLoop], &quot;_2&quot;) == strlen(dsPollGroups[iLoop]) - 2) &amp;&amp;
+         (dsPollGroups[iLoop] == dsPollGroups[iLoop-1] + &quot;_2&quot;)                    )
+    {
+      dynRemove(dsPollGroups, iLoop);
+    }
+
+    // if ( dpSubStr(dsPollGroups[iLoop],DPSUB_SYS) == &quot;System1:&quot; ) // NoCheckWarning
+    if( iLoop &lt;= dynlen(dsPollGroups) )
+    {
+      dsPollGroups[iLoop] = dpSubStr(dsPollGroups[iLoop], DPSUB_DP);
+      if( dsPollGroups[iLoop][0] == &quot;_&quot; )
+      {
+        dsPollGroups[iLoop] = substr(dsPollGroups[iLoop], 1, strlen(dsPollGroups[iLoop])-1);
+      }
+    }
+  }
+
+  cmbPollGroup.items(dsPollGroups);
+}
+
+
+
+
+/**
+* Update the subscriptions.
+*
+* @return void
+*/
+void fwPeriphAddressOPCUA_panel_updateSubscriptions()
+{
+  string sConnection, sSubscription;
+  dyn_string dsEquipment, dsSubscription;
+
+
+  sConnection   = cmbEquipment.text();
+  sSubscription = cmbSubscription.text();
+
+  fwPeriphAddressOPCUA_panel_updatePanelFillServers(dpe);
+  fwPeriphAddressOPCUA_panel_updatePanelFillSubscriptions(dpe, cmbEquipment.text());
+
+  getMultiValue(&quot;cmbEquipment&quot;,    &quot;items&quot;, dsEquipment,
+                &quot;cmbSubscription&quot;, &quot;items&quot;, dsSubscription);
+
+  setMultiValue(&quot;cmbEquipment&quot;,    &quot;selectedPos&quot;, dynContains(dsEquipment, sConnection),
+                &quot;cmbSubscription&quot;, &quot;selectedPos&quot;, dynContains(dsSubscription, sSubscription));
+}
+
+
+
+
+//the following functions are derived from opcuaDrvPara.ctl
+
+/**
+* Get the direction from the direction and receive mode GUI widgets.
+*
+* @return int The direction.
+*/
+int _getDirection() {
+  int direction = einaus.number, receiveMode = modus.number;
+  direction++;
+
+  if (direction == 2) {
+    if (receiveMode == 1) {
+      direction = DPATTR_ADDR_MODE_INPUT_POLL;
+    } else if (receiveMode == 2) {
+      direction = DPATTR_ADDR_MODE_INPUT_SQUERY;
+    } else if (receiveMode == 3) {
+      direction = DPATTR_ADDR_MODE_IO_SQUERY;
+    }
+  } else if (direction == 3) {
+    if (receiveMode == 0) {
+      direction = DPATTR_ADDR_MODE_IO_SPONT;
+    } else if (receiveMode == 1) {
+      direction = DPATTR_ADDR_MODE_IO_POLL;
+    } else if (receiveMode == 3) {
+      direction = 9; //DPATTR_ADDR_MODE_AM_ALERT not defined in 3.11?
+    }
+  }
+
+  return direction;
+}
+
+/**
+* Fill the servers combo box.
+*
+* @return void
+*/
+void fwPeriphAddressOPCUA_panel_updatePanelFillServers(string sDpe)
+{
+  dyn_string exceptionInfo, dsServers;
+
+
+  dsServers = fwPeriphAddressOPCUA_getServers(dpSubStr(sDpe, DPSUB_SYS), exceptionInfo);
+  if( dynlen(exceptionInfo) &gt; 0 )
+  {
+    fwExceptionHandling_display(exceptionInfo);
+  }
+  else
+  {
+    setValue(&quot;cmbEquipment&quot;, &quot;items&quot;, dsServers);
+  }
+
+}
+
+
+
+
+/**
+* Fill the subscriptions combo box.
+*
+* @return void
+*/
+void fwPeriphAddressOPCUA_panel_updatePanelFillSubscriptions(string sDpe, string sServer)
+{
+  dyn_string dsSubscription, exceptionInfo;
+
+
+  dsSubscription = fwPeriphAddressOPCUA_getSubscriptions(dpSubStr(sDpe, DPSUB_SYS), sServer, exceptionInfo);
+  if( dynlen(exceptionInfo) &gt; 0 )
+  {
+    fwExceptionHandling_display(exceptionInfo);
+    return;
+  }
+  else
+  {
+    dynInsertAt(dsSubscription, &quot;&quot;, 1);
+
+    setValue(&quot;cmbSubscription&quot;, &quot;deleteAllItems&quot;);
+    setValue(&quot;cmbSubscription&quot;, &quot;items&quot;, dsSubscription);
+  }
+
+}
+
+
+
+
+
+/**
+* Update the view by hiding/showing widgets.
+*
+* @return void
+*/
+void fwPeriphAddressOPCUA_panel_update()
+{
+  bool bVisible, bVisibleMode, bVisiblePollGroup, bVisibleEinaus, bIsNotObjectMode;
+  int iDirection, iSubscription;
+  string sSubscriptionText;
+
+
+  DebugFTN(&quot;FW_INFO&quot;, &quot;fwPeriphAddressOPCUA_panelMode: &quot; + fwPeriphAddressOPCUA_panelMode);
+
+  bVisible          = FALSE;
+  bVisibleMode      = FALSE;
+  bVisiblePollGroup = FALSE;
+  bVisibleEinaus    = FALSE;
+  bIsNotObjectMode  = FALSE;
+
+  if( fwPeriphAddressOPCUA_panelMode == fwPeriphAddress_PANEL_MODE_MULTIPLE_DPES )
+  {
+    bVisible = TRUE;
+  }
+
+  if( bVisible &amp;&amp; modus.visible() )
+  {
+    bVisibleMode = TRUE;
+  }
+
+  if( bVisible &amp;&amp; cmbPollGroup.visible() )
+  {
+    bVisiblePollGroup = TRUE;
+  }
+
+  if( einaus.number != 0 )
+  {
+    bVisibleEinaus = TRUE;
+  }
+
+  if( fwPeriphAddressOPCUA_panelMode != fwPeriphAddress_PANEL_MODE_OBJECT )
+  {
+    bIsNotObjectMode = TRUE;
+  }
+
+  setMultiValue(&quot;mainApplyButton&quot;,        &quot;visible&quot;, TRUE,
+                &quot;txtPollGroup&quot;,           &quot;visible&quot;, FALSE,
+                &quot;setOpcuaServer&quot;,         &quot;visible&quot;, bVisible,
+                &quot;setOpcuaDriver&quot;,         &quot;visible&quot;, bVisible,
+                &quot;setOpcuaVariant&quot;,        &quot;visible&quot;, bVisible,
+                &quot;setOpcuaDirection&quot;,      &quot;visible&quot;, bVisible,
+                &quot;setOpcuaMode&quot;,           &quot;visible&quot;, bVisible,
+                &quot;setOpcuaSubscription&quot;,   &quot;visible&quot;, bVisible,
+                &quot;setOpcuaTransformation&quot;, &quot;visible&quot;, bVisible,
+                &quot;setOpcuaPollGroup&quot;,      &quot;visible&quot;, bVisible,
+                &quot;setOpcuaLowLevel&quot;,       &quot;visible&quot;, bVisible,
+                &quot;setOpcuaActive&quot;,         &quot;visible&quot;, bVisible,
+                &quot;setOpcuaMode&quot;,           &quot;visible&quot;, bVisibleMode,
+                &quot;setOpcuaPollGroup&quot;,      &quot;visible&quot;, bVisiblePollGroup,
+                &quot;lowlevel&quot;,               &quot;visible&quot;, bVisibleEinaus);
+
+  if( fwPeriphAddressOPCUA_panelMode != fwPeriphAddress_PANEL_MODE_MULTIPLE_DPES )
+  {
+    setMultiValue(&quot;setOpcuaServer&quot;,         &quot;state&quot;, 0, TRUE,
+                  &quot;setOpcuaDriver&quot;,         &quot;state&quot;, 0, TRUE,
+                  &quot;setOpcuaVariant&quot;,        &quot;state&quot;, 0, TRUE,
+                  &quot;setOpcuaSubscription&quot;,   &quot;state&quot;, 0, TRUE,
+                  &quot;setOpcuaDirection&quot;,      &quot;state&quot;, 0, TRUE,
+                  &quot;setOpcuaMode&quot;,           &quot;state&quot;, 0, TRUE,
+                  &quot;setOpcuaTransformation&quot;, &quot;state&quot;, 0, TRUE,
+                  &quot;setOpcuaPollGroup&quot;,      &quot;state&quot;, 0, TRUE,
+                  &quot;setOpcuaLowLevel&quot;,       &quot;state&quot;, 0, TRUE,
+                  &quot;setOpcuaActive&quot;,         &quot;state&quot;, 0, TRUE);
+  }
+
+  iDirection = _getDirection();
+
+  // IM 104259 mjeidler: iSub contains SubscriptionType of the chosen Subscription
+  iSubscription = radKind.number;
+  if( !bIsNotObjectMode )
+  {
+    sSubscriptionText = txtSubscription.text();
+  }
+  else
+  {
+    sSubscriptionText = cmbSubscription.text();
+  }
+
+  setMultiValue(&quot;tm&quot;,       &quot;visible&quot;, iDirection != DPATTR_ADDR_MODE_OUTPUT,
+                &quot;border1&quot;,  &quot;visible&quot;, bIsNotObjectMode &amp;&amp; iDirection != DPATTR_ADDR_MODE_OUTPUT,
+                &quot;modus&quot;,    &quot;visible&quot;, iDirection != DPATTR_ADDR_MODE_OUTPUT,
+                &quot;lowlevel&quot;, &quot;visible&quot;, /*bIsNotObjectMode &amp;&amp; */iDirection != DPATTR_ADDR_MODE_OUTPUT);
+
+  // IM 104259 mjeidler: Direction, Receiving Mode, LowLevel will be shown only for the correct SubscriptionType
+  if( sSubscriptionText &amp;&amp; ((iSubscription == 0) || (iSubscription == 1)) )
+  {
+    if( (modus.number == 1) ||
+        (modus.number == 2) ||
+        (modus.number == 3)  )
+    {
+      modus.number = 0;
+    }
+
+    setMultiValue(&quot;modus&quot;,    &quot;itemEnabled&quot;, 0, TRUE,
+                  &quot;modus&quot;,    &quot;itemEnabled&quot;, 1, FALSE,
+                  &quot;modus&quot;,    &quot;itemEnabled&quot;, 2, FALSE,
+                  &quot;modus&quot;,    &quot;itemEnabled&quot;, 3, FALSE,
+                  &quot;einaus&quot;,   &quot;itemEnabled&quot;, 0, TRUE,
+                  &quot;einaus&quot;,   &quot;itemEnabled&quot;, 1, TRUE,
+                  &quot;lowlevel&quot;, &quot;visible&quot;,     TRUE);
+  }
+  else
+    if( sSubscriptionText &amp;&amp; (iSubscription == 2) )
+    {
+      if( (modus.number == 0) ||
+          (modus.number == 1) ||
+          (modus.number == 2)  )
+      {
+        modus.number = 3;
+      }
+
+      setMultiValue(&quot;modus&quot;,    &quot;itemEnabled&quot;, 0, FALSE,
+                    &quot;modus&quot;,    &quot;itemEnabled&quot;, 1, FALSE,
+                    &quot;modus&quot;,    &quot;itemEnabled&quot;, 2, FALSE,
+                    &quot;modus&quot;,    &quot;itemEnabled&quot;, 3, TRUE,
+                    &quot;einaus&quot;,   &quot;itemEnabled&quot;, 0, FALSE,
+                    &quot;einaus&quot;,   &quot;itemEnabled&quot;, 1, FALSE,
+                    &quot;einaus&quot;,   &quot;number&quot;,      2,
+                    &quot;lowlevel&quot;, &quot;visible&quot;,     FALSE);
+
+      if( einaus.number() == 2 )
+      {
+        setMultiValue(&quot;tm&quot;,      &quot;visible&quot;, TRUE,
+                      &quot;border1&quot;, &quot;visible&quot;, TRUE,
+                      &quot;modus&quot;,   &quot;visible&quot;, TRUE);
+      }
+    }
+    else
+    {
+      if( (modus.number() == 0) ||
+          (modus.number() == 3)  )
+      {
+        modus.number(1);
+      }
+
+      setMultiValue(&quot;modus&quot;,    &quot;itemEnabled&quot;, 0, FALSE,
+                    &quot;modus&quot;,    &quot;itemEnabled&quot;, 1, TRUE,
+                    &quot;modus&quot;,    &quot;itemEnabled&quot;, 2, TRUE,
+                    &quot;modus&quot;,    &quot;itemEnabled&quot;, 3, FALSE,
+                    &quot;einaus&quot;,   &quot;itemEnabled&quot;, 0, TRUE,
+                    &quot;einaus&quot;,   &quot;itemEnabled&quot;, 1, TRUE,
+                    &quot;lowlevel&quot;, &quot;visible&quot;,     TRUE);
+    }
+
+  // IM 104259 mjeidler: view PollGroup only, if Mode PollGroup is chosen
+  if( shapeExists(&quot;frmPollGroup&quot;) &amp;&amp;
+      (einaus.number != 0)        &amp;&amp;
+      (modus.number == 1)           )
+  {
+    setMultiValue(&quot;lblPollGroup&quot;, &quot;visible&quot;, TRUE,
+                  &quot;frmPollGroup&quot;, &quot;visible&quot;, TRUE);
+
+    if( bIsNotObjectMode )
+    {
+      setMultiValue(&quot;cmbPollGroup&quot;, &quot;visible&quot;, TRUE,
+                    &quot;cmdPollGroup&quot;, &quot;visible&quot;, TRUE);
+    }
+    else
+    {
+      txtPollGroup.visible(TRUE);
+    }
+  }
+  else
+  {
+    setMultiValue(&quot;frmPollGroup&quot;, &quot;visible&quot;, FALSE,
+                  &quot;lblPollGroup&quot;, &quot;visible&quot;, FALSE,
+                  &quot;cmbPollGroup&quot;, &quot;visible&quot;, FALSE,
+                  &quot;cmdPollGroup&quot;, &quot;visible&quot;, FALSE,
+                  &quot;txtPollGroup&quot;, &quot;visible&quot;, FALSE);
+  }
+
+  setMultiValue(&quot;setOpcuaMode&quot;,         &quot;visible&quot;, isMultiDpes &amp;&amp; modus.visible(),
+                &quot;setOpcuaPollGroup&quot;,    &quot;visible&quot;, isMultiDpes &amp;&amp; cmbPollGroup.visible(),
+                &quot;lowlevel&quot;,             &quot;visible&quot;, /* bIsNotObjectMode &amp;&amp;*/ iDirection != DPATTR_ADDR_MODE_OUTPUT,
+                &quot;setOpcuaLowLevel&quot;,     &quot;visible&quot;, isMultiDpes &amp;&amp; lowlevel.visible(),
+                &quot;setOpcuaSubscription&quot;, &quot;visible&quot;, isMultiDpes,
+                &quot;setOpcuaVariant&quot;,      &quot;visible&quot;, isMultiDpes);
+
+  if( isMultiDpes )
+  {
+    setMultiValue(&quot;txtItem&quot;,     &quot;text&quot;,    &quot;Can't set OPC item in multiple data point element mode&quot;,
+                  &quot;txtItem&quot;,     &quot;enabled&quot;, FALSE,
+                  &quot;buGetItemId&quot;, &quot;enabled&quot;, FALSE);
+  }
+
+  setMultiValue(&quot;buGetItemId&quot;,      &quot;visible&quot;, bIsNotObjectMode,
+                &quot;lblDriverNumber&quot;,  &quot;visible&quot;, bIsNotObjectMode,
+                &quot;Treiber&quot;,          &quot;visible&quot;, bIsNotObjectMode,
+                &quot;radVariant&quot;,       &quot;visible&quot;, bIsNotObjectMode,
+                &quot;lblVariant&quot;,       &quot;visible&quot;, bIsNotObjectMode,
+                &quot;cmbEquipment&quot;,     &quot;visible&quot;, bIsNotObjectMode,
+                &quot;lblServer&quot;,        &quot;visible&quot;, bIsNotObjectMode,
+                &quot;cboAddressActive&quot;, &quot;visible&quot;, bIsNotObjectMode);
+
+  if( !txtPollGroup.visible() )
+  {
+    txtPollGroup.text(&quot;&quot;);
+  }
+
+  //TODO is it allowed to change Kind for OPCUA (it's not editable in PARA)
+  //lblKind.visible = !bIsNotObjectMode;
+  //radKind.visible = !bIsNotObjectMode;
+
+  if( !bIsNotObjectMode )
+  {
+    setMultiValue(&quot;lblVariant&quot;, &quot;visible&quot;, TRUE,
+                  &quot;radVariant&quot;, &quot;visible&quot;, TRUE);
+  }
+
+  setMultiValue(&quot;cmbSubscription&quot;, &quot;visible&quot;, bIsNotObjectMode,
+                &quot;cmdSubscription&quot;, &quot;visible&quot;, bIsNotObjectMode,
+                &quot;txtSubscription&quot;, &quot;visible&quot;, !bIsNotObjectMode);
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[void main()
+{
+  dyn_string exceptionInfo;
+
+
+  //_fwPeriphAddressOPCUA_initPanel($sDpe, exceptionInfo);
+
+  // Initialize buGetItemId
+  Initialize_buGetItemId();
+
+
+  // Initialize cmbPollGroup
+  Initialize_cmbPollGroup();
+
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="frmPollGroup" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">371 212</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">87</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">371 212</prop>
+    <prop name="End">631 212</prop>
+   </properties>
+  </shape>
+  <shape Name="LINE2" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">371 162</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">88</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">371 162</prop>
+    <prop name="End">631 162</prop>
+   </properties>
+  </shape>
+  <shape Name="Text_transfo_S7" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">381 152</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">381 152</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> Type of transformation </prop>
+     <prop name="en_US.iso88591"> Type of transformation </prop>
+     <prop name="de_AT.iso88591"> Trans.Art </prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="brd3" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">14 169</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.8901098901098901 0 0 1 14.07692307692308 -8</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">121 169</prop>
+    <prop name="Size">87 -1</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="lblDirection" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">131 150</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">131 150</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> Direction </prop>
+     <prop name="en_US.iso88591"> Direction </prop>
+     <prop name="de_AT.iso88591"> Richtung </prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="border1" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">106 169</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.7978210768908444 0 0 1 51.38191578838696 -8</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">216 169</prop>
+    <prop name="Size">144 -1</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="tm" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">234.1351351351351 151</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">234.1351351351351 151</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> Receive mode </prop>
+     <prop name="en_US.iso88591"> Receive mode </prop>
+     <prop name="de_AT.iso88591"> Empfangsmodus </prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblPollGroup" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">381 202</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">59</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">381 202</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> Poll group </prop>
+     <prop name="en_US.iso88591"> Poll group </prop>
+     <prop name="de_AT.iso88591"> Pollgruppe </prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lowlevel" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">131 252</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">131 252</prop>
+    <prop name="Size">157 18</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Low level comparison</prop>
+       <prop name="en_US.iso88591">Low level comparison</prop>
+       <prop name="de_AT.iso88591">Low-Level-Vergleich</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="cmdPollGroup" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">531 220</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">63</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">531 220</prop>
+    <prop name="Size">91 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Poll groups...</prop>
+     <prop name="en_US.iso88591">Poll groups...</prop>
+     <prop name="de_AT.iso88591">Pollgruppen...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int iPos;
+  dyn_string dsResult;
+  dyn_float  dfResult;
+
+
+//!!!pollgroup
+  ChildPanelOnCentralModalReturn(&quot;para/poll_groups.pnl&quot;,
+                                 &quot;Poll groups&quot;,
+                                 makeDynString(&quot;$fromPara:&quot; + cmbPollGroup.text),
+                                 dfResult,
+                                 dsResult);
+  if( dynlen(dfResult) &gt; 0 &amp;&amp; dfResult[1] )
+  {
+    iPos = dynContains(cmbPollGroup.items(), dsResult[1]);
+
+    if( iPos &lt; 1 )
+    {
+      cmbPollGroup.appendItem(dsResult[1]);
+    }
+    cmbPollGroup.text = dsResult[1];
+  }
+
+}
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cboAddressActive" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">131 272</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">86</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">131 272</prop>
+    <prop name="Size">157 18</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Address active</prop>
+       <prop name="en_US.iso88591">Address active</prop>
+       <prop name="de_AT.iso88591">Low-Level-Vergleich</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="lblServer" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">171 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">93</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">171 30</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Server:</prop>
+     <prop name="en_US.iso88591">Server:</prop>
+     <prop name="de_AT.iso88591">Server:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblSubscription" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">206 72</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">95</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">206 72</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Subscription:</prop>
+     <prop name="en_US.iso88591">Subscription:</prop>
+     <prop name="de_AT.iso88591">Subscription:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="cmbEquipment" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">211 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">96</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">211 30</prop>
+    <prop name="Size">171 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  fwPeriphAddressOPCUA_panel_updatePanelFillSubscriptions($sDpe, cmbEquipment.text());
+}
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmbSubscription" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">178.9304764758766 92</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">97</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">211 70</prop>
+    <prop name="Size">147 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  int iType;
+  string sText;
+  dyn_string exceptionInfo;
+
+
+  sText = cmbSubscription.text();
+  if( sText == &quot;&quot; )
+  {
+    radKind.number(0);
+  }
+  else
+  {
+    iType = fwPeriphAddressOPCUA_getSubscriptionType(dpSubStr($sDpe, DPSUB_SYS), sText, exceptionInfo);
+    radKind.number(iType - 1);
+    fwExceptionHandling_display(exceptionInfo);
+  }
+  fwPeriphAddressOPCUA_panel_update();
+
+}
+
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="buGetItemId" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">550 108</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">100</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">552 109</prop>
+    <prop name="Size">77 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Get Item ID</prop>
+     <prop name="en_US.iso88591">Get Item ID</prop>
+     <prop name="de_AT.iso88591">Get Item ID</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int iKind, iVariant;
+  string sServer;
+  dyn_float  dfResult;
+  dyn_string dsResult;
+
+
+  if( !getUserPermission(4) )
+  {
+    ChildPanelOnCentralModal(&quot;vision/MessageWarning&quot;,
+                             getCatStr(&quot;para&quot;,&quot;warning&quot;),
+                             makeDynString(getCatStr(&quot;general&quot;,&quot;permission&quot;)));
+    return;
+  }
+
+
+  getMultiValue(&quot;cmbEquipment&quot;, &quot;text&quot;,   sServer,
+                &quot;radKind&quot;,      &quot;number&quot;, iKind,
+                &quot;radVariant&quot;,   &quot;number&quot;, iVariant);
+
+  if( strlen(sServer) == 0 )
+  {
+    return;
+  }
+  sServer = strltrim(strrtrim(sServer));
+
+
+  ChildPanelOnCentralModalReturn(&quot;para/address_opcua_server_items.pnl&quot;,
+                                 &quot;OPCUA Server Items&quot;,
+                                 makeDynString(&quot;$SERVER:&quot;       + sServer,
+                                               &quot;$EVENT_SOURCE:&quot; + iKind,
+                                               &quot;$VARIANT:&quot;      + iVariant,
+                                               &quot;$ALARM_TYPES:FALSE&quot;),
+                                 dfResult,
+                                 dsResult);
+  if( dynlen(dsResult) &gt; 0 )
+  {
+    setValue(&quot;txtItem&quot;, &quot;text&quot;, dsResult[1]);
+    if( dynlen(dsResult) &gt; 1 )
+    {
+      radVariant.number = (int)(dsResult[2]);
+    }
+  }
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="lblItem" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">158 110</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">101</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">158 110</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Item:</prop>
+     <prop name="en_US.iso88591">Item:</prop>
+     <prop name="de_AT.iso88591">Item:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="radKind" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">391 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">102</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">394 31</prop>
+    <prop name="Size">129 71</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Value</prop>
+       <prop name="en_US.iso88591">Value</prop>
+       <prop name="de_AT.iso88591">Wert</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Event</prop>
+       <prop name="en_US.iso88591">Event</prop>
+       <prop name="de_AT.iso88591">Ereignis</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Alarm &amp;&amp; Condition</prop>
+       <prop name="en_US.iso88591">Alarm &amp;&amp; Condition</prop>
+       <prop name="de_AT.iso88591">Alarm &amp;&amp; Zustand</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  fwPeriphAddressOPCUA_panel_update();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="txtItem" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">80.84170225254975 318</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">103</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">211 110</prop>
+    <prop name="Size">335 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[120s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="cmdSubscription" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">359 69</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">104</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">manage subscriptions</prop>
+     <prop name="en_US.iso88591">manage subscriptions</prop>
+     <prop name="de_AT.iso88591">Subscriptions verwalten</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">359 69</prop>
+    <prop name="Size">25 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">...</prop>
+     <prop name="en_US.iso88591">...</prop>
+     <prop name="de_AT.iso88591">...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string sSubscription;
+  dyn_float dfResult;
+  dyn_string dsResult, exceptionInfo;
+
+
+  sSubscription = cmbSubscription.text;
+  ChildPanelOnRelativModalReturn(&quot;para/opcuaSubscription.pnl&quot;,
+                                 &quot;chooseSubscription&quot;,
+                                 makeDynString(&quot;$SERVER_DP:&quot; + &quot;_&quot; + cmbEquipment.text()),
+                                 0, 0,
+                                 dfResult,
+                                 dsResult);
+
+
+  fwPeriphAddressOPCUA_panel_updatePanelFillSubscriptions($sDpe, cmbEquipment.text());
+  fwPeriphAddressOPCUA_panel_update();
+
+}
+
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="lblDriverNumber" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">567 15</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">91</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">567 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,10,-1,5,75,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> Driver Nr. </prop>
+     <prop name="en_US.iso88591"> Driver Nr. </prop>
+     <prop name="de_AT.iso88591">Treibernummer</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblKind" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">406 15</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">98</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">406 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,10,-1,5,75,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> Kind </prop>
+     <prop name="en_US.iso88591"> Kind </prop>
+     <prop name="de_AT.iso88591">Art</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblVariant" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">471 16</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">99</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">471 16</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,10,-1,5,75,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> Variant </prop>
+     <prop name="en_US.iso88591"> Variant </prop>
+     <prop name="de_AT.iso88591">Variante</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="opcuaButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 36</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">106</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">OPC UA driver configuration</prop>
+     <prop name="en_US.iso88591">OPC UA driver configuration</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,69,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,69,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-arial-bold-r-normal-*-*-160-100-100-*-*-iso8859-1</prop>
+    </prop>
+    <prop name="Location">30 136</prop>
+    <prop name="Size">52 47</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">SysMgm/40x40/OpcUAClient.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  if( !isModuleOpen(&quot;PVSS&quot;) )
+  {
+    ModuleOn(&quot;PVSS&quot;, 100, 100, 500, 500, 1, 1, &quot;None&quot;);
+  }
+
+  RootPanelOnModule(&quot;para/opcuaDriver.pnl&quot;, &quot;&quot;, &quot;PVSS&quot;, makeDynString(&quot;&quot;));
+
+}
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="modus" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">238.1351351351351 172</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">107</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">238 172</prop>
+    <prop name="Size">101 71</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Spontaneous</prop>
+       <prop name="en_US.iso88591">Spontaneous</prop>
+       <prop name="de_AT.iso88591">Spontan</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Polling</prop>
+       <prop name="en_US.iso88591">Polling</prop>
+       <prop name="de_AT.iso88591">Polling</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Single query</prop>
+       <prop name="en_US.iso88591">Single query</prop>
+       <prop name="de_AT.iso88591">Einzelabfrage</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Alarm</prop>
+       <prop name="en_US.iso88591">Alarm</prop>
+       <prop name="de_AT.iso88591">Alarm</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  fwPeriphAddressOPCUA_panel_update();
+}
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="einaus" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">129 171</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">108</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">131 172</prop>
+    <prop name="Size">76 71</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Output</prop>
+       <prop name="en_US.iso88591">Output</prop>
+       <prop name="de_AT.iso88591">Ausgang</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Input</prop>
+       <prop name="en_US.iso88591">Input</prop>
+       <prop name="de_AT.iso88591">Eingang</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">In/Out</prop>
+       <prop name="en_US.iso88591">In/Out</prop>
+       <prop name="de_AT.iso88591">Ein/Aus</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  if( einaus.number == 2 &amp;&amp;
+      modus.number  == 3   )
+  {
+    modus.number = 0;
+  }
+
+  fwPeriphAddressOPCUA_panel_update();
+
+}
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmbPollGroup" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">369.8888888888889 221</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">109</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">371 222</prop>
+    <prop name="Size">151 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+  </shape>
+  <shape Name="trans_art" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">369.0769230769231 170</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">110</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">371 172</prop>
+    <prop name="Size">151 23</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">default</prop>
+       <prop name="en_US.iso88591">default</prop>
+       <prop name="de_AT.iso88591">default</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">boolean</prop>
+       <prop name="en_US.iso88591">boolean</prop>
+       <prop name="de_AT.iso88591">boolean</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">sbyte</prop>
+       <prop name="en_US.iso88591">sbyte</prop>
+       <prop name="de_AT.iso88591">sbyte</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">byte</prop>
+       <prop name="en_US.iso88591">byte</prop>
+       <prop name="de_AT.iso88591">byte</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">int16</prop>
+       <prop name="en_US.iso88591">int16</prop>
+       <prop name="de_AT.iso88591">int16</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">uint16</prop>
+       <prop name="en_US.iso88591">uint16</prop>
+       <prop name="de_AT.iso88591">uint16</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">int32</prop>
+       <prop name="en_US.iso88591">int32</prop>
+       <prop name="de_AT.iso88591">int32</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">uint32</prop>
+       <prop name="en_US.iso88591">uint32</prop>
+       <prop name="de_AT.iso88591">uint32</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">int64</prop>
+       <prop name="en_US.iso88591">int64</prop>
+       <prop name="de_AT.iso88591">int64</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">uint64</prop>
+       <prop name="en_US.iso88591">uint64</prop>
+       <prop name="de_AT.iso88591">uint64</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">float</prop>
+       <prop name="en_US.iso88591">float</prop>
+       <prop name="de_AT.iso88591">float</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">double</prop>
+       <prop name="en_US.iso88591">double</prop>
+       <prop name="de_AT.iso88591">double</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">string</prop>
+       <prop name="en_US.iso88591">string</prop>
+       <prop name="de_AT.iso88591">string</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">date time</prop>
+       <prop name="en_US.iso88591">date time</prop>
+       <prop name="de_AT.iso88591">date time</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">guid</prop>
+       <prop name="en_US.iso88591">guid</prop>
+       <prop name="de_AT.iso88591">guid</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">byte string</prop>
+       <prop name="en_US.iso88591">byte string</prop>
+       <prop name="de_AT.iso88591">byte string</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">xml element</prop>
+       <prop name="en_US.iso88591">xml element</prop>
+       <prop name="de_AT.iso88591">xml element</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">node id</prop>
+       <prop name="en_US.iso88591">node id</prop>
+       <prop name="de_AT.iso88591">node id</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">localized text</prop>
+       <prop name="en_US.iso88591">localized text</prop>
+       <prop name="de_AT.iso88591">localized text</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+  </shape>
+  <shape Name="radVariant" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">453 31</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">89</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">456 32</prop>
+    <prop name="Size">95 47</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Node ID</prop>
+       <prop name="en_US.iso88591">Node ID</prop>
+       <prop name="de_AT.iso88591">Node ID</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Browse Path</prop>
+       <prop name="en_US.iso88591">Browse Path</prop>
+       <prop name="de_AT.iso88591">Browse Pfad</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  fwPeriphAddressOPCUA_panel_update();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="Treiber" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">558.8571428571429 33</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">94</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+     <prop name="de_AT.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">561 35</prop>
+    <prop name="Size">61 23</prop>
+    <prop name="MinimumID">1</prop>
+    <prop name="MaximumID">256</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">1</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  int iDriverNumber;
+  dyn_int diDriverNumbers;
+  dyn_string dsServers, exceptionInfo;
+
+
+  iDriverNumber = Treiber.value();
+  getAllDrivers(diDriverNumbers, exceptionInfo);
+  if( dynContains(diDriverNumbers, iDriverNumber) == 0 )
+  {
+    cmbEquipment.deleteAllItems();
+    cmbEquipment.enabled(FALSE);
+
+    cmbSubscription.deleteAllItems();
+    cmbSubscription.enabled(FALSE);
+  }
+  else
+  {
+    if( returnServersInDriver(iDriverNumber, dsServers, exceptionInfo) == FALSE )
+    {
+      fwExceptionHandling_display(exceptionInfo);
+    }
+
+    if( dynlen(dsServers) &gt; 0 )
+    {
+      cmbEquipment.enabled(TRUE);
+      cmbEquipment.items(dsServers);
+
+      cmbSubscription.enabled(TRUE);
+      fwPeriphAddressOPCUA_panel_updatePanelFillSubscriptions($sDpe, cmbEquipment.text());
+    }
+    else
+    {
+      cmbEquipment.deleteAllItems();
+      cmbEquipment.enabled(FALSE);
+
+      cmbSubscription.deleteAllItems();
+      cmbSubscription.enabled(FALSE);
+    }
+  }
+
+}
+
+
+
+
+
+void getAllDrivers(dyn_int &amp;diDriverNumbers)
+{
+  int iLoop, iLen;
+  dyn_string dsDps;
+
+
+  dsDps = dpNames(&quot;_OPCUA*&quot;, &quot;_OPCUA&quot;);
+  iLen  = dynlen(dsDps);
+  for( iLoop = 1 ; iLoop &lt;= iLen ; iLoop++ )
+  {
+    dsDps[iLoop] = dpSubStr(dsDps[iLoop], DPSUB_DP);
+    strreplace(dsDps[iLoop], &quot;_OPCUA&quot;, &quot;&quot;);
+    diDriverNumbers[iLoop] = (int) dsDps[iLoop];
+  }
+
+}
+
+
+
+
+bool returnServersInDriver(int iDriverNumber, dyn_string &amp;dsServers, dyn_string &amp;exceptionInfo)
+{
+  string sServerDp, sRunTimeServer;
+
+
+  sServerDp = &quot;_OPCUA&quot; + iDriverNumber;
+  if( !dpExists(sServerDp) )
+  {
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Error, internal DP doesn't exist: &quot; + sServerDp, &quot;&quot;);
+    return FALSE;
+  }
+
+  dpGet(sServerDp + &quot;.Config.Servers&quot;,    dsServers,
+        sServerDp + &quot;.Command.AddServer&quot;, sRunTimeServer);
+
+  if( sRunTimeServer != &quot;&quot; )
+    dynAppend(dsServers, sRunTimeServer);
+
+  dynUnique(dsServers);
+
+  return TRUE;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="setOpcuaDirection" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">111 151</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">111</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">111 151</prop>
+    <prop name="Size">14 16</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  setOpcuaDirection.state(0) = state;
+}
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="setOpcuaMode" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">221 151</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">112</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">221 151</prop>
+    <prop name="Size">14 16</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  setOpcuaMode.state(0) = state;
+}
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="setOpcuaServer" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">112 29</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">115</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">112 29</prop>
+    <prop name="Size">14 16</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="setOpcuaDriver" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">39</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">556 15</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">118</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">556 15</prop>
+    <prop name="Size">14 16</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="setOpcuaTransformation" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">361 151</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">119</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">361 151</prop>
+    <prop name="Size">14 16</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="setOpcuaPollGroup" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">41</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">361 201</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">120</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">361 201</prop>
+    <prop name="Size">14 16</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="setOpcuaLowLevel" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">42</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">111 253</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">121</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">111 253</prop>
+    <prop name="Size">14 16</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="setOpcuaActive" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">44</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">111 273</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">123</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">111 273</prop>
+    <prop name="Size">14 16</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="setOpcuaSubscription" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">46</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">112 71</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">125</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">112 71</prop>
+    <prop name="Size">14 16</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="setOpcuaVariant" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">47</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">458 16</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">126</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">458 16</prop>
+    <prop name="Size">14 16</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="txtSubscription" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">49</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">211 74</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">128</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">211 70</prop>
+    <prop name="Size">173 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+   <events>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+  fwPeriphAddressOPCUA_panel_update();
+}
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="txtPollGroup" shapeType="TEXT_FIELD" layerId="1">
+   <properties>
+    <prop name="serialId">51</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">372 225</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">130</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,10,-1,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">372 221</prop>
+    <prop name="Size">173 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

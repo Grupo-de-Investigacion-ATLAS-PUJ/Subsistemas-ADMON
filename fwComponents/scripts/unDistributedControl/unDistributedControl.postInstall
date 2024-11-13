@@ -1,0 +1,142 @@
+#uses "unDistributedControl/unDistributedControl.ctl"
+
+main()
+{
+  string sDistributedControlDpName;
+  string sSystemName, sHostName, sPortNumber;
+  int iRes;
+  dyn_string exceptionInfo;
+
+  bool installOK=true;
+
+// get the local system
+  sSystemName = getSystemName();
+
+  sDistributedControlDpName = "_unDistributedControl_"+substr(sSystemName, 0, strpos(sSystemName, ":"));
+
+  fwInstallation_throw("unDistributedControl.postInstall: checking configuration", "INFO", 10);
+  
+// create distributedControl dp for the local system.
+  if(!dpExists(sDistributedControlDpName)) {
+  	fwInstallation_throw("unDistributedControl.postInstall: creating internal data point "+sDistributedControlDpName, "INFO", 10);
+    int rc = dpCreate(sDistributedControlDpName, "_UnDistributedControl");
+    if(rc || (!dpExists(sDistributedControlDpName))) {
+    	fwInstallation_throw("unDistributedControl.postInstall: Could not create DP: "+sDistributedControlDpName,"ERROR",1);
+    } else {
+      unDistributedControl_convertHostPort(sHostName, sPortNumber);
+      unDistributedControl_setDeviceConfig(getSystemName(), getSystemId(), sHostName, sPortNumber, exceptionInfo);
+      if(dynlen(exceptionInfo) > 0) {
+    	fwInstallation_throw("unDistributedControl.postInstall: Could not set: "+sDistributedControlDpName,"ERROR",1);
+      } else {
+      	fwInstallation_throw("unDistributedControl.postInstall: DP succesfully set up","INFO",10);
+      }
+    }
+  } else {
+    fwInstallation_throw("unDistributedControl.postInstall: DP already present "+sDistributedControlDpName,"INFO",10);
+  }
+
+  iRes = unDistributedControl_postInstallUpdate();
+  if(iRes > 0)
+  {
+  	installOK=false;
+    fwInstallation_throw("unDistributedControl.postInstall: errors have been encountered during system configuration","ERROR",10);
+  } else {
+    fwInstallation_throw("unDistributedControl.postInstall: configuration successfully completed","INFO",10);
+  }
+  
+  if(isFunctionDefined("fwInstallation_setComponentInstallationStatus")) fwInstallation_setComponentInstallationStatus("unDistributedControl", installOK);
+
+}
+
+/**
+	@return : 0 if the execution has no errors, 
+				or the number of errors (length of exceptionInfo) otherwise
+				
+	Note that the errors/exceptionInfo are reported to the log by the function itself/
+*/
+int unDistributedControl_postInstallUpdate()
+{
+  dyn_string dsSystemName, dsHostName, exceptionInfo;
+  dyn_int diSystemId, diPortNumber;
+
+  dyn_string dsFileHostName, dsFileReduHostName;
+  dyn_int diFileSystemId, diFilePortNumber;
+
+  int i, len;
+  string sPortNumber;
+  
+  unDistributedControl_getAllDeviceConfig(dsSystemName, diSystemId, dsHostName, diPortNumber);
+  dyn_int uniqueDiSystemId = diSystemId;
+  dynUnique(uniqueDiSystemId);
+  if(dynlen(uniqueDiSystemId) != dynlen(diSystemId))
+  {
+    fwInstallation_throw("ERROR: unDistributedControl ERROR -> Various system have the same number. Please, correct this before proceeding...", "WARNING", 10);
+  }
+  
+  
+  len = dynlen(dsSystemName);
+  for(i=1;i<=len;i++) {
+    if(diPortNumber[i] == 0)
+      sPortNumber = "";
+    else
+      sPortNumber = diPortNumber[i];
+    unDistributedControl_convertHostPort(dsHostName[i], sPortNumber);
+    unDistributedControl_setDeviceConfig(dsSystemName[i], diSystemId[i], dsHostName[i], sPortNumber, exceptionInfo);
+  }
+ 
+  //if it is not a UNICOS project, skip updating the config file of the project
+  string version = "";
+  bool unicos = fwInstallation_isComponentInstalled("unCore", version);
+  if(unicos){
+    fwInstallation_throw("unDistributedControl.postInstall: updating config file", "INFO", 10);  
+    unDistributedControl_addToConfigFile(exceptionInfo);
+    if(dynlen(exceptionInfo) > 0){
+      fwInstallation_throw("unDistributedControl.postInstall: failed to update the config file", "WARNING", 10);
+    }
+  }
+  //Verify that the project config file and the internal dps are in sync
+  unDistributedControl_getAllDeviceConfig(dsSystemName, diSystemId, dsHostName, diPortNumber);
+  unDistributedControl_getAllDeviceConfigFromFile(diFileSystemId, dsFileHostName, diFilePortNumber, dsFileReduHostName, exceptionInfo);
+
+  dynUnique(diSystemId);
+  dynUnique(diFileSystemId);
+  dynSortAsc(diSystemId);
+  dynSortAsc(diFileSystemId);
+
+  int localSystemPos = dynContains(diSystemId, getSystemId()); // unDistributedControl has a datapoint also for the local system
+  if(localSystemPos > 0){
+    dynRemove(diSystemId, localSystemPos); // remove local system id before comparing with system ids from distPeer config entries
+  }
+
+  if(diSystemId == diFileSystemId){
+    fwInstallation_throw("unDistributedControl.postInstall: configuration OK", "INFO", 10);
+  } else {
+    string notFoundInFile;
+    string notFoundInConf;
+    for (int i=1;i<=dynlen(diSystemId);i++) {
+    	int id=diSystemId[i];
+    	if (!dynContains(diFileSystemId,id)) {
+    		if (notFoundInFile!="") notFoundInFile+=",";
+    		notFoundInFile+=(string)id;
+    	}
+    }    
+    for (int i=1;i<=dynlen(diFileSystemId);i++) {
+    	int id=diFileSystemId[i];
+    	if (!dynContains(diSystemId,id)) {
+    		if (notFoundInConf!="") notFoundInConf+=",";
+    		notFoundInConf+=(string)id;
+    	}
+    }
+    if (unicos) {
+      if (notFoundInConf!="") fwInstallation_throw("unDistributedControl.postInstall: some distPeers listed in the config file are not defined for unDistributedControl, SYSID:"+notFoundInConf+" . Correct this from the component configuration panel...", "WARNING", 10);
+      if (notFoundInFile!="") fwInstallation_throw("unDistributedControl.postInstall: some of configured distPeers are not found in the config file, SYSID:"+notFoundInFile+" . Correct this from the component configuration panel...", "WARNING", 10);
+    } else {
+      fwInstallation_throw("unDistributedControl.postInstall: some of connected/configured distPeers are not in the config file (relevant only if this system should start the dist connection), SYSID: "+notFoundInFile, "INFO", 10);
+    }
+  }
+
+  //finally, append unDistributedControl CTRL manager to the console:
+  fwInstallationManager_add("WCCOActrl", "always", 30, 3, 2, "unDistributedControl.ctl");
+  return dynlen(exceptionInfo);
+}
+

@@ -1,0 +1,2435 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">400 201</prop>
+  <prop name="BackColor">FwTrendingViewBackground</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+
+dyn_int CONNECTED_SYSTEM_IDS;
+dyn_string DPES_FROM_CONFIG_DP;
+bool LOADED_PLOT_CONFIG = FALSE;
+bool ACCESS_RIGHTS_GRANTED = TRUE;
+bool IS_DP_AVAILABLE;
+time LAST_CONFIG_UPDATE;
+
+trendingDisplay_update2(string dp1, dyn_int val1, string dp2, dyn_int val2)
+{
+	bool run, isConnected, changeButtons = FALSE;
+	int i;
+	string isRunning, systemName, ref=$sRefName, tooltip;
+	dyn_int systemIds, connectedSystemIds;
+	dyn_string plotShapes, exceptionInfo;
+	dyn_dyn_string plotData;
+
+	if(ref!=&quot;&quot;)
+		ref+=&quot;.&quot;;
+
+	_fwTrending_getConnectedSystemIds(connectedSystemIds, exceptionInfo);
+	
+	if(connectedSystemIds != CONNECTED_SYSTEM_IDS)
+	{
+		if($sDpName != &quot;&quot;)
+		{
+			_fwTrending_isSystemForDpeConnected($sDpName, isConnected, exceptionInfo);
+			IS_DP_AVAILABLE = isConnected;
+
+			if(isConnected)
+				tooltip = &quot;Save configuration to plot data point&quot;;
+			else
+				tooltip = &quot;The plot data point is on a remote system which is unavailable&quot;;
+
+			if(ACCESS_RIGHTS_GRANTED)
+				changeButtons = TRUE;
+		}
+		else
+			isConnected = FALSE;
+		
+		if(!LOADED_PLOT_CONFIG)
+		{
+			if(isConnected)
+			{
+				loadAndConnectToDp($sDpName, $sRefName);
+				dpNotExist.visible = FALSE;
+				dpNotAvailable.visible = FALSE;
+			}
+		}
+		else
+		{
+			fwTrending_getRuntimePlotDataWithExtendedObject($sRefName, isRunning, plotShapes, plotData, exceptionInfo);
+			for(i=1; i&lt;=dynlen(plotData[fwTrending_PLOT_OBJECT_DPES]); i++)
+			{
+				systemName = dpSubStr(plotData[fwTrending_PLOT_OBJECT_DPES][i], DPSUB_SYS);
+				if(systemName != &quot;&quot;)
+					dynAppend(systemIds, getSystemId(systemName));
+					
+				systemName = dpSubStr(plotData[fwTrending_PLOT_OBJECT_DPES_X][i], DPSUB_SYS);
+				if(systemName != &quot;&quot;)
+					dynAppend(systemIds, getSystemId(systemName));
+
+				dynUnique(systemIds);
+			}
+		
+//DebugN(&quot;Previous: &quot; + dynIntersect(systemIds, CONNECTED_SYSTEM_IDS) + &quot; Current: &quot; + dynIntersect(systemIds, connectedSystemIds));
+
+			if((dynIntersect(systemIds, CONNECTED_SYSTEM_IDS)) != (dynIntersect(systemIds, connectedSystemIds)))
+			{
+//DebugN(&quot;So do refresh (&quot; + $sRefName + &quot;)&quot;);
+				refreshTrend(FALSE);
+			}
+		}
+	}
+	
+	if(changeButtons)
+	{
+		setValue(ref+&quot;saveSettings&quot;, &quot;enabled&quot;, isConnected);
+		setValue(ref+&quot;saveSettings&quot;, &quot;toolTipText&quot;, tooltip);
+	}
+	CONNECTED_SYSTEM_IDS = connectedSystemIds;
+}
+
+
+trendingDisplay_update(string dp1, dyn_string val1)
+{
+	time timeStamp;
+	string isRunning, shouldRefresh;
+	dyn_string plotShapes, exceptionInfo, dpes;
+	dyn_dyn_string returnValue, plotData;
+		
+	dp1 = dpSubStr(dp1, DPSUB_SYS_DP_EL);
+  
+  if( (dp1 != &quot;&quot;) &amp;&amp; (dpExists(dp1 + &quot;:_online.._stime&quot;)) )
+  {
+  	dpGet(dp1 + &quot;:_online.._stime&quot;, timeStamp);
+  }
+  else
+  {
+    DebugTN(&quot;Error in &quot; + myPanelName() + &quot; -&gt; trendingDisplay_update() -&gt; dp1 is empty or doesn't exist: &quot; + dp1 + &quot;:_online.._stime&quot;);
+    return;
+  }
+
+	if(timeStamp == LAST_CONFIG_UPDATE)
+		return;
+	
+	shouldRefresh = refreshTrend.text;
+	if(shouldRefresh != &quot;TRUE&quot;)
+		return;
+
+	fwTrending_getRuntimePlotDataWithExtendedObject($sRefName, isRunning, plotShapes, plotData, exceptionInfo);
+	fwTrending_getPlotExtended($sDpName, $sRefName, returnValue, exceptionInfo, TRUE);
+
+	if(dynlen(returnValue) == fwTrending_getPlotData_LEN_RETURN_DATA)
+		fwTrending_setRuntimePlotDataWithExtendedObject($sRefName, isRunning, returnValue, exceptionInfo);
+
+	dpes = returnValue[fwTrending_PLOT_OBJECT_DPES];
+	dynAppend(dpes, returnValue[fwTrending_PLOT_OBJECT_DPES_X]);
+
+	if(DPES_FROM_CONFIG_DP == dpes)
+		refreshTrend(FALSE);
+	else
+		refreshTrend(TRUE);
+
+	DPES_FROM_CONFIG_DP = dpes;
+	LAST_CONFIG_UPDATE = timeStamp;
+	dpNotExist.visible = FALSE;
+	dpNotAvailable.visible = FALSE;
+}
+
+readDollarValues(dyn_string &amp;plotData, dyn_string &amp;exceptionInfo)
+{
+	int currentTimeRange;
+	float fTemp;
+
+/*	fTemp = $fMinForLog;
+	if(fTemp &lt;= 0)
+		plotData[fwTrending_PLOT_OBJECT_EXT_MIN_FOR_LOG] = fwTrending_MIN_FOR_LOG;
+	else
+		plotData[fwTrending_PLOT_OBJECT_EXT_MIN_FOR_LOG] = $fMinForLog;
+			
+	fTemp = $fMaxPercentageForLog;
+	if(fTemp &lt;= 0)
+		plotData[fwTrending_PLOT_OBJECT_EXT_MAX_PERCENTAGE_FOR_LOG] = fwTrending_MAX_PERCENTAGE_FOR_LOG;
+	else
+		plotData[fwTrending_PLOT_OBJECT_EXT_MAX_PERCENTAGE_FOR_LOG] = $fMaxPercentageForLog;
+*/	
+	plotData[fwTrending_PLOT_OBJECT_TITLE] = $ZoomWindowTitle;
+	plotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC] = &quot;FALSE&quot;; //$bTrendLog;
+	plotData[fwTrending_PLOT_OBJECT_DPES] = $dsCurveDPE;
+	plotData[fwTrending_PLOT_OBJECT_LEGENDS] = $dsCurveLegend;
+	plotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS] = $dsCurveToolTipText;
+	plotData[fwTrending_PLOT_OBJECT_DPES_X] = $dsCurveXDPE;
+	plotData[fwTrending_PLOT_OBJECT_LEGENDS_X] = $dsCurveXLegend;
+	plotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS_X] = $dsCurveXToolTipText;
+	plotData[fwTrending_PLOT_OBJECT_COLORS] = $dsCurveColor;
+	plotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE] = $dsCurveRange;
+	plotData[fwTrending_PLOT_OBJECT_EXT_UNITS] = $dsUnit;
+	plotData[fwTrending_PLOT_OBJECT_EXT_MIN_MAX_RANGE_X] = $dsXCurveRange;
+	plotData[fwTrending_PLOT_OBJECT_EXT_UNITS_X] = $dsXUnit;
+	plotData[fwTrending_PLOT_OBJECT_CURVES_HIDDEN] = $dsCurveVisible;
+//	plotData[fwTrending_PLOT_OBJECT_AXII] = $dsCurveScaleVisible;
+	plotData[fwTrending_PLOT_OBJECT_CURVE_TYPES] = $dsCurvesType;
+	plotData[fwTrending_PLOT_OBJECT_BACK_COLOR] = $sBackColor;
+	plotData[fwTrending_PLOT_OBJECT_FORE_COLOR] = $sForeColor;
+	plotData[fwTrending_PLOT_OBJECT_GRID] = $bShowGrid;
+	plotData[fwTrending_PLOT_OBJECT_LEGEND_ON] = $bShowLegend;
+		
+	currentTimeRange = $sTimeRange;
+	if(currentTimeRange &lt;= 0) 
+		currentTimeRange = fwTrending_SECONDS_IN_ONE_HOUR;
+
+	plotData[fwTrending_PLOT_OBJECT_TIME_RANGE] = currentTimeRange;
+}
+
+loadAndConnectToDp(string dpName, string ref)
+{
+	dyn_string exceptionInfo;
+	dyn_dyn_string returnValue;
+
+	fwTrending_getPlotExtended(dpName, ref, returnValue, exceptionInfo, TRUE);
+	LOADED_PLOT_CONFIG = TRUE;
+
+	if(dynlen(returnValue) == fwTrending_getPlotData_LEN_RETURN_DATA)
+		fwTrending_setRuntimePlotDataWithExtendedObject(ref, TRUE, returnValue, exceptionInfo);
+
+	dpConnect(&quot;trendingDisplay_update&quot;, TRUE, dpName + fwTrending_PLOT_DPES);
+}
+
+refreshTrend(bool eraseData = TRUE)
+{
+	drawTrend($sRefName, eraseData);
+}
+
+drawTrend(string ref, bool eraseData = TRUE)
+{
+	bool isOk, trendRunning, isLog;
+	int i, length;
+	string parameterString;
+	dyn_float df;
+	dyn_string plotShapes, exceptionInfo, parameters, ds;
+	dyn_dyn_string plotData;
+	shape activeTrendShape, parameterStore;
+
+// here get all data and initialize the trends and the control trend buttons.
+	fwTrending_getRuntimePlotDataWithExtendedObject(ref, trendRunning, plotShapes, plotData, exceptionInfo);
+//DebugN(plotData);
+
+	if(ref == &quot;&quot;)
+		parameterStore = getShape(&quot;parameterValues&quot;);
+	else
+		parameterStore = getShape(ref + &quot;trend.parameterValues&quot;);
+
+	if(isDollarDefined(&quot;$templateParameters&quot;))
+		parameterStore.text = $templateParameters;
+	else
+		parameterStore.text = &quot;&quot;;
+		
+	parameterString = parameterStore.text;
+	fwTrending_checkAndGetAllTemplateParameters(ref, plotData, fwTrending_PLOT, parameterString, exceptionInfo, TRUE);
+	parameterStore.text = parameterString;
+
+	_fwTrending_evaluateTemplate(parameterString, plotData[fwTrending_PLOT_OBJECT_DPES], exceptionInfo);    
+	_fwTrending_evaluateTemplate(parameterString, plotData[fwTrending_PLOT_OBJECT_DPES_X], exceptionInfo);    
+	_fwTrending_evaluateTemplate(parameterString, plotData[fwTrending_PLOT_OBJECT_LEGENDS], exceptionInfo);    
+	_fwTrending_evaluateTemplate(parameterString, plotData[fwTrending_PLOT_OBJECT_LEGENDS_X], exceptionInfo);    
+	_fwTrending_evaluateTemplate(parameterString, plotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS], exceptionInfo);    
+	_fwTrending_evaluateTemplate(parameterString, plotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS_X], exceptionInfo);    
+
+	fwTrending_convertUnicosDpeListToPvssDpeList(plotData[fwTrending_PLOT_OBJECT_DPES], plotData[fwTrending_PLOT_OBJECT_DPES], exceptionInfo);
+	fwTrending_convertUnicosDpeListToPvssDpeList(plotData[fwTrending_PLOT_OBJECT_DPES_X], plotData[fwTrending_PLOT_OBJECT_DPES_X], exceptionInfo);
+
+	activeTrendShape = getShape(plotShapes[fwTrending_ACTIVE_TREND_NAME]);
+
+	for(i=1; i&lt;=fwTrending_MAX_NUM_CURVES; i++)
+	{
+		activeTrendShape.disconnectDirectly(&quot;curve_&quot; + i);
+		if(eraseData)
+			activeTrendShape.curveRemoveData(&quot;curve_&quot; + i, getCurrentTime());
+	}
+
+/*	if((plotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC][1] == &quot;TRUE&quot;) || (plotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC][1] == TRUE))
+	{
+		isLog = TRUE;					
+		setValue(ref+&quot;trend.activeTrendText&quot;, &quot;text&quot;, plotShapes[fwTrending_LOG_TREND_NAME]);
+		plotShapes[fwTrending_ACTIVE_TREND_NAME] = plotShapes[fwTrending_LOG_TREND_NAME];
+	}
+	else
+	{
+*/
+		isLog = FALSE;
+		setValue(ref+&quot;trend.activeTrendText&quot;, &quot;text&quot;, plotShapes[fwTrending_LINEAR_TREND_NAME]);
+		plotShapes[fwTrending_ACTIVE_TREND_NAME] = plotShapes[fwTrending_LINEAR_TREND_NAME];
+//	}
+
+// initialise the trends
+	fwTrending_initTrendWithObject($sRefName, plotShapes[fwTrending_ACTIVE_TREND_NAME], plotShapes, plotData, trendRunning, TRUE, exceptionInfo, TRUE);
+// show the log or standard trend
+	fwTrending_showStandardTrend(!isLog, plotShapes[fwTrending_LINEAR_TREND_NAME], plotShapes[fwTrending_LOG_TREND_NAME]);
+
+// initialize the buttons of the fwTrending/fwTrendingTrendControl.pnl
+	fwTrending_initControlTrendXYButtons(plotData[fwTrending_PLOT_OBJECT_TIME_RANGE][1], $sRefName, $sDpName, plotData[fwTrending_PLOT_OBJECT_IS_LOGARITHMIC][1]);
+
+// send exception to the message text if any
+	if(isFunctionDefined(&quot;unMessageText_sendException&quot;))
+		unMessageText_sendException(getSystemName(), myManNum(), &quot;trending&quot;, &quot;user&quot;, &quot;*&quot;, exceptionInfo);
+
+// handle here any error 
+	if(dynlen(exceptionInfo)&gt;0) {
+		fwExceptionHandling_display(exceptionInfo);
+	}
+}
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="refName" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">330</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 60</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 62</prop>
+    <prop name="Size">42 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">refName</prop>
+     <prop name="en_US.iso88591">refName</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="trendRunningText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">332</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 42</prop>
+    <prop name="Size">86 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">trendRunningText</prop>
+     <prop name="en_US.iso88591">trendRunningText</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="standardTrendText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">333</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">38</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 82</prop>
+    <prop name="Size">93 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">standardTrendText</prop>
+     <prop name="en_US.iso88591">standardTrendText</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="logTrendText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">334</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">39</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 102</prop>
+    <prop name="Size">64 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">logTrendText</prop>
+     <prop name="en_US.iso88591">logTrendText</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="activeTrendText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">335</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">40</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 122</prop>
+    <prop name="Size">79 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">activeTrendText</prop>
+     <prop name="en_US.iso88591">activeTrendText</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="dpNameText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">347</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">70 60</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">72 62</prop>
+    <prop name="Size">61 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">dpNameText</prop>
+     <prop name="en_US.iso88591">dpNameText</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="refreshTrend" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">360</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">220 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">63</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">222 82</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">TRUE</prop>
+     <prop name="en_US.iso88591">TRUE</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="initScript" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 -7</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 22</prop>
+    <prop name="Size">44 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">init script</prop>
+     <prop name="en_US.iso88591">init script</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{	
+	string ref, dpName;
+	bool isConnected, bFromPVSSDB = FALSE;
+	dyn_string exceptionInfo, dollarValues, errorMessage;	
+	
+	dpNameText.text = $sDpName;
+	refName.text = $sRefName;
+	ref = $sRefName;
+	dpName = $sDpName;
+
+	if(dpName != &quot;&quot;)
+	{
+		if(dpExists(dpName))
+		{
+			if(dpTypeName(dpName) == fwTrending_PLOT)
+			{
+				bFromPVSSDB = TRUE;
+				loadAndConnectToDp(dpName, ref);
+			}
+
+			_fwTrending_isSystemForDpeConnected(dpName, isConnected, exceptionInfo);
+			IS_DP_AVAILABLE = isConnected;
+			if(!isConnected)
+			{
+				errorMessage = dpNotAvailable.text;
+				errorMessage[2] = &quot;\&quot;&quot; + dpName + &quot;\&quot;&quot;;
+				dpNotAvailable.text = errorMessage;
+				dpNotAvailable.visible = TRUE;
+			}
+		}
+		else
+		{
+			bFromPVSSDB = TRUE;
+			errorMessage = dpNotExist.text;
+			errorMessage[2] = &quot;\&quot;&quot; + dpName + &quot;\&quot;&quot;;
+			dpNotExist.text = errorMessage;
+			dpNotExist.visible = TRUE;
+		}
+	}
+	
+	if(!bFromPVSSDB) { // the data are not read from PVSS database, use the $param instead
+		readDollarValues(dollarValues, exceptionInfo);
+		LOADED_PLOT_CONFIG = TRUE;
+		fwTrending_setRuntimePlotDataWithStrings(ref, TRUE, dollarValues, exceptionInfo);
+
+		drawTrend(ref);
+	}
+	
+	_fwTrending_getConnectedSystemIds(CONNECTED_SYSTEM_IDS, exceptionInfo);
+ string sConnectionsDp = fwInstallationRedu_getLocalDp(&quot;_Connections&quot;);
+ string sDistDp = fwInstallationRedu_getLocalDp(&quot;_DistManager&quot;);
+	dpConnect(&quot;trendingDisplay_update2&quot;, FALSE, sConnectionsDp+&quot;.Dist.ManNums&quot;,sDistDp+&quot;.State.SystemNums&quot;);
+}
+
+/* callback function set up in the fwTrending_initControlTrendXYButtons, this is for access control */
+selectCB(string sUi, string sUser)
+{
+	bool granted = false;
+	dyn_string exceptionInfo, domainList, priviledgeList, systems;
+	string ref=$sRefName, tooltip;
+	shape cascadeButton;
+
+	if(ref!=&quot;&quot;)
+		ref+=&quot;.&quot;;
+
+	fwAccessControl_getDomainList(domainList, exceptionInfo);
+	fwAccessControl_getPriviledgeList(priviledgeList, exceptionInfo);
+// get the priviledge and domain list. the saveSettings and plot configuration is allowed for any user having the second priviledge level of the first domain
+	if(dynlen(exceptionInfo)&lt;=0)
+	{
+		fwAccessControl_getUserPermission(priviledgeList[2], domainList[1], granted, exceptionInfo);
+	}
+
+	ACCESS_RIGHTS_GRANTED = granted;
+	if(IS_DP_AVAILABLE)
+		setValue(ref+&quot;saveSettings&quot;, &quot;enabled&quot;, granted);
+
+	cascadeButton = getShape(ref+&quot;OtherCascadeButton&quot;);
+	cascadeButton.enableItem(&quot;8&quot;, granted);	
+	cascadeButton.enableItem(&quot;9&quot;, granted);	
+}
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="dpNotAvailable" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">363</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">66</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">180 55</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">The plot configuration data point
+{name}
+is from a remote system which is not available.</prop>
+     <prop name="en_US.iso88591">The plot configuration data point
+{name}
+is from a remote system which is not available.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">15</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="dpNotExist" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">362</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">73 37</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">65</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">180 52</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">The plot configuration data point
+{name}
+does not exist.</prop>
+     <prop name="en_US.iso88591">The plot configuration data point
+{name}
+does not exist.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">15</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="parameterValues" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">364</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">180 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">67</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">182 92</prop>
+    <prop name="Size">157 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">parameterValues</prop>
+     <prop name="en_US.iso88591">parameterValues</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="standardTrend" shapeType="TREND">
+   <properties>
+    <prop name="serialId">365</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">FwTrendingTrendForeground</prop>
+    <prop name="BackColor">FwTrendingFaceplateBackground</prop>
+    <prop name="TabOrder">67</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">401 201</prop>
+    <prop name="TimeTrend">False</prop>
+    <prop name="Logarithmic">False</prop>
+    <prop name="ShowToolBox">False</prop>
+    <prop name="ShowLegend">False</prop>
+    <prop name="Vertical">True</prop>
+    <prop name="ShowGrid">True</prop>
+    <prop name="ShowBackgroundGrid">False</prop>
+    <prop name="TimeRange">60</prop>
+    <prop name="ScrollPercent">90</prop>
+    <prop name="LegendFont">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="ScaleFont">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="DefaultFont">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="TrendArea">
+     <prop name="PixmapFile"></prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_1</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen1</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">5</prop>
+      <prop name="GridBelowCount">5</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_1</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">5</prop>
+       <prop name="GridBelowCount">5</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_2</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat">%6.2f</prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen2</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">4</prop>
+      <prop name="GridBelowCount">4</prop>
+      <prop name="GridAboveDistance">1</prop>
+      <prop name="GridBelowDistance">1</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_2</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat">%6.2f</prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_3</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen3</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_3</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_4</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen4</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_4</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_5</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen5</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_5</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_6</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen6</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_6</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_7</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen7</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_7</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_8</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen8</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_8</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_9</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">2</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">{0,0,0}</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%6.2f</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">True</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_9</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%6.2f</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">True</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="logTrend" shapeType="TREND">
+   <properties>
+    <prop name="serialId">367</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">FwTrendingTrendForeground</prop>
+    <prop name="BackColor">FwTrendingFaceplateBackground</prop>
+    <prop name="TabOrder">67</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">401 201</prop>
+    <prop name="TimeTrend">False</prop>
+    <prop name="Logarithmic">False</prop>
+    <prop name="ShowToolBox">False</prop>
+    <prop name="ShowLegend">False</prop>
+    <prop name="Vertical">True</prop>
+    <prop name="ShowGrid">True</prop>
+    <prop name="ShowBackgroundGrid">False</prop>
+    <prop name="TimeRange">60</prop>
+    <prop name="ScrollPercent">90</prop>
+    <prop name="LegendFont">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="ScaleFont">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="DefaultFont">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="TrendArea">
+     <prop name="PixmapFile"></prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_1</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">2</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">False</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">1</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen1</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">5</prop>
+      <prop name="GridBelowCount">5</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_1</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">False</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">1</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">5</prop>
+       <prop name="GridBelowCount">5</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_2</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat">%6.2f</prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen2</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">4</prop>
+      <prop name="GridBelowCount">4</prop>
+      <prop name="GridAboveDistance">1</prop>
+      <prop name="GridBelowDistance">1</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_2</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat">%6.2f</prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_3</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen3</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_3</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_4</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen4</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_4</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_5</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen5</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_5</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_6</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen6</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_6</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_7</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen7</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_7</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_8</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">7</prop>
+      <prop name="Type">1</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"> </prop>
+       <prop name="en_US.iso88591"> </prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">STD_trend_pen8</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_8</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+     <prop name="TrendCurve" type="ValueOverValue">
+      <prop name="Name">curve_9</prop>
+      <prop name="DataSource"></prop>
+      <prop name="PointType">0</prop>
+      <prop name="Type">2</prop>
+      <prop name="Filled">0</prop>
+      <prop name="RefValue">0</prop>
+      <prop name="LegendFormat"></prop>
+      <prop name="LegendShowDate">False</prop>
+      <prop name="LegendShowMilli">False</prop>
+      <prop name="LegendName">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="LegendUnit">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="VisibleInLegend">True</prop>
+      <prop name="AutoScale">True</prop>
+      <prop name="ValueShape"></prop>
+      <prop name="TimeShape"></prop>
+      <prop name="Min">0</prop>
+      <prop name="Max">100</prop>
+      <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+      <prop name="Color">{0,0,0}</prop>
+      <prop name="GridVisible">False</prop>
+      <prop name="GridAboveCount">0</prop>
+      <prop name="GridBelowCount">0</prop>
+      <prop name="GridAboveDistance">0</prop>
+      <prop name="GridBelowDistance">0</prop>
+      <prop name="GridRefValue">0</prop>
+      <CurveScale>
+       <prop name="Format1">%g</prop>
+       <prop name="Format2">%x</prop>
+       <prop name="AutoFormat">True</prop>
+       <prop name="Visible">False</prop>
+       <prop name="Position">Left</prop>
+      </CurveScale>
+      <TrendCurveX>
+       <prop name="Name">curve_9</prop>
+       <prop name="DataSource"></prop>
+       <prop name="PointType">0</prop>
+       <prop name="Type">2</prop>
+       <prop name="Filled">0</prop>
+       <prop name="RefValue">0</prop>
+       <prop name="LegendFormat"></prop>
+       <prop name="LegendShowDate">False</prop>
+       <prop name="LegendShowMilli">False</prop>
+       <prop name="LegendName">
+        <prop name="en_US.utf8"></prop>
+       </prop>
+       <prop name="LegendUnit">
+        <prop name="en_US.utf8"></prop>
+        <prop name="en_US.iso88591"></prop>
+       </prop>
+       <prop name="VisibleInLegend">True</prop>
+       <prop name="AutoScale">True</prop>
+       <prop name="ValueShape"></prop>
+       <prop name="TimeShape"></prop>
+       <prop name="Min">0</prop>
+       <prop name="Max">100</prop>
+       <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+       <prop name="Color">{255,0,0}</prop>
+       <prop name="GridVisible">False</prop>
+       <prop name="GridAboveCount">0</prop>
+       <prop name="GridBelowCount">0</prop>
+       <prop name="GridAboveDistance">0</prop>
+       <prop name="GridBelowDistance">0</prop>
+       <prop name="GridRefValue">0</prop>
+       <CurveScale>
+        <prop name="Format1">%g</prop>
+        <prop name="Format2">%x</prop>
+        <prop name="AutoFormat">True</prop>
+        <prop name="Visible">False</prop>
+        <prop name="Position">Bottom</prop>
+       </CurveScale>
+      </TrendCurveX>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="trendInfo" shapeType="SELECTION_LIST">
+   <properties>
+    <prop name="serialId">359</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">50 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">62</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">50 40</prop>
+    <prop name="Size">281 121</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

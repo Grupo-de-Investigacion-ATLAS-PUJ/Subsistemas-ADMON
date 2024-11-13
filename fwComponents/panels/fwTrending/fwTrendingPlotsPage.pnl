@@ -1,0 +1,1642 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">640 556</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+
+// Do not load fwAccessControl lib explicitly.
+// it will be loaded (if fwAccessControl installed)
+// during the installation of fwTrending.ctl
+// or by the fact that we inject the &quot;fwAccessControl_currentUser&quot; widget anyway.
+//#uses &quot;fwAccessControl/fwAccessControl.ctc&quot;
+
+
+int MAX_COLS;
+int MAX_ROWS;
+int START_X = 20;
+int START_Y = 120;
+int MID_X = 320;
+int MID_Y = 270;
+const int REF_WIDTH = 180;
+const int REF_HEIGHT = 80;
+const int canvasWidth = 620;
+const int canvasHeight = 320;
+
+string g_AccessRightsRequired = &quot;&quot;;
+
+int nCols = 0, nRows = 0;
+//global dyn_string plots;
+
+string pageName, Command, originalPageTitle = &quot;&quot;;
+
+dyn_string plots, exceptionInfo;
+
+// Order: X ~ i Y ~ j
+
+checkHasSaveRights(string dp, string user)
+{
+  bool isAllowed=TRUE;
+  dyn_string exceptionInfo;
+
+  if (Command != &quot;onlineedit&quot;)
+    isAllowed = true;
+  else if(g_AccessRightsRequired!=&quot;&quot;)
+    if (isFunctionDefined(&quot;fwAccessControl_isGranted&quot;)) fwAccessControl_isGranted(g_AccessRightsRequired, isAllowed, exceptionInfo);
+
+  ButtonOK.enabled = (isAllowed || (Command == &quot;onlineedit&quot;));
+  ButtonApply.enabled = isAllowed;
+  saveAsButton.enabled = isAllowed;
+}
+
+fwShowAcOptions(bool shouldShow)
+{
+  saveRights.visible = shouldShow;
+  saveRightsText.visible = shouldShow;
+  saveRightsSelect.visible = shouldShow;
+  accessControlOn.visible = shouldShow;
+  accessControlOnText.visible = shouldShow; 
+}
+
+fwEnableAcOptions(bool shouldEnable)
+{
+  saveRights.enabled = shouldEnable;
+  saveRightsSelect.enabled = shouldEnable;
+}
+
+void addRef(int _x, int _y, dyn_string &amp;exceptionInfo) 
+{
+  addSymbol(myModuleName(), myPanelName(), &quot;fwTrending/fwTrendingSinglePlot.pnl&quot;, &quot;Plot_&quot; + _x + &quot;_&quot; + _y,
+    makeDynString(&quot;$AnchorName:&quot; + pageName + &quot;_&quot; + _x + &quot;_&quot; + _y, &quot;$PageName:&quot; + pageName,
+    &quot;$Col:&quot; + _x, &quot;$Row:&quot; + _y, &quot;$plot:&quot; + fwTrending_getColRow(plots, _x, _y)), 
+    START_X + (_x - 1) * REF_WIDTH, START_Y + (_y - 1) * REF_HEIGHT, 0, 1, 1);
+  if(dynlen(exceptionInfo) &gt; 0)
+    fwExceptionHandling_display(exceptionInfo);
+}
+
+void remRef(int _x, int _y, dyn_string &amp;exceptionInfo) 
+{
+  removeSymbol(myModuleName(), myPanelName(), &quot;Plot_&quot; + _x + &quot;_&quot; + _y);
+  if(dynlen(exceptionInfo) &gt; 0)
+    fwExceptionHandling_display(exceptionInfo);}
+
+void repositionRefs() {
+  int i, j;
+  int x,y;
+  getValue(&quot;PagesCanvas&quot;,&quot;position&quot;,x,y);
+  MID_X = x + canvasWidth /2;
+  MID_Y = y - canvasHeight /2;
+//  DebugN(x,y);
+  for(i = 1; i &lt;= nCols; i++)
+    for(j = 1; j &lt;= nRows; j++) {
+      setValue(&quot;Plot_&quot; + i + &quot;_&quot; + j, &quot;position&quot;, 
+        MID_X + (i - 1) * REF_WIDTH - nCols * REF_WIDTH / 2, 
+        MID_Y + (j - 1) * REF_HEIGHT - nRows * REF_HEIGHT / 2);
+    }
+}
+
+void colsChanged() 
+{
+  int _nCols = ColsSpinButton.text;
+  int i, j;
+//  DebugN(_colsDP + &quot; is &quot; + _nCols + &quot;, &quot; + _rowsDP + &quot; is &quot; + _nRows);
+  if(nCols &lt; _nCols)
+    for(i = nCols + 1; i &lt;= _nCols; i++) 
+      for(j = 1; j &lt;= nRows; j++) {
+//        fwTrendingWorkCopies_CreateNewPlotAnchor(workPageName, i, j);
+        addRef(i, j, exceptionInfo);
+      }
+  else if(nCols &gt; _nCols)
+    for(i = _nCols + 1; i &lt;= nCols; i++)
+      for(j = 1; j &lt;= nRows; j++)
+        remRef(i, j, exceptionInfo);
+  nCols = _nCols;
+  repositionRefs();
+  if(dynlen(exceptionInfo) &gt; 0)
+    fwExceptionHandling_display(exceptionInfo);
+}
+
+void rowsChanged() 
+{
+  int _nRows = RowsSpinButton.text;
+  int i, j;
+//  DebugN(_colsDP + &quot; is &quot; + _nCols + &quot;, &quot; + _rowsDP + &quot; is &quot; + _nRows);
+  if(nRows &lt; _nRows)
+    for(j = nRows + 1; j &lt;= _nRows; j++)
+      for(i = 1; i &lt;= nCols; i++) {
+        addRef(i, j, exceptionInfo);
+      }
+  else if(nRows &gt; _nRows)
+    for(j = _nRows + 1; j &lt;= nRows; j++)
+      for(i = 1; i &lt;= nCols; i++)
+        remRef(i, j, exceptionInfo);
+  nRows = _nRows;
+  repositionRefs();
+  if(dynlen(exceptionInfo) &gt; 0)
+    fwExceptionHandling_display(exceptionInfo);
+}
+
+string CheckInput(dyn_string &amp;exceptionInfo)
+{
+  string tempString;
+  string okStr = &quot;OK&quot;;
+  bool tempBool;
+
+  if(!((nCols &gt; 0) &amp;&amp; (nRows &gt; 0))) 
+  {
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;There must be rows and columns&quot;, &quot;&quot;);
+    okStr = &quot;NoReturn&quot;;
+  }            
+  
+//check for impossible combinations
+  if((nCols==2)&amp;&amp;(nRows==1)) 
+  {
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;This combination of rows and columns is not valid&quot;, &quot;&quot;);
+    okStr = &quot;NoReturn&quot;;
+  }    
+
+//check page title
+  tempString = TextFieldPageTitle.text;
+  strreplace(tempString, fwTrending_TEMPLATE_OPEN, &quot;&quot;);
+  strreplace(tempString, fwTrending_TEMPLATE_CLOSE, &quot;&quot;);
+
+  if(!_fwTrending_isUnicosEnvironment(exceptionInfo))
+    strreplace(tempString, &quot; &quot;, &quot;&quot;);
+
+  tempBool = dpIsLegalName(tempString);
+//  tempBool = TRUE;
+
+   if(!tempBool || (tempString == &quot;&quot;))
+  {
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The entered page title is not legal&quot;, &quot;&quot;);
+    okStr = &quot;NoReturn&quot;;
+  }
+    
+  return okStr;
+}
+
+ReadInput(dyn_dyn_string &amp;pageData, dyn_string &amp;exceptionInfo)
+{
+  int i,j;
+
+  pageData[fwTrending_PAGE_OBJECT_MODEL][1] = fwTrending_YT_PAGE_MODEL;
+  pageData[fwTrending_PAGE_OBJECT_TITLE][1] = TextFieldPageTitle.text;
+
+  pageData[fwTrending_PAGE_OBJECT_NCOLS][1] = ColsSpinButton.text;
+  pageData[fwTrending_PAGE_OBJECT_NROWS][1] = RowsSpinButton.text;
+  pageData[fwTrending_PAGE_OBJECT_CONTROLS][1] = ControlsCheckButton.state(0);
+        pageData[fwTrending_PAGE_OBJECT_ACCESS_CONTROL_SAVE][1] = accessControlOn.state(0)?saveRights.text:&quot;&quot;;
+
+//first clear plot names
+  dynClear(pageData[fwTrending_PAGE_OBJECT_PLOTS]);
+  for(i=1; i&lt;=MAX_COLS; i++)
+    for(j=1; j&lt;=MAX_ROWS; j++)
+      dynAppend(pageData[fwTrending_PAGE_OBJECT_PLOTS], &quot;&quot;);
+//get plots names back
+  for(i=1; i&lt;=nCols; i++)
+    for(j=1; j&lt;=nRows; j++)
+            {
+              getValue(&quot;Plot_&quot; + i + &quot;_&quot; + j + &quot;.Text3&quot;, &quot;text&quot;, pageData[fwTrending_PAGE_OBJECT_PLOTS][6 * (j - 1) + i]);
+              getValue(&quot;Plot_&quot; + i + &quot;_&quot; + j + &quot;.localParameterValues&quot;, &quot;text&quot;, pageData[fwTrending_PAGE_OBJECT_PLOT_TEMPLATE_PARAMETERS][6 * (j - 1) + i]);
+                }
+}
+
+ApplyCancelOKButtonClick(string button)
+{
+  dyn_dyn_string pageData;
+  string tempString;
+  dyn_string tempPageData;
+  string okStr = &quot;OK&quot;;
+  bool tempBool, isConnected;
+  int i;
+  
+//DebugN(button);
+//DebugN(nCols, nRows);
+  if(button != &quot;Cancel&quot;)
+  {
+    okStr = CheckInput(exceptionInfo);
+  
+    if(dynlen(exceptionInfo) &gt; 0)
+      fwExceptionHandling_display(exceptionInfo);
+  }
+
+  if((button != &quot;Cancel&quot;) &amp;&amp; (okStr != &quot;NoReturn&quot;))
+  {
+    switch(Command) 
+    {            
+    case &quot;new&quot;: 
+    {
+      pageName = TextFieldPageName.text;
+      if(pageName == &quot;&quot;) 
+      {
+        fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;You did not enter a page name&quot;, &quot;&quot;);
+        fwExceptionHandling_display(exceptionInfo);
+        okStr = &quot;NoReturn&quot;;
+      } 
+      else 
+      {
+        tempBool = dpIsLegalName(pageName);
+          if(tempBool)
+            if(!dpExists(pageName))
+         {
+             fwTrending_newPage(pageName);
+          if(!dpExists(pageName))
+          {
+                fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The page could not be created&quot;, &quot;&quot;);
+                fwExceptionHandling_display(exceptionInfo);
+                okStr = &quot;NoReturn&quot;;
+          }
+         }
+          else
+          {
+            fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The entered page name is already in use&quot;, &quot;&quot;);
+            fwExceptionHandling_display(exceptionInfo);
+            okStr = &quot;NoReturn&quot;;
+//              break;
+          }            
+        else 
+        {
+          fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The entered page name is not legal&quot;, &quot;&quot;);
+          fwExceptionHandling_display(exceptionInfo);
+          okStr = &quot;NoReturn&quot;;
+        }
+      }
+    }
+  
+    case &quot;edit&quot;:
+    case &quot;onlineedit&quot;:
+      if(okStr != &quot;NoReturn&quot;)
+      {
+        TextFieldPageName.editable = FALSE;
+        TextFieldPageName.enabled = FALSE;
+        //change mode to edit once to config has been saved once
+        if(Command == &quot;new&quot;)
+          Command = &quot;edit&quot;;
+
+        if(Command == &quot;onlineedit&quot;)
+        {
+          pageData = strsplit(getDollarValue(&quot;$dsPageData&quot;), &quot;|&quot;);
+     // if last element of array delivered as string by $dsPageData only contains an empty string, the conversion into a real array loses this empty string
+     // in this case, it has to be attached again manually
+     if(dynlen(pageData) &lt; 8) 
+     {
+       dynAppend(pageData, &quot;&quot;);
+     }
+     
+          for(i=1; i&lt;=fwTrending_SIZE_PAGE_OBJECT; i++)
+          {
+            pageData[i][1] = strltrim(pageData[i][1], &quot; &quot;);
+            pageData[i][1] = strrtrim(pageData[i][1], &quot; &quot;);
+            pageData[i] = strsplit(pageData[i][1], fwTrending_CONTENT_DIVIDER);
+          }
+        }
+        else
+          fwTrending_getPage(pageName, pageData, exceptionInfo);
+        
+        ReadInput(pageData, exceptionInfo);
+        
+        if(Command != &quot;onlineedit&quot;)
+        {
+          _fwTrending_isSystemForDpeConnected(pageName, isConnected, exceptionInfo);
+          if(isConnected)
+{
+//                                           bool isAllowed;
+//             if(g_AccessRightsRequired != &quot;&quot;)
+//                                           {
+//                                              fwAccessControl_isGranted(g_AccessRightsRequired, isAllowed, exceptionInfo);
+//                                              if(!isAllowed)
+//                                              {
+//                                                fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The current access right for saving this page configuration is: &quot; + g_AccessRightsRequired
+//                                                                   + &quot;. You do not have sufficient rights to continue.  Your changes have not been saved&quot;, &quot;&quot;);
+//                                              }
+//                                           }
+//                                           
+//             if(pageData[fwTrending_PAGE_OBJECT_ACCESS_CONTROL_SAVE] != &quot;&quot;)
+//                                           {
+//                                             fwAccessControl_isGranted(pageData[fwTrending_PAGE_OBJECT_ACCESS_CONTROL_SAVE], isAllowed, exceptionInfo);
+//                                             if(!isAllowed)
+//                                             {
+//                                                fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The proposed access control settings would mean you could no longer modify this page configuration. &quot; 
+//                                                                   + &quot;You do not have the \&quot;&quot; + saveRights.text + &quot;\&quot; access right. &quot;
+//                                                                   + &quot;Please modify your configuration.&quot;, &quot;&quot;);
+//                                              }
+//                                           }
+//                                           
+                                          if(dynlen(exceptionInfo) == 0)
+                                          {
+                                            g_AccessRightsRequired = pageData[fwTrending_PAGE_OBJECT_ACCESS_CONTROL_SAVE];
+                                            fwTrending_setPage(pageName, pageData, exceptionInfo);
+                                          }
+}
+                                        else
+            fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The configuration can not be saved because \&quot;&quot; + pageName +
+                              &quot;\&quot; is from a remote system which is currently unavailable&quot;, &quot;&quot;);
+        }
+        else
+        {
+          for(i=1; i&lt;=fwTrending_SIZE_PAGE_OBJECT; i++)
+          {
+            fwTrending_convertDynToString(pageData[i], tempPageData[i], exceptionInfo);
+            pageData[i] = makeDynString(tempPageData[i]);
+          }
+        }
+      }
+      break;
+    }
+
+  /* added by Herve */
+    if(button == &quot;Apply&quot;) {
+      if(isFunctionDefined(&quot;unTrendTree_deviceConfiguration_postExecution&quot;)) {
+        execScript(&quot;main()&quot;+
+                    &quot;{&quot;+
+                    &quot;    unTrendTree_deviceConfiguration_postExecution();&quot;+
+                    &quot;}&quot;, makeDynString());
+      }
+    }
+  /* end added by Herve */
+
+    if(dynlen(exceptionInfo) &gt; 0)
+      fwExceptionHandling_display(exceptionInfo);
+    else
+      if((button == &quot;OK&quot;) &amp;&amp; (okStr != &quot;NoReturn&quot;))
+        PanelOffReturn(makeDynFloat(0.0), makeDynString(okStr, TextFieldPageName.text, pageData));
+  } else
+    if(okStr != &quot;NoReturn&quot;) 
+    {
+      PanelOffReturn(makeDynFloat(0.0), makeDynString(&quot;Cancel&quot;, TextFieldPageName.text));
+    } else 
+      if(dynlen(exceptionInfo) &gt; 0)
+        fwExceptionHandling_display(exceptionInfo);
+}
+
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+  int i;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape layerId="0" Name="accessControlOn" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">46</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 427</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">45</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 427</prop>
+    <prop name="Size">21 31</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8"></prop>
+       <prop name="en_US.iso88591"></prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  fwEnableAcOptions(state);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="TextPageName" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 52</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Page Name (DP)</prop>
+     <prop name="en_US.iso88591">Page Name (DP)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="TextPageTitle" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 82</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Page Title (Text)</prop>
+     <prop name="en_US.iso88591">Page Title (Text)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text2" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">485 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">487 52</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Columns:</prop>
+     <prop name="en_US.iso88591">Columns:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text3" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">667 198</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">577 52</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Rows:</prop>
+     <prop name="en_US.iso88591">Rows:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text5" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">40 400</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">42 402</prop>
+    <prop name="Size">357 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Show individual PVSS controls for all plots</prop>
+     <prop name="en_US.iso88591">Show individual PVSS controls for all plots</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Frame1" shapeType="FRAME">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 110</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">620 70</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="PagesCanvas" shapeType="FRAME">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 430</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 0.971786833855799 0 3.10344827586208</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 110</prop>
+    <prop name="Size">620 320</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="Text1" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 8</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Page Layout Configuration</prop>
+     <prop name="en_US.iso88591">Page Layout Configuration</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main() 
+{
+  string tempString, originalData, sShowButtons;
+  int i, j, tempInt;
+  bool tempBool, showAcOptions = FALSE, isConnected = TRUE;
+  dyn_dyn_string pageData;
+  dyn_string buttons, exceptionInfo;
+  int iRes;
+  string sMaxColumns, sMaxRows;
+  
+  sMaxColumns = &quot;TrendingConfiguration.PageSettings.maxColumns:_original.._value&quot;;
+  sMaxRows    = &quot;TrendingConfiguration.PageSettings.maxRows:_original.._value&quot;;
+  
+  while(!isFunctionDefined(&quot;ApplyCancelOKButtonClick&quot;))
+    delay(0,50);
+  
+  
+  if( (sMaxColumns != &quot;&quot;) &amp;&amp; (dpExists(sMaxColumns)) )
+  {
+    dpGet(sMaxColumns, MAX_COLS);
+  }
+  else
+  {
+    DebugTN(&quot;Error in &quot; + myPanelName() + &quot; -&gt; main() -&gt; sMaxColumns = &quot; + sMaxColumns + &quot; doesn't exist&quot;);
+    return;
+  }
+  
+  if( (sMaxRows != &quot;&quot;) &amp;&amp; (dpExists(sMaxRows)) )
+  {
+    dpGet(sMaxRows, MAX_ROWS);
+  }
+  else
+  {
+    DebugTN(&quot;Error in &quot; + myPanelName() + &quot; -&gt; main() -&gt; sMaxRows = &quot; + sMaxRows + &quot; doesn't exist&quot;);
+    return;
+  }
+  
+  ColsSpinButton.sbMaximum = MAX_COLS;
+  RowsSpinButton.sbMaximum = MAX_ROWS;
+
+//  DebugN($Command);
+
+  if(isDollarDefined(&quot;$Command&quot;))
+  {
+    Command = $Command;
+  } else {
+    Command = &quot;edit&quot;;      
+  }
+  if(Command == &quot;&quot;) Command = &quot;edit&quot;;
+
+  if(isDollarDefined(&quot;$sDpName&quot;))
+    if(Command != &quot;new&quot;)
+      pageName = $sDpName;
+  else
+    pageName = &quot;&quot;;
+
+  if(pageName == &quot;&quot;)
+    Command = &quot;new&quot;;
+
+  Command = strtolower(Command);
+
+  if(isDollarDefined(&quot;$dsShowButtons&quot;))
+  {
+    sShowButtons = $dsShowButtons;
+    strreplace(sShowButtons, &quot; &quot;, &quot;&quot;);
+    sShowButtons = strtolower(sShowButtons);
+    buttons = strsplit(sShowButtons, &quot;|&quot;);
+    
+    if(dynContains(buttons, &quot;all&quot;) &gt; 0)
+    {
+      ButtonOK.visible = TRUE;
+      ButtonApply.visible = TRUE;
+      ButtonCancel.visible = TRUE;
+    }
+    else
+    {
+      if(dynContains(buttons, &quot;ok&quot;) &gt; 0)
+        ButtonOK.visible = TRUE;
+  
+      if(dynContains(buttons, &quot;apply&quot;) &gt; 0)
+        ButtonApply.visible = TRUE;
+  
+      if(dynContains(buttons, &quot;cancel&quot;) &gt; 0)
+        ButtonCancel.visible = TRUE;    
+    }
+  }
+  else
+  {
+    ButtonOK.visible = TRUE;
+    ButtonApply.visible = TRUE;
+    ButtonCancel.visible = TRUE;
+  }
+        
+  if((Command == &quot;edit&quot;) || (Command == &quot;onlineedit&quot;))  
+  {  
+    TextFieldPageName.editable = FALSE;
+    TextFieldPageName.enabled = FALSE;
+    TextFieldPageTitle.editable = TRUE;
+    TextFieldPageTitle.enabled = TRUE;
+  }
+  else
+  {
+    TextFieldPageName.editable = TRUE;
+    TextFieldPageName.enabled = TRUE;
+    TextFieldPageTitle.editable = TRUE;
+    TextFieldPageTitle.enabled = TRUE;
+  }
+
+  if(Command == &quot;new&quot;) 
+  {
+                showAcOptions = TRUE;
+    dynClear(pageData[fwTrending_PAGE_OBJECT_PLOTS]);
+    for(i=1; i&lt;=MAX_COLS; i++)
+      for(j=1; j&lt;=MAX_ROWS; j++)
+        dynAppend(pageData[fwTrending_PAGE_OBJECT_PLOTS], &quot;&quot;);
+    pageData[fwTrending_PAGE_OBJECT_PLOT_TEMPLATE_PARAMETERS] = pageData[fwTrending_PAGE_OBJECT_PLOTS];
+    pageData[fwTrending_PAGE_OBJECT_TITLE][1] = &quot;&quot;;
+    pageData[fwTrending_PAGE_OBJECT_CONTROLS][1] = &quot;FALSE&quot;;
+    pageData[fwTrending_PAGE_OBJECT_NCOLS][1] = 1;
+    pageData[fwTrending_PAGE_OBJECT_NROWS][1] = 1;
+    pageData[fwTrending_PAGE_OBJECT_ACCESS_CONTROL_SAVE][1] = &quot;&quot;;
+    repositionRefs();
+  }
+  else if(Command == &quot;onlineedit&quot;)
+  {
+    originalData = getDollarValue(&quot;$dsPageData&quot;);
+    strreplace(originalData, &quot; | &quot;, &quot;|&quot;);
+    pageData = strsplit(originalData, &quot;|&quot;);
+  
+  // if last element of array delivered as string by $dsPageData only contains an empty string, the conversion into a real array loses this empty string
+  // in this case, it has to be attached again manually
+  if(dynlen(pageData) &lt; 8) 
+  {
+    dynAppend(pageData, &quot;&quot;);
+  }
+
+    for(i=1; i&lt;=fwTrending_SIZE_PAGE_OBJECT; i++)
+    {   
+      fwTrending_convertStringToDyn(pageData[i][1], pageData[i], exceptionInfo);
+    }
+  }
+  else if(Command == &quot;edit&quot;) 
+  {
+                showAcOptions = TRUE;
+    _fwTrending_isSystemForDpeConnected(pageName, isConnected, exceptionInfo);
+    fwTrending_getPage(pageName, pageData, exceptionInfo);
+  }
+  
+  tempString = pageData[fwTrending_PAGE_OBJECT_TITLE][1];
+  nCols = pageData[fwTrending_PAGE_OBJECT_NCOLS][1];
+  nRows = pageData[fwTrending_PAGE_OBJECT_NROWS][1];
+  tempBool = pageData[fwTrending_PAGE_OBJECT_CONTROLS][1];
+  plots = pageData[fwTrending_PAGE_OBJECT_PLOTS];
+//DebugN(pageData, fwTrending_PAGE_OBJECT_ACCESS_CONTROL_SAVE);        
+
+        g_AccessRightsRequired = pageData[fwTrending_PAGE_OBJECT_ACCESS_CONTROL_SAVE][1];
+        setValue(&quot;saveRights&quot;, &quot;text&quot;, g_AccessRightsRequired);
+        setValue(&quot;accessControlOn&quot;, &quot;state&quot;, 0, (g_AccessRightsRequired==&quot;&quot;)?FALSE:TRUE);
+        fwEnableAcOptions(g_AccessRightsRequired!=&quot;&quot;);
+          
+  if(_fwTrending_isUnicosEnvironment(exceptionInfo))
+    strreplace(tempString, &quot; &quot;, &quot;&quot;);
+  
+  if(nCols &lt; 1)
+    nCols = 1;
+  if(nRows &lt; 1)
+    nRows = 1;
+  
+  TextFieldPageName.text = pageName;
+  TextFieldPageName.toolTipText = pageName;
+  TextFieldPageTitle.text = tempString;
+  TextFieldPageTitle.toolTipText = tempString;
+  originalPageTitle = tempString;
+  ColsSpinButton.text = nCols;
+  RowsSpinButton.text = nRows;
+  setValue(&quot;ControlsCheckButton&quot;, &quot;state&quot;, 0, tempBool);
+  for(i=1; i&lt;=nCols; i++)
+    for(j=1; j&lt;=nRows; j++)
+      addRef(i,j, exceptionInfo);
+  repositionRefs();
+
+  if(!isFunctionDefined(&quot;unGenericDpFunctionsHMI_setCallBack_user&quot;)) 
+  {
+    //only show access control options if not UNICOS project
+    if(isFunctionDefined(&quot;fwAccessControl_setupPanel&quot;))
+      fwShowAcOptions(showAcOptions);
+  }
+  
+  if(isConnected)
+  {
+    // Access Control
+    if(isFunctionDefined(&quot;unGenericDpFunctionsHMI_setCallBack_user&quot;)) 
+    {
+      unGenericDpFunctionsHMI_setCallBack_user(&quot;unGenericButtonFunctionsHMI_plotsPageselectCB&quot;, iRes, exceptionInfo);
+                        TextFieldPageTitle.enabled(ButtonApply.visible());
+    }
+                else if(isFunctionDefined(&quot;fwAccessControl_setupPanel&quot;))
+                {
+                  fwAccessControl_setupPanel(&quot;checkHasSaveRights&quot;, exceptionInfo);
+                }                 
+  }
+  else
+  {
+    ButtonOK.enabled = FALSE;
+    ButtonApply.enabled = FALSE;
+    saveAsButton.enabled = FALSE;
+
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The data point \&quot;&quot; + pageName +
+                      &quot;\&quot; can not be edited because it is from a remote system which is currently unavailable&quot;, &quot;&quot;);
+  }
+
+  if(dynlen(exceptionInfo)&gt;0)
+    fwExceptionHandling_display(exceptionInfo);
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="InstructionsText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">44</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">3554 722</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 472</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Template parameters can be defined in the page title using {} brackets - e.g. {device}Page
+The template parameter values are passed to the page when it is displayed.</prop>
+     <prop name="en_US.iso88591">Template parameters can be defined in the page title using {} brackets - e.g. {device}Page
+The template parameter values are passed to the page when it is displayed.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="TextFieldPageTitle" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">146 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">42</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">146 80</prop>
+    <prop name="Size">301 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="ButtonOK" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">340 513</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">49</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">340 513</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  ApplyCancelOKButtonClick(&quot;OK&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ButtonCancel" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">540 513</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">51</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">540 513</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  ApplyCancelOKButtonClick(&quot;Cancel&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ControlsCheckButton" shapeType="CHECK_BOX">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 400</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Courier New,-1,12,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Courier New,-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 400</prop>
+    <prop name="Size">11 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">CheckButton1</prop>
+       <prop name="en_US.iso88591">CheckButton1</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="ColsSpinButton" shapeType="SPIN_BUTTON">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">495 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">43</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">495 70</prop>
+    <prop name="Size">41 24</prop>
+    <prop name="MinimumID">1</prop>
+    <prop name="MaximumID">100</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">1</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  colsChanged();
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="RowsSpinButton" shapeType="SPIN_BUTTON">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">575 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">44</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">575 70</prop>
+    <prop name="Size">41 24</prop>
+    <prop name="MinimumID">1</prop>
+    <prop name="MaximumID">100</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">1</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  rowsChanged();
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="ButtonApply" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">440 513</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">50</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">440 513</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+     <prop name="en_US.iso88591">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  ApplyCancelOKButtonClick(&quot;Apply&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="saveAsButton" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 513</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">48</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 513</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Save as...</prop>
+     <prop name="en_US.iso88591">Save as...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  bool newDp = FALSE, isFromDp;
+  string proposedName, sDpName;
+  dyn_float df;
+  dyn_string ds, exceptionInfo;
+  dyn_dyn_string pageData;
+
+  CheckInput(exceptionInfo);
+  if(dynlen(exceptionInfo)&gt;0)
+  {
+    fwExceptionHandling_display(exceptionInfo);
+    return;
+  }
+
+  sDpName = TextFieldPageName.text;
+  proposedName = dpGetAlias(sDpName + &quot;.&quot;);
+  if(proposedName == &quot;&quot;)
+    proposedName = dpSubStr(sDpName, DPSUB_DP);
+  ChildPanelOnCentralReturn(&quot;fwTrending/fwTrendingSaveAsSelector.pnl&quot;, &quot;Save page settings as...&quot;,
+                              makeDynString(&quot;$sDpType:&quot; + fwTrending_PAGE, &quot;$sProposedName:&quot; + proposedName), df, ds);
+  if(ds[1] == &quot;ok&quot;)
+  {
+    ReadInput(pageData, exceptionInfo);
+    if(!dpExists(ds[2]))
+    {
+      fwTrending_createPage(ds[2], exceptionInfo);
+      newDp = TRUE;
+    }
+    fwTrending_setPage(ds[2], pageData, exceptionInfo);
+
+    isFromDp = !((TextFieldPageName.enabled) || (TextFieldPageName.text == &quot;&quot;));
+//DebugN(&quot;Call UNICOS&quot;, newDp, isFromDp);
+
+    if(isFunctionDefined(&quot;unTrendTree_savePageAs&quot;))
+    {
+      unTrendTree_savePageAs(ds[2], newDp, isFromDp, exceptionInfo);
+    }
+  }
+
+  if(dynlen(exceptionInfo)&gt;0)
+    fwExceptionHandling_display(exceptionInfo);
+}]]></script>
+   </events>
+  </shape>
+  <reference referenceId="0" Name="Group2" parentSerial="-1">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">364 10</prop>
+    <prop name="Geometry">1 0 0 1 239 0</prop>
+    <prop name="TabOrder">53</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwTrending/fwTrendingPlotsPage</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape layerId="0" Name="accessControlOnText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">47</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">43 427</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">43 427</prop>
+    <prop name="Size">131 36</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Protect configuration
+with access control</prop>
+     <prop name="en_US.iso88591">Protect configuration
+with access control</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="saveRights" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">48</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">280 433</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">46</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">280 433</prop>
+    <prop name="Size">181 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="saveRightsSelect" shapeType="PUSH_BUTTON">
+   <properties>
+    <prop name="serialId">49</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">470 429</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">47</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Leave filter unchanged</prop>
+     <prop name="en_US.iso88591">Leave filter unchanged</prop>
+    </prop>
+    <prop name="Hotkey">Esc</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">470 429</prop>
+    <prop name="Size">71 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Choose</prop>
+     <prop name="en_US.iso88591">Choose</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string privileges, exceptionInfo;
+    
+  privileges[1] = saveRights.text;
+  if(isFunctionDefined(&quot;fwAccessControl_selectPrivileges&quot;))
+  {
+    fwAccessControl_selectPrivileges(privileges, &quot;Please choose access right&quot;);
+    if(dynlen(privileges))
+      saveRights.text = privileges[1];    
+  }
+  else
+  {
+    fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;The access control component is not installed.&quot;, &quot;&quot;);
+    fwExceptionHandling_display(exceptionInfo); 
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="saveRightsText" shapeType="PRIMITIVE_TEXT">
+   <properties>
+    <prop name="serialId">50</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">181 437</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">181 437</prop>
+    <prop name="Size">91 21</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Required Right:</prop>
+     <prop name="en_US.iso88591">Required Right:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="FRAME1" shapeType="FRAME">
+   <properties>
+    <prop name="serialId">51</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 113</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">38</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1 0 -3</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg,-1,11,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">MS Shell Dlg,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 113</prop>
+    <prop name="Size">621 358</prop>
+   </properties>
+  </shape>
+  <shape layerId="0" Name="acNotAvailable" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">52</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">387 12</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">54</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">387 12</prop>
+    <prop name="Size">189 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  if(!isFunctionDefined(&quot;unGenericDpFunctionsHMI_setCallBack_user&quot;)) 
+  {
+    //only show access control options if not UNICOS project
+    int x, y;
+  
+    getValue(&quot;&quot;, &quot;position&quot;, x, y);
+  
+    if(getPath(PANELS_REL_PATH, &quot;objects/fwAccessControl/fwAccessControl_CurrentUser.pnl&quot;) != &quot;&quot;)
+      addSymbol(myModuleName(), myPanelName(), &quot;objects/fwAccessControl/fwAccessControl_CurrentUser.pnl&quot;, &quot;currentUser&quot;, makeDynString(), x, y-16, 0, 1, 1);
+    else
+    {
+      this.visible = TRUE;
+      this.text = &quot;Access Control not available&quot;;
+    }
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape layerId="0" Name="TextFieldPageName" shapeType="TEXT_FIELD">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">146 50</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">41</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">146 50</prop>
+    <prop name="Size">301 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

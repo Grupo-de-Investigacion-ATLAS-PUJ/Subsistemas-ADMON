@@ -1,0 +1,2126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">650 850</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+dyn_dyn_mixed matrix;
+
+bool modified;
+
+const int fwAlarmScreen_groups_CONFIG_TABLE_COL_NAME  = 0;
+const int fwAlarmScreen_groups_CONFIG_TABLE_COL_VALUE = 1;
+const int fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE  = 2;
+
+
+
+const string fwAlarmScreen_groups_TYPE_DP                   = &quot;dp&quot;;
+const string fwAlarmScreen_groups_TYPE_ROOT                 = &quot;root&quot;;
+const string fwAlarmScreen_groups_TYPE_GROUP                = &quot;group&quot;;
+const string fwAlarmScreen_groups_TYPE_ROW_BREAK            = &quot;__rowBreak__&quot;;
+const string fwAlarmScreen_groups_TYPE_SYS                  = &quot;system&quot;;
+const string fwAlarmScreen_groups_TYPE_ALIAS                = &quot;alias&quot;;
+const string fwAlarmScreen_groups_TYPE_FSMCU                = &quot;FSM CU&quot;;
+
+
+int fwAlarmScreen_groups_filterActive;
+
+int iRowBreakCurrentId = 0;
+
+// ------------------------------------------------------------------------------------------------
+
+void loadSettings()
+{
+  dyn_string dsDpeSys;
+  dyn_string dsDpeAlias;
+  dyn_string dsDpeDpes;
+  dyn_string dsDpeFsmCU;
+  dyn_string dsDpeGroups = dpNames(fwAlarmScreen_groups_CONFIG_DP + &quot;*&quot;, fwAlarmScreen_groups_CONFIG_DPTYPE);  
+  
+  TREE1.clear();
+  addItemToTree(&quot;&quot;, &quot;Groups&quot;, &quot;Groups&quot;, fwAlarmScreen_groups_TYPE_ROOT);
+  
+  // If it exists, take the group order list
+  if(dpExists(fwAlarmScreen_groups_ORDER_DP))
+  {
+    dyn_string dsOrderedGroups;
+    dpGet(fwAlarmScreen_groups_ORDER_DP, dsOrderedGroups);
+    
+    if(dynlen(dsOrderedGroups))
+    {
+      dyn_string dsMergedGroups;
+      
+      for(int i = 1 ; i &lt;= dynlen(dsOrderedGroups) ; i++)
+      {
+        if(dpExists(fwAlarmScreen_groups_CONFIG_DP + dsOrderedGroups[i]))
+        {
+          dynAppend(dsMergedGroups, fwAlarmScreen_groups_CONFIG_DP + dsOrderedGroups[i]);
+        }
+        else if (fwAlarmScreen_groups_ROW_BREAK_LABEL == dsOrderedGroups[i])
+        {
+          dynAppend(dsMergedGroups, fwAlarmScreen_groups_ROW_BREAK_LABEL);
+        }
+      }     
+      
+      // If there are dpes not appearing in the ordered list, append them to the bottom of the list
+      if(dynlen(dsMergedGroups) &lt; dynlen(dsDpeGroups))
+      for(int i = 1 ; i &lt;= dynlen(dsDpeGroups) ; i++)
+      {
+        if(!dynContains(dsMergedGroups,dsDpeGroups[i]))
+        {
+          dynAppend(dsMergedGroups , dsDpeGroups[i]);
+        }
+      }  
+      
+      dsDpeGroups = dsMergedGroups;
+    }
+  }
+  else
+  {
+    dpCreate(fwAlarmScreen_groups_SETUP_DP, fwAlarmScreen_groups_SETUP_DPTYPE);
+  }
+  
+  if (dpExists(fwAlarmScreen_groups_ALARM_SHOW_MODE_DP))
+  {
+    int iAlarmShowMode;
+    dpGet(fwAlarmScreen_groups_ALARM_SHOW_MODE_DP, iAlarmShowMode);
+    radioAlarmShowMode.number(iAlarmShowMode);    
+  }
+  
+  for(int i = 1 ; i &lt;= dynlen(dsDpeGroups) ; i++)
+  {
+    dynAppend(dsDpeSys,   dsDpeGroups[i] + &quot;.systems&quot;);
+    dynAppend(dsDpeAlias, dsDpeGroups[i] + &quot;.aliases&quot;);
+    dynAppend(dsDpeDpes,  dsDpeGroups[i] + &quot;.dpes&quot;);
+    dynAppend(dsDpeFsmCU, dsDpeGroups[i] + &quot;.fsmCu&quot;);
+  }  
+  
+  // Load the configs
+  if(dynlen(dsDpeGroups))
+  {
+    
+    for(int i = 1 ; i &lt;= dynlen(dsDpeSys) ; i++)
+    {
+      
+      if (fwAlarmScreen_groups_ROW_BREAK_LABEL == dsDpeGroups[i])
+      {      
+        addRowBreak(&quot;Groups&quot;);
+        continue;      
+      }
+      // Group
+      // Take the group name 
+      string sGroupName = dpGetDescription(dsDpeGroups[i]+&quot;.&quot;,-2);
+      string sGroupId = fwAlarmScreen_groups_getGroupId(dsDpeGroups[i]);
+      addItemToTree(&quot;Groups&quot;,sGroupId,sGroupId,fwAlarmScreen_groups_TYPE_GROUP);
+      setItemValue(sGroupId, sGroupName);
+      
+      // Systems
+      dyn_string dsSystems;
+      dpGet(dsDpeSys[i],dsSystems);
+      for(int j = 1 ; j &lt;= dynlen(dsSystems) ; j++)
+      {
+        addItemToTree(sGroupId, sGroupId + &quot;.&quot; + dsSystems[j], dsSystems[j], fwAlarmScreen_groups_TYPE_SYS);
+      }
+      
+      // Dpes
+      dyn_string dsDpes;
+      dpGet(dsDpeDpes[i],dsDpes);
+      for(int j = 1 ; j &lt;= dynlen(dsDpes) ; j++)
+      {
+        if(dynlen(dsSystems)&gt;=j &amp;&amp; dsDpes[j]!=&quot;&quot;)
+        {
+          addItemToTree(sGroupId + &quot;.&quot; + dsSystems[j], sGroupId + &quot;.&quot; + dsSystems[j] + &quot;.dpes&quot;, fwAlarmScreen_groups_TYPE_DP, fwAlarmScreen_groups_TYPE_DP);
+          setItemValue(sGroupId + &quot;.&quot; + dsSystems[j] + &quot;.dpes&quot;, dsDpes[j]);
+        }
+      }
+      
+      // Aliases
+      dyn_string dsAliases;
+      dpGet(dsDpeAlias[i], dsAliases);
+      for(int j = 1 ; j &lt;= dynlen(dsAliases) ; j++)
+      {
+        if(dynlen(dsSystems) &gt;= j &amp;&amp; dsAliases[j] != &quot;&quot;)
+        {
+          addItemToTree(sGroupId + &quot;.&quot; + dsSystems[j], sGroupId + &quot;.&quot; + dsSystems[j] + &quot;.alias&quot;, fwAlarmScreen_groups_TYPE_ALIAS, fwAlarmScreen_groups_TYPE_ALIAS);
+          setItemValue(sGroupId + &quot;.&quot; + dsSystems[j] + &quot;.alias&quot;, dsAliases[j]);
+        }
+      }
+      
+      // Fsm cu
+      dyn_string dsFsmCu;
+      dpGet(dsDpeFsmCU[i], dsFsmCu);
+      for(int j = 1 ; j &lt;= dynlen(dsFsmCu) ; j++)
+      {
+        addItemToTree(sGroupId, sGroupId + &quot;.&quot; + dsFsmCu[j], dsFsmCu[j], fwAlarmScreen_groups_TYPE_FSMCU);     
+      }
+    }
+  }
+  
+  modified = false;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void saveSettings()
+{
+  dyn_string dsExceptions;
+  bool bForceCustomOrder = false;
+  // Save sound settings
+  if(dpExists(fwAlarmScreen_groups_SOUNDENABLED_DP))
+  {
+    dpSetWait(
+        fwAlarmScreen_groups_SOUNDENABLED_DP,  ckEnabled.state(0),
+        fwAlarmScreen_groups_SOUNDFILE_DP,     lblPathW.text,
+        fwAlarmScreen_groups_SOUNDSOURCE_DP,   radioSource.number,
+        fwAlarmScreen_groups_SOUNDINHIBIT_DP,  spnInhibit.text
+      );
+  }
+  
+  // Save groups
+  dyn_string dsGroupsNames;
+  dyn_string dsGroups = TREE1.children(&quot;Groups&quot;);
+  for(int i = 1 ; i &lt;= dynlen(dsGroups) ; i++)
+  {
+    dyn_string dsAliases;
+    dyn_string dsFsmCu;
+    dyn_string dsDpes;
+    dyn_string dsSystems;
+    
+    string sGroupName = getItemValue(dsGroups[i]);    
+    
+    dsGroupsNames[i] = getItemName(dsGroups[i]);  
+    if (fwAlarmScreen_groups_ROW_BREAK_LABEL == dsGroupsNames[i])
+    {
+      bForceCustomOrder = true;
+      continue;
+    }  
+    
+    dyn_string dsTmp = TREE1.children(dsGroups[i]);
+    
+    //get systems
+    for(int j = 1 ; j &lt;= dynlen(dsTmp) ; j++)
+    {
+      string sType = getItemType(dsTmp[j]);
+      switch(sType)
+      {
+        case fwAlarmScreen_groups_TYPE_SYS:
+        {;
+          dynAppend(dsSystems, getItemName(dsTmp[j]));
+          dynAppend(dsDpes,&quot;&quot;);
+          dynAppend(dsAliases,&quot;&quot;);
+          int lastIndex = dynlen(dsDpes);
+          dyn_string dsDpesOfOneSys = TREE1.children(dsTmp[j]);
+          
+          // Get dpes and aliases
+          for(int k = 1 ; k &lt;= dynlen(dsDpesOfOneSys) ; k++)
+          {
+            switch(getItemType(dsDpesOfOneSys[k]))
+            {
+              case fwAlarmScreen_groups_TYPE_DP:
+              {
+                dsDpes[lastIndex] = getItemValue(dsDpesOfOneSys[k]);
+                break;
+              }
+              case fwAlarmScreen_groups_TYPE_ALIAS:
+              {
+                dsAliases[lastIndex] = getItemValue(dsDpesOfOneSys[k]);
+                break;
+              }
+            }
+          }
+          
+          break;
+        }
+      }
+    }
+    
+    for(int j = 1 ; j &lt;= dynlen(dsTmp) ; j++)
+    {
+      string sType = getItemType(dsTmp[j]);
+      switch(sType)
+      {
+        case fwAlarmScreen_groups_TYPE_FSMCU:
+        {
+          dynAppend(dsFsmCu, getItemName(dsTmp[j]));
+          break;
+        }
+      }
+    }    
+    
+    string sDpGroupName = fwAlarmScreen_groups_CONFIG_DP + dsGroupsNames[i];
+    
+    if(!dpExists(sDpGroupName))  
+    {
+      dpCreate(sDpGroupName, fwAlarmScreen_groups_CONFIG_DPTYPE);
+    }
+    
+    if(dpExists(sDpGroupName))
+    {
+      dpSetWait(
+          sDpGroupName + &quot;.systems&quot;,  dsSystems,
+          sDpGroupName + &quot;.dpes&quot;,     dsDpes,
+          sDpGroupName + &quot;.aliases&quot;,  dsAliases,
+          sDpGroupName + &quot;.fsmCu&quot;,    dsFsmCu
+        );   
+      
+      dpSetDescription(sDpGroupName + &quot;.&quot;, sGroupName);
+    }
+    else
+    {
+      fwException_raise(dsExceptions, &quot;ERROR&quot;, &quot;Config DP type &quot; + fwAlarmScreen_groups_CONFIG_DPTYPE + &quot; does not exist. Try reinstalling _fwAlarmHandling.&quot;, &quot;&quot;);
+      fwExceptionHandling_display(dsExceptions);      
+    }
+  }
+  
+  // Upon user choice, create custom order (or not)
+  if(!dpExists(fwAlarmScreen_groups_SETUP_DP))
+  {
+    dpCreate(fwAlarmScreen_groups_SETUP_DP, fwAlarmScreen_groups_SETUP_DPTYPE);
+  }
+  
+  if(dpExists(fwAlarmScreen_groups_ORDERMODE_DP))
+  {
+    dpSet(fwAlarmScreen_groups_ORDERMODE_DP, radioOrder.number);
+    dpSet(fwAlarmScreen_groups_ALARM_SHOW_MODE_DP, radioAlarmShowMode.number);
+  }
+  
+  
+  saveGroupsOrder(dsGroupsNames);
+  
+  // Delete the groups dpes that have been removed from the panel
+  dyn_string dsDpeGroups = dpNames(getSystemName() + fwAlarmScreen_groups_CONFIG_DP + &quot;*&quot;, fwAlarmScreen_groups_CONFIG_DPTYPE);
+  for(int i = 1 ; i &lt;= dynlen(dsDpeGroups) ; i++)
+  {
+    if(!dynContains(dsGroupsNames, fwAlarmScreen_groups_getGroupId(dsDpeGroups[i])))
+    {
+      dpDelete(dsDpeGroups[i]);
+    }
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+addItemToTree(string father, string id, string label, string type)
+{
+  string s_dpIcon;
+ 
+  s_dpIcon = GetDpIcon(type);
+  if(father==&quot;&quot; || TREE1.itemExists(father))
+  {
+    TREE1.appendItem(father, id, label);
+    TREE1.setIcon(id, fwAlarmScreen_groups_CONFIG_TABLE_COL_NAME, s_dpIcon);
+    TREE1.setText(id, fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE, type);
+    TREE1.setOpen(id, (type == fwAlarmScreen_groups_TYPE_ROOT));
+    TREE1.setColumnWidth(fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE, 0);
+    TREE1.hideColumn(fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE);
+    modified = true;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setItemValue(string id, string value)
+{
+  if(TREE1.itemExists(id))
+  {
+    TREE1.setText(id, fwAlarmScreen_groups_CONFIG_TABLE_COL_VALUE, value);
+    modified = true;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setItemName(string id, string name)
+{
+  if(TREE1.itemExists(id))
+  {
+    TREE1.setText(id, fwAlarmScreen_groups_CONFIG_TABLE_COL_NAME, name);
+    modified = true;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+string getItemName(string id)
+{
+  string name;
+  if(TREE1.itemExists(id))
+    name = TREE1.getText(id, fwAlarmScreen_groups_CONFIG_TABLE_COL_NAME);
+  return name;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+string getItemValue(string id)
+{
+  string val;
+  if(TREE1.itemExists(id))
+    val = TREE1.getText(id, fwAlarmScreen_groups_CONFIG_TABLE_COL_VALUE);
+  return val;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+string getItemType(string id)
+{
+  string val;
+  if(TREE1.itemExists(id))
+    val = TREE1.getText(id, fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE);
+  return val;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+string GetDpIcon(string type)
+{
+  string s_dpIcon;
+  switch (type)
+  {
+    case  fwAlarmScreen_groups_TYPE_ROW_BREAK:
+    case  fwAlarmScreen_groups_TYPE_GROUP:  
+    {
+      s_dpIcon = &quot;dptree/blobstruct.png&quot;;  
+      break;
+    }
+    case	fwAlarmScreen_groups_TYPE_SYS	  :  
+    {
+      s_dpIcon = &quot;dptree/system.png&quot;;  
+      break;
+    }
+    case	fwAlarmScreen_groups_TYPE_DP	  :  
+    {
+      s_dpIcon = &quot;dptree/dp.png&quot;;  
+      break;
+    }
+    case	fwAlarmScreen_groups_TYPE_ALIAS	:  
+    {
+      s_dpIcon = &quot;dptree/ref.png&quot;;  
+      break;
+    }
+    case	fwAlarmScreen_groups_TYPE_FSMCU	:  
+    {
+      s_dpIcon = &quot;cu_icon.gif&quot;;  
+      break;
+    }
+    case	fwAlarmScreen_groups_TYPE_ROOT	:  
+    {
+      s_dpIcon = &quot;dptree/struct.png&quot;;  
+      break;
+    }
+    default :     
+    {
+      s_dpIcon = &quot;dptree/dp.png&quot;;  
+      break;
+    }
+  }
+  
+  if(isfile(getPath(PICTURES_REL_PATH, s_dpIcon)))
+  {
+    return getPath(PICTURES_REL_PATH, s_dpIcon);
+  }
+  else
+  {
+    return getPath(PICTURES_REL_PATH,&quot;dpTree/dp.png&quot;);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+editFilter(string id, string mode)
+{
+  dyn_string dsRet;
+  
+  dyn_float dfRet;  
+  
+  string sFilterMode;  
+  string nodeName = getItemName(id);
+
+  switch(mode)
+  {
+    case fwAlarmScreen_groups_TYPE_DP:
+    {
+      sFilterMode = &quot;.dpes&quot;;
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_ALIAS:
+    {
+      sFilterMode = &quot;.alias&quot;;
+      break;
+    }
+    default:
+    {
+      return;
+    }
+  }    
+
+  string sCurrentValue = getItemValue(id + sFilterMode);
+  
+  ChildPanelOnModalReturn(
+      &quot;fwAlarmHandling/fwAlarmScreenGroupsConfigurationDp.pnl&quot;,
+      &quot;Add &quot;+mode+ &quot; pattern for &quot; + nodeName + &quot; ...&quot;,
+      makeDynString(
+          &quot;$sMode:&quot;+mode,
+          &quot;$sFilter:&quot; + sCurrentValue
+        ),
+        0,
+        0,
+        dfRet,
+        dsRet
+      ); 
+      
+  if(dynlen(dsRet))
+  {
+    if(!TREE1.itemExists(id+sFilterMode))
+    {
+      addItemToTree(id, id + sFilterMode, mode, mode);
+    }
+    
+    setItemValue(id + sFilterMode, dsRet[1]);
+  }  
+  
+  modified = true;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+addRowBreak(string sId)
+{
+  // fwAlarmScreen_groups_TYPE_ROW_BREAK
+  string sLineId = fwAlarmScreen_groups_TYPE_ROW_BREAK + iRowBreakCurrentId;
+  
+  string sNodeId = sId + &quot;.&quot; + sLineId;
+ 
+    
+  string s_dpIcon; 
+  s_dpIcon = GetDpIcon(fwAlarmScreen_groups_TYPE_ROW_BREAK);
+  if(sId == &quot;&quot; || TREE1.itemExists(sId))
+  {
+    TREE1.appendItem(sId, sNodeId, fwAlarmScreen_groups_ROW_BREAK_LABEL);
+    TREE1.setIcon(sNodeId, fwAlarmScreen_groups_CONFIG_TABLE_COL_NAME, s_dpIcon);
+    TREE1.setText(sNodeId, fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE, fwAlarmScreen_groups_TYPE_ROW_BREAK);
+    TREE1.setOpen(sNodeId, (fwAlarmScreen_groups_TYPE_ROW_BREAK == fwAlarmScreen_groups_TYPE_ROOT));
+    TREE1.setColumnWidth(fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE, 0);
+    TREE1.hideColumn(fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE);
+  }  
+  
+  modified = true;
+  iRowBreakCurrentId++;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+editNode(string id, string mode, bool addNew = false, bool bRowBreak = false)
+{
+  dyn_string dsRet;
+  dyn_float dfRet;  
+  string sFilterMode, nodeId, childPanelTitle;  
+  string nodeName = getItemName(id);
+  string sLabel = getItemValue(id);
+  bool modifyOnly;
+  
+  if(addNew)
+  {
+    nodeName = &quot;&quot;;
+  }
+  
+  switch(mode)
+  {
+    case fwAlarmScreen_groups_TYPE_FSMCU:
+    {
+      // determine modal panel title
+      if(strlen(nodeName))
+        childPanelTitle = &quot;Edit &quot;+mode+ &quot; &quot; + nodeName + &quot; ...&quot;;
+      else
+        childPanelTitle = &quot;Add new &quot;+mode + &quot; ...&quot;;
+      
+      ChildPanelOnModalReturn(
+          &quot;fwAlarmHandling/fwAlarmScreenGroupsConfigurationFSMCU.pnl&quot;,
+          childPanelTitle,
+          makeDynString(),
+          0,
+          0,
+          dfRet,
+          dsRet
+        );  
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_GROUP:
+    {
+      // determine modal panel title
+      switch(mode)
+      {
+        case &quot;group&quot;:
+          if(strlen(nodeName))
+            childPanelTitle = &quot;Edit &quot;+ mode + &quot; &quot; + nodeName + &quot; ...&quot;;
+          else
+            childPanelTitle = &quot;Add new &quot;+ mode + &quot; ...&quot;;
+        break;
+      }
+      
+      ChildPanelOnModalReturn(
+          &quot;fwAlarmHandling/fwAlarmScreenGroupsConfigurationGroup.pnl&quot;,
+          &quot;GroupEdit&quot;,
+          makeDynString(
+              &quot;$sFilter:&quot; + nodeName,
+              &quot;$sLabel:&quot; + sLabel
+            ),
+          0,
+          0,
+          dfRet,
+          dsRet
+        );  
+        
+      break;
+    }
+    default:
+    {
+      // determine modal panel title
+      switch(mode)
+      {
+        case &quot;group&quot;:
+          if(strlen(nodeName))
+            childPanelTitle = &quot;Edit &quot;+ mode + &quot; &quot; + nodeName + &quot; ...&quot;;
+          else
+            childPanelTitle = &quot;Add new &quot; + mode + &quot; ...&quot;;
+          break;
+        case &quot;system&quot;:
+        default:
+          if(strlen(nodeName))
+            childPanelTitle = &quot;Edit &quot;+ mode + &quot; pattern to &quot; + nodeName + &quot; ...&quot;;
+          else
+            childPanelTitle = &quot;Add &quot;+ mode + &quot; pattern ...&quot;;
+          break;
+      }
+      
+      ChildPanelOnModalReturn(
+          &quot;fwAlarmHandling/fwAlarmScreenGroupsConfigurationSys.pnl&quot;,
+          childPanelTitle,
+          makeDynString(
+              &quot;$sFilter:&quot; + nodeName
+            ),
+          0,
+          0,
+          dfRet,
+          dsRet
+        );  
+      break;
+    }
+  }
+  
+  if(dynlen(dsRet))
+  {
+    if(strlen(dsRet[1]))
+    {
+      nodeId = id + &quot;.&quot; + dsRet[1];
+      if(!TREE1.itemExists(nodeId))
+      {
+        if(!addNew)
+        {
+          setItemName(id, dsRet[1]);
+        }
+        else
+        {
+          if(getItemType(id) == fwAlarmScreen_groups_TYPE_ROOT)
+          {
+            addItemToTree(id, dsRet[1], dsRet[1], mode); 
+          }
+          else
+          {
+            addItemToTree(id, nodeId, dsRet[1], mode); 
+          }
+        } 
+      }
+      
+      modified = true;
+    }
+  }
+  
+  if(dynlen(dsRet) &gt; 1) // Add label
+  {
+    setItemValue(dsRet[1], dsRet[2]);
+    modified = true;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void moveNodeUp(string id)
+{
+  string sIdUp;
+  sIdUp = TREE1.itemAbove(id);
+  sIdUp = TREE1.itemAbove(sIdUp);
+  if(getItemType(sIdUp)!=fwAlarmScreen_groups_TYPE_ROOT)
+  {
+    TREE1.moveItem(id, sIdUp);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void moveNodeDown(string id)
+{
+  string sIdDown;
+  sIdDown = TREE1.itemBelow(id);
+  TREE1.moveItem(id, sIdDown);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void reorderNodes(string id)
+{
+  dyn_string dsRet;
+  dyn_float dfRet;
+  
+  bool ok = true;
+  
+  //can reorder only after saving
+  if(modified)
+  {
+    dyn_string dsExceptions;
+    fwGeneral_openMessagePanel(&quot;Settings must be saved before proceeding. \nSave?&quot;, ok, dsExceptions, &quot;Save settings&quot;);
+    
+    if(ok)
+    {
+      saveSettings();
+      loadSettings();      
+    }            
+  }
+  
+  if(ok)
+  {
+    string sNodesList;
+    dyn_string dsNodeList = TREE1.children(id);
+    for (int i = 1 ; i &lt;= dynlen(dsNodeList) ; i++)
+    {
+      if (strpos(dsNodeList[i], fwAlarmScreen_groups_TYPE_ROW_BREAK) &gt;= 0)
+      {
+        dsNodeList[i] = fwAlarmScreen_groups_ROW_BREAK_LABEL;
+      }      
+    }
+    fwGeneral_dynStringToString(dsNodeList, sNodesList);
+    
+    ChildPanelOnModalReturn(
+        &quot;fwAlarmHandling/fwAlarmScreenGroupsConfigurationOrder.pnl&quot;,
+        &quot;Order groups ...&quot;,
+        makeDynString(&quot;$sNodesList:&quot; + sNodesList),
+        0,
+        0,
+        dfRet,
+        dsRet
+      );  
+      
+    if(dynlen(dsRet))
+    {
+      // Update custom order
+      saveGroupsOrder(dsRet);
+      loadSettings();
+    }
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+void saveGroupsOrder(dyn_string groupList)
+{
+  if(dynlen(groupList))
+  {    
+    if(!dpExists(fwAlarmScreen_groups_SETUP_DP))
+    {
+      dpCreate(fwAlarmScreen_groups_SETUP_DP, fwAlarmScreen_groups_SETUP_DPTYPE);
+    }
+    if(dpExists(fwAlarmScreen_groups_ORDERMODE_DP))
+    {
+      dpSet(fwAlarmScreen_groups_ORDER_DP, groupList);
+    }  
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+showUserFeedback(bool sState)
+{
+  savingFeedback.visible(sState);
+  savingArrow.visible(sState);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+enableSoundSettingsInputs(bool bState)
+{
+  radioSource.enabled = bState;
+  spnInhibit.enabled = bState;
+  
+  lblPathW.enabled = bState &amp;&amp; radioSource.number;
+  cmOpen.enabled = bState &amp;&amp; radioSource.number;
+  cmPlay.enabled =  bState &amp;&amp; radioSource.number; 
+}
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  return;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  while(TREE1.columns &lt; 3)
+    delay(0,100);
+  
+  loadSettings();
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="backgroundRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-1 -1</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1271 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 4</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Alarm Groups Configuration</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PUSH_BUTTON3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">567 581.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">565 815</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON7" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">402 581.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">400 815</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  saveSettings();
+  
+  PanelOff();      
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON13" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">485 581.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">483 815</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  saveSettings();
+  modified = false;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="TREE1" shapeType="TREE" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10.00000000000011 74.99999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="AcceptDrops">True</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 75</prop>
+    <prop name="Size">630 495</prop>
+    <extended>
+     <prop type="BOOL" name="autoScroll">False</prop>
+     <prop type="BOOL" name="showDropIndicator">False</prop>
+     <prop type="BOOL" name="itemsExpandable">True</prop>
+     <prop type="BOOL" name="allColumnsShowFocus">False</prop>
+     <prop type="BOOL" name="animated">True</prop>
+     <prop type="BOOL" name="alternatingRowColors">True</prop>
+     <prop type="ENUM" name="horizontalScrollBarPolicy">1</prop>
+     <prop type="ENUM" name="contextMenuPolicy">1</prop>
+     <prop type="ENUM" name="selectionMode">0</prop>
+     <prop type="ENUM" name="resizeMode">0</prop>
+     <prop type="ENUM" name="resizePolicy">1</prop>
+     <prop type="ENUM" name="layoutDirection">0</prop>
+     <prop type="ENUM" name="defaultRenameAction">0</prop>
+     <prop type="ENUM" name="vScrollBarMode">0</prop>
+     <prop type="INT" name="itemMargin">3</prop>
+     <prop type="INT" name="midLineWidth">0</prop>
+     <prop type="INT" name="margin">0</prop>
+     <prop type="ENUM" name="hScrollBarMode">1</prop>
+     <prop type="BOOL" name="rootIsDecorated">True</prop>
+     <prop type="ENUM" name="frameShadow">16</prop>
+     <prop type="ENUM" name="frameShape">1</prop>
+     <prop type="INT" name="lineWidth">0</prop>
+     <script name="rightClicked" isEscaped="1"><![CDATA[rightClicked(string id, int column)
+{
+  int answer;
+  string messageText;
+  dyn_string ds;
+  dyn_float df;
+  string type = getItemType(id);
+
+  switch(type)
+  {
+    case fwAlarmScreen_groups_TYPE_ROOT:
+    {
+      int enableReorder = (dynlen(TREE1.children(id))&gt;1) ? 1 : 0; // If there are children, enable the Reorder option
+      popupMenu(
+          makeDynString(
+              &quot;PUSH_BUTTON,Add group,1,1&quot;,
+              &quot;PUSH_BUTTON,Reorder groups,2,&quot; + enableReorder,
+              &quot;PUSH_BUTTON,Add row break,3,&quot;
+            ),
+          answer
+        );  
+        
+      switch(answer)
+      {
+        case 1:
+        {
+          editNode(id, fwAlarmScreen_groups_TYPE_GROUP, 1);
+          break;
+        }
+        case 2:
+        {
+          reorderNodes(id);
+          break;
+        }
+        case 3:
+        {
+          addRowBreak(id);
+          break;
+        }
+      }    
+      
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_ROW_BREAK:
+    {
+      popupMenu(
+          makeDynString(
+              &quot;PUSH_BUTTON,Delete,1,1&quot;
+            ),
+          answer
+        );  
+        
+      switch(answer)
+      {
+        case 1:
+        {
+          ChildPanelOnCentralReturn(&quot;fwGeneral/fwOkCancel.pnl&quot;, &quot;Delete row break ...&quot;,
+																		makeDynString(&quot;$text:Delete row break?&quot;), df, ds);
+				  if(ds[1] == &quot;ok&quot;)
+          {
+					  TREE1.removeItem(id);
+          }          
+          break;
+        }
+      }
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_GROUP:
+    {
+      popupMenu(
+          makeDynString(
+              &quot;PUSH_BUTTON,Edit,2,1&quot;,
+              &quot;SEPARATOR&quot;,
+              &quot;PUSH_BUTTON,Delete,1,1&quot;,                              
+              &quot;SEPARATOR&quot;,
+              &quot;CASCADE_BUTTON,Add,3,1&quot;,
+              &quot;Add&quot;,
+              &quot;PUSH_BUTTON,System name,4,1&quot;,
+              &quot;PUSH_BUTTON,FSM control unit,5,1&quot;
+            ),
+          answer
+        );  
+        
+      switch(answer)
+      {
+        case 1:
+        {
+          ChildPanelOnCentralReturn(&quot;fwGeneral/fwOkCancel.pnl&quot;, &quot;Delete group ...&quot;,
+																		makeDynString(&quot;$text:Delete group?&quot;), df, ds);
+				  if(ds[1] == &quot;ok&quot;)
+          {
+					  TREE1.removeItem(id);
+          }
+          break;
+        }
+        case 2:
+        {
+          editNode(id,fwAlarmScreen_groups_TYPE_GROUP);
+          break;
+        }
+        case 4:
+        {
+          editNode(id, fwAlarmScreen_groups_TYPE_SYS, 1);
+          break;
+        }
+        case 5:
+        {
+          editNode(id, fwAlarmScreen_groups_TYPE_FSMCU, 1);
+          break;
+        }
+        case 6:
+        {
+          reorderNodes(id);
+          break;
+        }
+      }    
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_SYS:
+    {
+      popupMenu(
+          makeDynString(
+              &quot;PUSH_BUTTON,Edit,2,1&quot;,
+              &quot;SEPARATOR&quot;,
+              &quot;PUSH_BUTTON,Delete,1,1&quot;,                              
+              &quot;SEPARATOR&quot;,
+              &quot;CASCADE_BUTTON,Add,3,1&quot;,
+              &quot;Add&quot;,
+              &quot;PUSH_BUTTON,Dpe,3,1&quot;,
+              &quot;PUSH_BUTTON,Alias,4,1&quot;
+            ),
+          answer
+        );  
+        
+      switch(answer)
+      {
+        case 1://remove node
+        {
+          ChildPanelOnCentralReturn(&quot;fwGeneral/fwOkCancel.pnl&quot;, &quot;Delete system node ...&quot;,
+																		makeDynString(&quot;$text:Delete system node?&quot;), df, ds);
+				  if(ds[1] == &quot;ok&quot;)
+          {
+					  TREE1.removeItem(id);
+          }
+          break;
+        }
+        case 2:
+        {
+          editNode(id,fwAlarmScreen_groups_TYPE_SYS);
+          break;
+        }
+        case 3://add dpe
+        {
+          editFilter(id,fwAlarmScreen_groups_TYPE_DP);
+          break;
+        }
+        case 4://add dpe
+        {
+          editFilter(id,fwAlarmScreen_groups_TYPE_ALIAS);
+          break;
+        }
+      }
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_DP: 
+      messageText = &quot;Delete DP node?&quot;;
+    case fwAlarmScreen_groups_TYPE_ALIAS:
+    {
+      if(messageText == &quot;&quot;)
+      {
+        messageText = &quot;Delete alias node?&quot;;
+      }
+      
+      popupMenu(
+          makeDynString(
+              &quot;PUSH_BUTTON,Edit,2,1&quot;,
+              &quot;SEPARATOR&quot;,
+              &quot;PUSH_BUTTON,Delete,1,1&quot;
+            ),
+          answer
+        );  
+        
+      switch(answer)
+      {
+        case 1:
+        {
+          ChildPanelOnCentralReturn(&quot;fwGeneral/fwOkCancel.pnl&quot;, &quot;Delete DP/alias ...&quot;,
+																		makeDynString(&quot;$text:&quot;+messageText), df, ds);
+				  if(ds[1] == &quot;ok&quot;)
+          {
+					  TREE1.removeItem(id);
+          }
+          break;
+        }
+        case 2:
+        {
+          editFilter(TREE1.parent(id),type);
+          break;
+        }
+      } 
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_FSMCU:
+    {
+      popupMenu(makeDynString(&quot;PUSH_BUTTON,Delete,1,1&quot;),answer);  
+      switch(answer)
+      {
+        case 1:
+        {
+          ChildPanelOnCentralReturn(&quot;fwGeneral/fwOkCancel.pnl&quot;, &quot;Delete FSMCU ...&quot;,
+																		makeDynString(&quot;$text:Delete FSMCU?&quot;), df, ds);
+				  if(ds[1] == &quot;ok&quot;)
+          {
+					  TREE1.removeItem(id);
+          }
+          break;
+        }
+      } 
+      
+      break;
+    }
+  }
+}]]></script>
+     <script name="doubleClicked" isEscaped="1"><![CDATA[doubleClicked(string id, int column)
+{
+  string type = TREE1.getText(id, fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE);
+
+  switch(type)
+  {
+    case fwAlarmScreen_groups_TYPE_ROOT: 
+    {
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_GROUP:
+    {
+      editNode(id,fwAlarmScreen_groups_TYPE_GROUP);
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_SYS:
+    {
+      editNode(id,fwAlarmScreen_groups_TYPE_SYS); 
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_DP: 
+    case fwAlarmScreen_groups_TYPE_ALIAS:
+    {
+      editFilter(TREE1.parent(id),type);
+      break;
+    }
+    case fwAlarmScreen_groups_TYPE_FSMCU:
+    {
+      break;
+    }
+  }
+}]]></script>
+    </extended>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main() 
+{
+    this.addColumn(&quot;Name&quot;); 
+    this.addColumn(&quot;Value&quot;); 
+    this.addColumn(&quot;Type&quot;);
+    this.setColumnWidthMode(0,1);//auto
+    this.setColumnWidthMode(1,0);//fixed
+    this.setColumnWidthMode(2,0);//fixed        
+    this.setColumnWidth(fwAlarmScreen_groups_CONFIG_TABLE_COL_NAME,200);
+    this.setColumnWidth(fwAlarmScreen_groups_CONFIG_TABLE_COL_VALUE,6000);
+    this.setColumnWidth(fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE,0);
+    this.hideColumn(fwAlarmScreen_groups_CONFIG_TABLE_COL_TYPE);
+    this.showHeader(false);
+    this.acceptDrops(true);
+}
+
+
+
+
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">370 122</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">370 122</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="radioOrder" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">228.9999999999998 592</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">341 600</prop>
+    <prop name="Size">260 20</prop>
+    <prop name="Vertical">False</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Alphabetical</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Tree representation</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  if(dpExists(fwAlarmScreen_groups_ORDERMODE_DP))
+  {  
+    int iOrderMode;
+    dpGet(fwAlarmScreen_groups_ORDERMODE_DP,iOrderMode);
+    setValue(&quot;radioOrder&quot;, &quot;number&quot;, iOrderMode);
+  }  
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="orderFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 42</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.06551724137931 0 0 0.9791666666666666 298.0344827586207 538.875</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Order of groups</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 42</prop>
+    <prop name="Size">291 49</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="cmHelp" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">604 10</prop>
+    <prop name="Geometry">1 0 0 1 401.0000000000001 -8</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwAlarmHandling/fwAlarmHandlingGroupsConfiguration</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="cmImEx" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Import/Export groups configs and panel/sound settings</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">120 25</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Import/Export</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Import</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">2</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Export</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+  const string PREFIX = &quot;fwAlarmHandlingGroupsExport_&quot;;
+  
+  dyn_string dsExceptions;
+  string sProjName;
+  string sFile;
+  
+
+  sProjName = fwAlarmScreen_groups_getProjectName();
+  
+  if(sProjName == &quot;&quot;)
+  {
+    fwException_raise(
+        dsExceptions, 
+        &quot;WARNING&quot;, 
+        &quot;fwAlarmScreenGroupsConfiguration.pnl - could not get the local project name. The Import/Export cannot be performed&quot;,
+        &quot;&quot;
+      );
+    return;
+  }
+  
+  switch(id)
+  {
+    case 1: // Import
+    {
+      bool bOk = true;
+      if(dynlen(TREE1.children(&quot;Groups&quot;)) &gt; 0)
+      {
+        fwGeneral_openMessagePanel(&quot;Warning: Importing groups will merge\nnew groups with the existing ones.\nContinue?&quot;, bOk, dsExceptions, &quot;Importing&quot;, false);
+      }
+      
+      if(!bOk)
+      {
+        fwGeneral_openMessagePanel(&quot;Import Aborted&quot;,bOk,dsExceptions,&quot;Importing&quot;,true);
+        return;
+      }
+      
+      fileSelector(sFile, getPath(DPLIST_REL_PATH), false, PREFIX + &quot;*&quot;);
+      if(isfile(sFile))
+      {
+        if(strpos(sFile, PREFIX)&lt;0)
+        {
+          fwGeneral_openMessagePanel(&quot;The file name must begin with &quot; + PREFIX, bOk, dsExceptions, &quot;&quot;, true);
+        }
+        
+        openProgressBar(&quot;Groups Import&quot;, &quot;copy.gif&quot;, &quot;Importing Groups config and setup from &quot;, sFile, &quot; Be patient!&quot;, 1); 
+        saveSettings();
+        system(fwInstallation_getWCCOAExecutable(&quot;ascii&quot;) + &quot; -in &quot; + sFile + &quot; -proj &quot; + sProjName );
+        loadSettings();
+        closeProgressBar();
+      }
+      
+      break;
+    }
+    case 2: // Export
+    {    
+      fileSelector(sFile, getPath(DPLIST_REL_PATH), false, PREFIX + &quot;*&quot;, false);
+      
+      if(strlen(sFile))
+      {
+        // If prefix does not exist, add it to file name
+        if(strpos(sFile, PREFIX) &lt; 0)
+        {
+          string sTmp;
+          dyn_string dsTmp;
+          dsTmp = strsplit(sFile,&quot;/&quot;);
+          sTmp = dsTmp[dynlen(dsTmp)];
+          sTmp = PREFIX + sTmp;
+          dsTmp[dynlen(dsTmp)] = sTmp;
+          fwGeneral_dynStringToString(dsTmp, sFile, &quot;/&quot;);
+        }    
+        
+        openProgressBar(
+            &quot;Groups Export&quot;, 
+            &quot;copy.gif&quot;, 
+            &quot;Exporting Groups config and setup to &quot;, 
+            sFile, 
+            &quot; Be patient!&quot;, 
+            1
+          ); 
+          
+        saveSettings();
+        system(fwInstallation_getWCCOAExecutable(&quot;ascii&quot;) + &quot; -filterDp &quot; + fwAlarmScreen_groups_SETUP_DP + &quot;*; &quot; +
+               &quot;-filterDp &quot; + fwAlarmScreen_groups_CONFIG_DP + &quot;*; -out &quot; + sFile + &quot; -proj &quot; + sProjName + &quot; -filter DAO&quot;);
+        
+        closeProgressBar();
+      }
+      
+      break;
+    }
+  }
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmOpen" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">676 689.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select wav file</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">574 724</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">openpanel.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string s_wPath;
+  fileSelector(s_wPath, &quot;&quot;, true, &quot;*.wav&quot;);
+  if(strlen(s_wPath))
+  {
+    lblPathW.text = s_wPath;
+  }
+  
+  showUserFeedback(TRUE);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="lblPathW" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">212 710.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">110 725</prop>
+    <prop name="Size">461 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Command" isEscaped="1"><![CDATA[main()
+{
+  showUserFeedback(TRUE);
+}]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  dyn_errClass err;
+
+  if( !dpExists(fwAlarmScreen_groups_SOUNDFILE_DP))
+  {
+    setValue(&quot;&quot;, &quot;color&quot;, &quot;_dpdoesnotexist&quot;);
+    return;
+  }
+
+  dpConnect(&quot;EP_textFieldInCB&quot;, fwAlarmScreen_groups_SOUNDFILE_DP);
+  err = getLastError();
+  if (dynlen(err) &gt; 0)
+  {
+    setValue(&quot;&quot;, &quot;color&quot;, &quot;_dpdoesnotexist&quot;);
+  }
+}
+
+EP_textFieldInCB(string dp, string sNewValue)
+{
+  if(strlen(sNewValue))
+  {
+    this.text = dpValToString(dp, sNewValue, TRUE);
+  }
+  else
+  {
+    this.text = fwAlarmScreen_groups_getDefaultSoundPath();
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmPlay" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">705 689.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Play sound</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">603 724</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">start_en.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  startSound(lblPathW.text);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="spnInhibit" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">289 753.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">557 658</prop>
+    <prop name="Size">60 23</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">3600</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  showUserFeedback(TRUE);
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  if(dpExists(fwAlarmScreen_groups_SETUP_DP))
+  {
+    int iInhibit;
+    dpGet(fwAlarmScreen_groups_SOUNDINHIBIT_DP, iInhibit);
+    this.text = iInhibit;
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT5" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">414 662</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">414 662</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Do not re-play sound for</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT6" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">621 662</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">621 662</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">s</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="ckEnabled" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">32.00000000000001 697.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 660</prop>
+    <prop name="Size">81 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Enabled</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  enableSoundSettingsInputs(state);  
+  showUserFeedback(TRUE);
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  bool enabled;
+  if(dpExists(fwAlarmScreen_groups_SETUP_DP))
+  {
+    dpGet(fwAlarmScreen_groups_SOUNDENABLED_DP, enabled);
+    this.state(0, enabled);
+    radioSource.enabled = enabled;
+    spnInhibit.enabled = enabled;
+    
+    lblPathW.enabled = enabled &amp;&amp; radioSource.number;
+    cmOpen.enabled = enabled &amp;&amp; radioSource.number;
+    cmPlay.enabled =  enabled &amp;&amp; radioSource.number; 
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="radioSource" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">74.99999999999999 632.3333333333336</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 689</prop>
+    <prop name="Size">200 67</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Standard beep sound</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Sound file</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  lblPathW.enabled = button;
+  cmOpen.enabled = button;
+  cmPlay.enabled =  button;   
+  
+  showUserFeedback(TRUE);
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int iOrderMode;
+  if(dpExists(fwAlarmScreen_groups_SOUNDSOURCE_DP))
+  {
+      dpGet(fwAlarmScreen_groups_SOUNDSOURCE_DP, iOrderMode);
+      setValue(&quot;&quot;, &quot;number&quot;, iOrderMode);
+  }  
+  
+  lblPathW.enabled = iOrderMode;
+  cmOpen.enabled = iOrderMode;
+  cmPlay.enabled =  iOrderMode; 
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="FRAME2" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 42</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.797142857142857 0 0 1.693877551020408 10.00000000000001 566.8571428571428</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Play sound</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 42</prop>
+    <prop name="Size">351 99</prop>
+   </properties>
+  </shape>
+  <shape Name="cmDefault" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">28</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-119 355.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Reset to default settings</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">539 769</prop>
+    <prop name="Size">90 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Set default</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  spnInhibit.text = 0;
+  lblPathW.text = fwAlarmScreen_groups_getDefaultSoundPath();
+  ckEnabled.state(0,false);
+  
+  enableSoundSettingsInputs(FALSE);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="FRAME3" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 42</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.06551724137931 0 0 0.9791666666666666 -21.96551724137931 538.875</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Individual alarm visibility</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 42</prop>
+    <prop name="Size">291 49</prop>
+   </properties>
+  </shape>
+  <shape Name="radioAlarmShowMode" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-92.00000000000021 607</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 600</prop>
+    <prop name="Size">220 20</prop>
+    <prop name="Vertical">False</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">First group</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">All groups</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  int iCurrentValue;
+  dpGet(fwAlarmScreen_groups_ALARM_SHOW_MODE_DP, iCurrentValue);
+     
+  showUserFeedback(button != iCurrentValue);
+}
+
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  if(dpExists(fwAlarmScreen_groups_ORDERMODE_DP))
+  {  
+    int iOrderMode;
+    dpGet(fwAlarmScreen_groups_ORDERMODE_DP,iOrderMode);
+    setValue(&quot;radioOrder&quot;, &quot;number&quot;, iOrderMode);
+  }  
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="savingFeedback" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">25.10370370370367 819</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">25.10370370370367 819</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Settings will be applied next time the alarm panel is started.</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="savingArrow" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">39</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">_3DText</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.725925925925926 0 0 0.6825000000000001 2.740740740740755 294.475</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+     <prop name="Location">20 780</prop>
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+    </prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

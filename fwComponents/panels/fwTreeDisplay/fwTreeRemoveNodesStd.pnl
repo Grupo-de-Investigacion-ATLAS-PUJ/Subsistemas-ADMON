@@ -1,0 +1,832 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Remove Nodes</prop>
+   <prop name="en_US.iso88591">Remove Nodes</prop>
+   <prop name="de_AT.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">659 327</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">30 20</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[global dyn_string dsAllDps;
+global dyn_string dsAllDpsOrig, dsAllDpsOrigMore;
+global dyn_string dsSelDps;
+
+localDisableAll()
+{
+  cmdSel.enabled = false;
+  cmdSelAll.enabled = false;
+  cmdRem.enabled = false;
+  cmdRemAll.enabled = false;
+  cmdOk.enabled = false;
+}
+
+localEnableAll()
+{
+  cmdSel.enabled = true;
+  cmdSelAll.enabled = true;
+  cmdRem.enabled = true;
+  cmdRemAll.enabled = true;
+  cmdOk.enabled = true;
+
+}
+
+get_all_children(string node)
+{
+	dyn_string nodes, exInfo, types;
+	int i, ref;
+	string dev, type, ref_obj;
+	
+	dynClear(dsAllDpsOrig);
+	dynClear(dsAllDpsOrigMore);
+	fwTree_getChildren(node, nodes, exInfo);
+	for(i = 1; i &lt;= dynlen(nodes); i++)
+	{
+//		strreplace(nodes[i],&quot;&amp;&quot;,&quot;&amp;&amp;&quot;);
+		dsAllDpsOrig[i] = nodes[i];
+		ref_obj = nodes[i];
+		nodes[i] = fwTree_getNodeDisplayName(nodes[i], exInfo);
+		if((ref = fwFsm_isObjectReference(ref_obj)))
+		{
+ 				nodes[i] = &quot;&amp;&amp;&quot;+nodes[i];
+				nodes[i] += &quot;(&quot;+fwFsm_getReferencedObjectDevice(ref_obj)+&quot;)&quot;;
+		}
+		dsAllDpsOrigMore[i] = nodes[i];
+	}
+	tabAll.deleteAllLines();
+	dsAllDps = nodes;
+  tabAll.appendLines(dynlen(dsAllDps), &quot;#1&quot;, dsAllDps);
+}
+
+get_children(string node, string type)
+{
+	dyn_string nodes, exInfo, types, typenodes;
+	int i, ref;
+	string dev, devtype, ref_obj;
+	
+	dynClear(dsAllDpsOrig);
+	dynClear(dsAllDpsOrigMore);
+	fwTree_getChildren(node, nodes, exInfo);
+	for(i = 1; i &lt;= dynlen(nodes); i++)
+	{
+		fwTree_getNodeDevice(nodes[i], dev, devtype, exInfo);
+//		strreplace(nodes[i],&quot;&amp;&quot;,&quot;&amp;&amp;&quot;);
+
+		if(devtype == type)
+		{
+			dsAllDpsOrig[i] = nodes[i];
+			ref_obj = nodes[i];
+			nodes[i] = fwTree_getNodeDisplayName(nodes[i], exInfo);
+			if((ref = fwFsm_isObjectReference(ref_obj)))
+			{
+  			nodes[i] = &quot;&amp;&amp;&quot;+nodes[i];
+				nodes[i] += &quot;(&quot;+fwFsm_getReferencedObjectDevice(ref_obj)+&quot;)&quot;;
+			}
+			dsAllDpsOrigMore[i] = nodes[i];
+			dynAppend(typenodes, nodes[i]);
+		}	
+	}				
+	tabAll.deleteAllLines();
+	dsAllDps = typenodes;
+  tabAll.appendLines(dynlen(dsAllDps), &quot;#1&quot;, dsAllDps);
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int        i, j = 0;
+  string     sDp;
+  dyn_string list;
+  
+  tabAll.tableMode(TABLE_SELECT_MULTIPLE);
+  tabAll.selectByClick(TABLE_SELECT_LINE);
+  tabSel.tableMode(TABLE_SELECT_MULTIPLE);
+  tabSel.selectByClick(TABLE_SELECT_LINE);
+  dsAllDps = makeDynString();
+  dsSelDps = makeDynString();
+  setValue(&quot;type&quot;,&quot;text&quot;,&quot;All Types&quot;);
+  set_up($1, dsAllDps);
+}
+
+set_up(string node, dyn_string &amp;nodes)
+{
+	dyn_string exInfo, types;
+	int i;
+	string dev, type;
+	
+	fwTree_getChildren(node, nodes, exInfo);
+	for(i = 1; i &lt;= dynlen(nodes); i++)
+	{
+		fwTree_getNodeDevice(nodes[i], dev, type, exInfo);
+		if(!dynContains(types, type))
+			dynAppend(types, type);			
+	}				
+	dynAppend(types,&quot;All Types&quot;);
+	setValue(&quot;type&quot;,&quot;items&quot;,types);
+	get_all_children(node);
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="txtSelected" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">64</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">380 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">380 30</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"> ( 0 )</prop>
+     <prop name="en_US.iso88591"> ( 0 )</prop>
+     <prop name="de_AT.iso88591"> ( 0 )</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">66</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 20</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">22 22</prop>
+    <prop name="Size">237 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,75,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-bold-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,700,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Node:</prop>
+     <prop name="en_US.iso88591">Node:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">63</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">22 32</prop>
+    <prop name="Size">237 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,75,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-bold-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,700,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Type:</prop>
+     <prop name="en_US.iso88591">Type:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtType" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">45</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">60 20</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-110-100-100-*-*-iso8859-1|-11,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">60 20</prop>
+    <prop name="Size">281 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="tabAll" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">61</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,0,0,0,0,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Courier New-normal-r-normal-*-*-110-100-100-*-*-iso8859-1|-12,0,0,0,400,0,0,0,0,0,0,0,0,Courier New</prop>
+    </prop>
+    <prop name="Location">20 70</prop>
+    <prop name="Size">291 191</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">16</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">None</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">#1</prop>
+     <prop name="Width">257</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="cmdSel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">57</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">320 90</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select marked nodes to delete</prop>
+     <prop name="en_US.iso88591">Select marked nodes to delete</prop>
+     <prop name="de_AT.iso88591">Markierte DPs zum LÃ¶schen selektiere</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Right</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">320 90</prop>
+    <prop name="Size">31 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">cmdSel.bmp</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int        i;
+  dyn_int    di;
+  dyn_string dsDps;
+
+  localDisableAll();
+  
+  di = tabAll.getSelectedLines;
+  dynSortAsc(di);
+  for ( i = dynlen(di); i &gt; 0; i-- )
+  {
+    dsDps[i] = dsAllDps[di[i]+1];
+    dynRemove(dsAllDps, di[i]+1);
+  }
+  dynAppend(dsSelDps, dsDps);
+  dynSortAsc(dsSelDps);
+  dynUnique(dsSelDps);
+
+  tabSel.deleteAllLines();
+  tabAll.deleteAllLines();
+  tabSel.appendLines(dynlen(dsSelDps), &quot;#1&quot;, dsSelDps);
+  tabAll.appendLines(dynlen(dsAllDps), &quot;#1&quot;, dsAllDps);
+
+  txtSelected.text = &quot; ( &quot; + tabSel.lineCount + &quot; )&quot;;
+
+  localEnableAll();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdSelAll" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">58</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">320 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select all nodes to delete</prop>
+     <prop name="en_US.iso88591">Select all nodes to delete</prop>
+     <prop name="de_AT.iso88591">Alle DPs zum LÃ¶schen selektiere</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Alt+Right</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">320 120</prop>
+    <prop name="Size">31 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">cmdSelAll.bmp</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string ds = dsSelDps;
+  
+  localDisableAll();
+
+  tabSel.deleteAllLines();
+  dynAppend(dsAllDps, ds);
+  dynSortAsc(dsAllDps);
+  tabSel.appendLines(dynlen(dsAllDps), &quot;#1&quot;, dsAllDps);
+  dsSelDps = dsAllDps;
+  dsAllDps = makeDynString();
+  dynSortAsc(dsSelDps);
+  tabAll.deleteAllLines();
+
+  txtSelected.text = &quot; ( &quot; + tabSel.lineCount + &quot; )&quot;;
+
+  localEnableAll();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdRem" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">60</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">320 170</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Don't delete selected nodes</prop>
+     <prop name="en_US.iso88591">Don't delete selected nodes</prop>
+     <prop name="de_AT.iso88591">Markierte DPs nicht lÃ¶sche</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Left</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">320 170</prop>
+    <prop name="Size">31 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">cmdRem.bmp</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int        i;
+  dyn_int    di;
+  dyn_string dsDps;
+
+  localDisableAll();
+
+  di = tabSel.getSelectedLines;
+  dynSortAsc(di);
+  for ( i = dynlen(di); i &gt; 0; i-- )
+  {
+    dsDps[i] = dsSelDps[di[i]+1];
+    dynRemove(dsSelDps, di[i]+1);
+  }
+  dynAppend(dsAllDps, dsDps);
+  dynSortAsc(dsAllDps);
+  dynUnique(dsAllDps);
+
+  tabSel.deleteAllLines();
+  tabAll.deleteAllLines();
+  tabAll.appendLines(dynlen(dsAllDps), &quot;#1&quot;, dsAllDps);
+  tabSel.appendLines(dynlen(dsSelDps), &quot;#1&quot;, dsSelDps);
+
+  txtSelected.text = &quot; ( &quot; + tabSel.lineCount + &quot; )&quot;;
+
+  localEnableAll();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdRemAll" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">59</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">320 200</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Don't delete any nodes</prop>
+     <prop name="en_US.iso88591">Don't delete any nodes</prop>
+     <prop name="de_AT.iso88591">Keine DPs lÃ¶sche</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+Alt+Left</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">320 200</prop>
+    <prop name="Size">31 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">cmdRemAll.bmp</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string ds = dsAllDps;
+  
+  localDisableAll();
+
+  tabSel.deleteAllLines();
+  dsAllDps = dsSelDps;
+  dynAppend(dsAllDps, ds);
+  dynSortAsc(dsAllDps);
+  dsSelDps = makeDynString();
+  tabAll.deleteAllLines();
+  tabAll.appendLines(dynlen(dsAllDps), &quot;#1&quot;, dsAllDps);
+
+  txtSelected.text = &quot; ( &quot; + tabSel.lineCount + &quot; )&quot;;
+
+  localEnableAll();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="tabSel" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">62</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">336 -32</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+     <prop name="de_AT.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,0,0,0,0,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Courier New-normal-r-normal-*-*-110-100-100-*-*-iso8859-1|-12,0,0,0,400,0,0,0,0,0,0,0,0,Courier New</prop>
+    </prop>
+    <prop name="Location">360 70</prop>
+    <prop name="Size">291 191</prop>
+    <prop name="ShowColumnHeader">False</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">16</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">None</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">#1</prop>
+     <prop name="Width">257</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="cmdOk" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">430 280</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Delete selected datapoints</prop>
+     <prop name="en_US.iso88591">Delete selected datapoints</prop>
+     <prop name="de_AT.iso88591">Selektierte Datenpunkte lÃ¶sche</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">430 280</prop>
+    <prop name="Size">101 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+     <prop name="en_US.iso88591">OK</prop>
+     <prop name="de_AT.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  int        i, index;
+  dyn_int    di;
+  dyn_float  df;
+  dyn_string ds, dsDps;
+  string node_name;
+
+  if ( tabSel.lineCount &lt; 1 )
+  {
+    PanelOffReturn(makeDynFloat(0), makeDynString());
+    return;
+  }
+
+  for ( i = 1; i &lt;= tabSel.lineCount; i++ )
+  {
+    ds = tabSel.getLineN(i-1);
+    dsDps[i] = ds[1];
+  }
+
+	for(i = 1; i &lt;= dynlen(dsAllDpsOrigMore); i++)
+	{
+		node_name = dsAllDpsOrigMore[i];
+			if(index = dynContains(dsDps, node_name))
+			{
+				dsDps[index] = dsAllDpsOrig[i]; 
+			}
+	}	
+  if ( dynlen(dsDps) &gt; 0 )
+    PanelOffReturn(makeDynFloat(1), dsDps);
+  else
+    PanelOffReturn(makeDynFloat(0), makeDynString());
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">550 280</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Cancel without deleting</prop>
+     <prop name="en_US.iso88591">Cancel without deleting</prop>
+     <prop name="de_AT.iso88591">Abbrechen ohne LÃ¶sche</prop>
+    </prop>
+    <prop name="Hotkey">Esc</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+     <prop name="de_AT.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">550 280</prop>
+    <prop name="Size">101 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+     <prop name="en_US.iso88591">Cancel</prop>
+     <prop name="de_AT.iso88591">Abbrechen</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOffReturn(makeDynFloat(0), makeDynString());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="type" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">65</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">60 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-Arial-normal-r-normal-*-*-120-100-100-*-*-iso8859-1|-13,0,0,0,400,0,0,0,0,3,2,1,34,Arial</prop>
+    </prop>
+    <prop name="Location">60 30</prop>
+    <prop name="Size">281 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+string type;
+
+	getValue(&quot;&quot;,&quot;text&quot;,type);
+	if(type == &quot;All Types&quot;)
+		get_all_children($1);
+	else
+		get_children($1, type);
+}
+/*
+get_children(string node, string type)
+{
+	dyn_string nodes, exInfo, types, typenodes;
+	int i, ref;
+	string dev, devtype;
+	
+	fwTree_getChildren(node, nodes, exInfo);
+	for(i = 1; i &lt;= dynlen(nodes); i++)
+	{
+		fwTree_getNodeDevice(nodes[i], dev, devtype, exInfo);
+//		strreplace(nodes[i],&quot;&amp;&quot;,&quot;&amp;&amp;&quot;);
+
+		if(devtype == type)
+		{
+			dynAppend(dsAllDpsOrig, nodes[i]);	
+			if((ref = fwFsm_isObjectReference(nodes[i])))
+			{
+				nodes[i] = fwFsm_getReferencedObject(nodes[i]);
+				if(ref == 1)
+					nodes[i] = &quot;&amp;&amp;&quot;+nodes[i];
+			}
+			dynAppend(typenodes, nodes[i]);
+		}	
+	}				
+	tabAll.deleteAllLines();
+	dsAllDps = typenodes;
+  tabAll.appendLines(dynlen(dsAllDps), &quot;#1&quot;, dsAllDps);
+}
+*/]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">546 316</prop>
+  <prop name="BackColor">_Window</prop>
+  <prop name="RefPoint">60 70</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">2</prop>
+  <prop name="layoutRightMargin">2</prop>
+  <prop name="layoutTopMargin">2</prop>
+  <prop name="layoutBottomMargin">2</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;classes/fwStdLib/FwException.ctl&quot;
+
+/** This panel is supposed to be populated by invoking its
+	public init() method, with the argument being a FwException
+	object (which encapsulates a errClass variable).
+	
+	For proper functioning, it should be embedded as a reference
+	in another panel (e.g. fwStdLib/fwExceptionDisplay.pnl),
+	so that the invokeMethod() could be used. This is done
+	through the utility function fwOOPanelOpen(), which is 
+	called eg. from FwException::displayLast(), which in turn
+	is expected to be placed in the catch{} block of a panel.
+
+ */
+
+FwException exc;
+
+public FwException getException() {return exc;}
+
+public void init(const FwException &amp;newExc)
+{
+	exc=newExc;
+	populatePanel();
+}
+
+void populatePanel()
+{
+	string sevColor=exc.getSeverityColor();
+	// convert to HTML color code for the rich-text
+	int r,g,b,a;
+	string sevHtmlColor;
+
+	colorToRgb(sevColor,r,g,b,a);
+	sprintf(sevHtmlColor,&quot;#%02X%02X%02X&quot;,r,g,b);
+	
+	// re-format the exception text with RichText		
+	string rTxt;
+
+	rTxt+=&quot;&lt;p align=\&quot;center\&quot; style=\&quot;&quot;;
+	rTxt+=&quot;background-color:&quot;+sevHtmlColor+&quot;;margin-top:0;margin-bottom:0;font-size:large;font-weight:800;&quot;;
+	rTxt+=&quot;\&quot;&gt;&quot;;
+
+	rTxt+=&quot;&lt;b&gt;&quot;+exc.getSeverityText()+&quot;&lt;/b&gt;&lt;/p&gt;&lt;hr/&gt;&quot;;
+
+	rTxt+=&quot;&lt;p style=\&quot;margin-top:6;margin-bottom:6;text-indent:0;font-size:large;\&quot;&gt;&quot;+exc.getExcText()+&quot;.&lt;/p&gt;&quot;;
+	dyn_string details=exc.getExcDetails();
+	
+	if (!details.isEmpty()) {
+		rTxt+=&quot;Details:&lt;ul style=\&quot;margin-top:0;margin-bottom:5;\&quot;&gt;&quot;;
+		for (int i=0;i&lt;details.count();i++) {
+			rTxt+=&quot;&lt;li style=\&quot;margin-top:0;margin-bottom:0;text-indent:0;\&quot;&gt;&quot;+details.at(i)+&quot;&lt;/li&gt;&quot;;
+		}
+		rTxt+=&quot;&lt;/ul&gt;&quot;;
+	}
+	
+	if (exc.getCodeText()!=&quot;&quot;) rTxt+=&quot;&lt;tt&gt;&lt;div align=\&quot;right\&quot; , style=\&quot;font-size:small;margin-bottom:0;\&quot;&gt;&quot;+exc.getCodeText()+&quot; - &quot;+exc.getTypeText()+&quot;&lt;/div&gt;&lt;/tt&gt;&quot;;
+
+	time t=exc.getTimestamp();
+	rTxt+=&quot;&lt;hr/&gt;&lt;tt&gt;&lt;div align=\&quot;left\&quot; , style=\&quot;font-size:small;margin-bottom:0;\&quot;&gt;&quot;+formatTime(&quot;%Y.%m.%d %H:%M:%S&quot;,t)+&quot;&lt;/div&gt;&lt;/tt&gt;&quot;;
+
+	ExceptionText.text=rTxt;
+	
+	dyn_string stkTrace=exc.getStackTrace();
+	StackTrace.deleteAllLines();
+	for (int i=0;i&lt;stkTrace.count();i++) {
+		string stk=stkTrace.at(i);
+		// the &quot; at &quot; string delimits the function and location...
+		int splitPos=strpos(stk,&quot; at &quot;);
+		string fnName=substr(stk,0,splitPos);
+		string location=substr(stk,splitPos+4);
+		StackTrace.appendLine(&quot;#&quot;,i+1,&quot;Function&quot;,fnName,&quot;Location&quot;,location);
+	}
+	StackTrace.columnStretchable(0,true);
+	StackTrace.columnStretchable(1,false);
+	StackTrace.columnStretchable(2,false);
+	StackTrace.adjustColumn(2);
+	StackTrace.adjustColumn(1);
+	StackTrace.adjustColumn(0);
+}
+
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="ExceptionText" shapeType="TEXT_EDIT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21.00713236698356 56.14659685863607</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Details</prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">2 29</prop>
+    <prop name="Size">435 86</prop>
+    <extended>
+     <prop type="ENUM" name="contextMenuPolicy">1</prop>
+     <prop type="ENUM" name="textInteractionFlags">13</prop>
+     <prop type="CHAR_STRING" name="placeholderText">Not initialized</prop>
+     <prop type="ENUM" name="textFormat">1</prop>
+     <prop type="ENUM" name="frameShadow">48</prop>
+     <prop type="ENUM" name="frameShape">0</prop>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="StackTrace" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">2 121</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">-1 50</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">2 121</prop>
+    <prop name="Size">435 86</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">17</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">#</prop>
+     <prop name="Width">20</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">Function</prop>
+     <prop name="Width">150</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Function</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">Location</prop>
+     <prop name="Width">300</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Location</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.sortOnClick(false);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="ShowStackTraceButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">35.71296296296298 217.2612738058845</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Show/Hide Stack Trace</prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,11,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">36 213</prop>
+    <prop name="Size">32 26</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">debug.xpm</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+	StackTrace.visible=!(StackTrace.visible);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">4 4</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignLeft|AlignLeading</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">4 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Exception encountered</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER3" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">166 2</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">166 2</prop>
+    <prop name="Size">271 21</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="PUSH_BUTTON1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">2 218.361313868613</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">FwBackground</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Copy to clipboard</prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">2 214.5</prop>
+    <prop name="Size">28 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">clipboard_en.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+	string txt;
+	txt+=formatTime(&quot;%Y.%m.%d %H:%M:%S&quot;,exc.getTimestamp());
+	txt+=&quot;\t&quot;+exc.getSeverityText();
+	txt+=&quot;\t&quot;+exc.getCodeText() + &quot; - &quot; + exc.getTypeText()+&quot;\n&quot;;
+	txt+=exc.getText()+&quot;\n&quot;;
+	dyn_string stkTrace=exc.getStackTrace();
+	txt+=&quot;---Stack Trace:\n&quot;;
+	for (int i=1;i&lt;=dynlen(stkTrace);i++) {
+		txt+=&quot;   (&quot;+i+&quot;) &quot;+stkTrace[i]+&quot;\n&quot;;
+	}
+	setClipboardText(txt);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON2" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">356.9661964183969 213.0826716449484</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">FwForeground</prop>
+    <prop name="BackColor">FwBackground</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignTrailing|AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">358 214</prop>
+    <prop name="Size">80 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOffReturn(makeDynFloat(),makeDynString());
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="SPACER2" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">74 213</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">74 213</prop>
+    <prop name="Size">277 26</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="4" Name="LAYOUT_GROUP4" serial="2">
+   <properties>
+    <prop idx="1" name="shapeSerial">14</prop>
+    <prop idx="0" name="shapeSerial">13</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="4" Name="LAYOUT_GROUP5" serial="3">
+   <properties>
+    <prop idx="0" name="shapeSerial">15</prop>
+    <prop idx="1" name="shapeSerial">8</prop>
+    <prop idx="2" name="shapeSerial">17</prop>
+    <prop idx="3" name="shapeSerial">16</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP6" serial="4">
+   <properties>
+    <prop idx="1" name="shapeSerial">0</prop>
+    <prop idx="2" name="shapeSerial">2</prop>
+    <prop idx="0" name="groupSerial">2</prop>
+    <prop idx="3" name="groupSerial">3</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

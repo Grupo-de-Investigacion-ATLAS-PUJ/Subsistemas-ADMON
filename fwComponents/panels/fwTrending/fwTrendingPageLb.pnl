@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   
+  </prop>
+  <prop name="Size">1267 875</prop>
+  <prop name="BackColor">FwTrendingViewBackground</prop>
+  <prop name="RefPoint">1150 850</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[dyn_string FolderPages;
+int CurrPageIndex;
+
+init()
+{
+//  dyn_string pages;
+//  string page;
+/*  
+  string page = &quot;LBECSINFO:VELOTest_Page1&quot;;
+  addSymbol(myModuleName(), myPanelName(), &quot;fwTrending/fwTrendingPage.pnl&quot;, &quot;page1&quot;, 
+            makeDynString(&quot;$PageName:&quot;+page), 0, 0, 0, 1, 1);
+*/
+  float factor;
+  setScaleStyle(SCALE_SCALE);
+  if(isDollarDefined(&quot;$zoom&quot;))
+  {
+//    factor = getDollarValue(&quot;$zoom&quot;);
+    factor = (float)$zoom;
+    if((factor != 0) &amp;&amp; (factor != 1))
+    {
+      if(factor &lt; 1)
+      {
+        factor = 1/factor;
+        panelZoomOut(myModuleName(), factor);
+      }
+      else
+      {
+        panelZoomIn(myModuleName(), factor);
+      }
+    }
+DebugTN(&quot;factor&quot;,$zoom,factor);
+  }
+DebugTN($1, $2);
+  if($2 == 1)
+  {
+    FolderPages = fwTrending_getNodePages($1);
+    DebugN($1, FolderPages);
+ 
+    CurrPageIndex = 1;
+    showPage(FolderPages[CurrPageIndex], $3);
+  }
+  else
+  {
+    showPage($1, $3);
+    prev.visible = 0;
+    next.visible = 0;
+  } 
+}
+
+showPage(string page)
+{
+  string ref, title, auxPage;
+  int ret, i;
+  dyn_dyn_string data;
+  dyn_string exInfo, pars;
+  
+  if(shapeExists(&quot;APage&quot;))
+  {
+DebugTN(&quot;exists, removing...&quot;);    
+	  for(i=1; i&lt;=6; i++)
+	  {
+      ref = i;
+      if(shapeExists(ref))
+      {
+DebugTN(&quot;exists&quot;,ref);
+	  	  removeSymbol(myModuleName(), myPanelName(), ref);
+		    removeSymbol(myModuleName(), myPanelName(), ref + &quot;trend&quot;);
+      }
+	  }
+    removeSymbol(myModuleName(), myPanelName(), &quot;APage&quot;);
+    delay(0,200);
+  }
+//  page = FolderPages[index];
+  auxPage = page;
+//  strreplace(auxPage,&quot;:&quot;,&quot;|&quot;);
+//  strreplace(auxPage,getSystemName(),&quot;&quot;);
+  pars[1] = &quot;$PageName:&quot;+auxPage;
+  pars[2] = &quot;$templateParameters:&quot;;
+//  pars[3] = &quot;$PageBackColor:black&quot;;
+//  pars[3] = &quot;$TestPar:&quot;+&quot;Test2&quot;;
+//  pars[4] = &quot;$OpenPageName:&quot;+auxPage;
+//  pars[5] = &quot;$bEdit:&quot;;
+DebugTN(&quot;showPage&quot;, page, pars);
+
+//  ret = addSymbol(myModuleName(), myPanelName(), &quot;fwTrending/fwTrendingPage.pnl&quot;, &quot;APage&quot;, 
+//            makeDynString(&quot;$PageName:&quot;+page), 0, 0, 0, 1, 1);
+  ret = addSymbol(myModuleName(), myPanelName(), &quot;fwTrending/fwTrendingPage.pnl&quot;, &quot;APage&quot;, 
+            pars, 0, 0, 0, 1, 1);
+ 
+	fwTrending_getPage(page, data, exInfo);
+	title = &quot;Trending Page: &quot; + data[fwTrending_PAGE_OBJECT_TITLE];
+//  this.name = title;
+//  setWindowTitle(&quot;TrendingPage&quot;+$3,title);
+  setWindowTitle(myModuleName(), myPanelName(), title);
+  
+DebugN(&quot;adding page&quot;, page, title);
+  setValue(&quot;APage.CloseButton&quot;,&quot;visible&quot;,0);
+  setValue(&quot;APage.pageButton&quot;,&quot;visible&quot;,1);
+}
+
+nextPage()
+{
+  CurrPageIndex++;
+  if(CurrPageIndex &gt; dynlen(FolderPages))
+    CurrPageIndex = 1;
+  showPage(FolderPages[CurrPageIndex]); 
+}
+
+prevPage()
+{
+  CurrPageIndex--;
+  if(CurrPageIndex &lt; 1)
+    CurrPageIndex = dynlen(FolderPages);
+  showPage(FolderPages[CurrPageIndex]); 
+}
+
+linkAxiis(int flag)
+{
+  fwTrending_linkAxiis(flag);
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  init(); 
+}]]></script>
+ </events>
+ <shapes>
+  <shape Name="next" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1010 840</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+     
+    </prop>
+    <prop name="Location">1010 840</prop>
+    <prop name="Size">101 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Next Page</prop>
+     
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  nextPage();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="prev" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">900 840</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+     
+    </prop>
+    <prop name="Location">900 840</prop>
+    <prop name="Size">101 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Prev Page</prop>
+     
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  prevPage();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON3" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">750 840</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+     
+    </prop>
+    <prop name="Location">750 840</prop>
+    <prop name="Size">111 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Link Time Axiis</prop>
+     
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  string text = this.text;
+  
+  if(text == &quot;Link Time Axiis&quot;)
+  {
+    linkAxiis(1);
+    this.text = &quot;Unlink Time Axiis&quot;;
+  }
+  else
+  {
+    linkAxiis(0);
+    this.text = &quot;Link Time Axiis&quot;;
+  }
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PUSH_BUTTON4" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1150 840</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+     
+    </prop>
+    <prop name="Location">1150 840</prop>
+    <prop name="Size">101 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOff();
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

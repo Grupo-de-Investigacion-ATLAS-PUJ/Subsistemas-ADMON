@@ -1,0 +1,1232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">1270 835</prop>
+  <prop name="BackColor">FwTrendingViewBackground</prop>
+  <prop name="RefPoint">1170 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+
+string PAGE_DP_NAME;
+time LAST_CONFIG_UPDATE;
+dyn_string g_dsReference;
+bool g_bDpAvailable = FALSE, LOADED_PAGE_CONFIG = FALSE, g_bAccessGranted = FALSE;
+int REFRESH_DELAY = 250;
+
+const string CASCADE_SAVE = &quot;13&quot;;
+const string CASCADE_SAVE_AS = &quot;14&quot;;
+const string CASCADE_PAGE_CONFIG = &quot;12&quot;;
+const string CASCADE_SAVE_PLOTS = &quot;10&quot;;
+
+const string CASCADE_UNZOOM = &quot;2&quot;;
+const string CASCADE_Y_ZOOM = &quot;1.0&quot;;
+const string CASCADE_TIME_ZOOM = &quot;0.7&quot;;
+const string CASCADE_TIME_JUMP = &quot;0.8&quot;;
+const string CASCADE_TIME_BACK = &quot;0.10&quot;;
+const string CASCADE_TIME_FWD = &quot;0.11&quot;;
+
+const string CASCADE_10MIN = &quot;0.0&quot;;
+const string CASCADE_1HOUR = &quot;0.1&quot;;
+const string CASCADE_8HOUR = &quot;0.2&quot;;
+const string CASCADE_1DAY = &quot;0.3&quot;;
+const string CASCADE_10DAY = &quot;0.4&quot;;
+const string CASCADE_USER_SPEC = &quot;0.5&quot;;
+
+
+checkHasSaveRights(string dp, string user)
+{
+  bool isAllowed=TRUE;
+  dyn_string pageData, exceptionInfo;
+
+  while(dynlen(pageData) == 0)
+  {
+    fwTrending_getRuntimePageDataWithStrings(pageData, exceptionInfo);
+    delay(0,100);
+  }
+//DebugN(&quot;Rights: &quot; + pageData[fwTrending_PAGE_OBJECT_ACCESS_CONTROL_SAVE]);
+  if(pageData[fwTrending_PAGE_OBJECT_ACCESS_CONTROL_SAVE]!=&quot;&quot;)
+    fwAccessControl_isGranted(pageData[fwTrending_PAGE_OBJECT_ACCESS_CONTROL_SAVE], isAllowed, exceptionInfo);
+
+  g_bAccessGranted = isAllowed;
+  pageButton.enableItem(CASCADE_SAVE, (g_bDpAvailable &amp;&amp; g_bAccessGranted));
+  pageButton.enableItem(CASCADE_SAVE_AS, (g_bDpAvailable &amp;&amp; g_bAccessGranted));
+}
+
+pageDisplay_configDpSystemConnect(string dpe, bool isConnected)
+{
+	string dpName;
+	dyn_string errorMessage;
+	shape errorShape;
+	
+	g_bDpAvailable = isConnected;
+	dpName = PAGE_DP_NAME;
+//DebugN(dpName, isConnected);
+
+	if(!LOADED_PAGE_CONFIG)
+	{
+		if(isConnected)
+		{
+			if(dpExists(dpName))
+			{
+				if(dpTypeName(dpName) == fwTrending_PAGE)
+				{
+					dpConnect(&quot;pageDisplay_update&quot;, TRUE, dpName + fwTrending_PAGE_PLOTS);
+					dpNotExist.visible = FALSE;
+					dpNotAvailable.visible = FALSE;
+				}
+			}
+		}
+		else
+		{
+			if(dpExists(dpName))
+				errorShape = getShape(&quot;dpNotAvailable&quot;);
+			else
+				errorShape = getShape(&quot;dpNotExist&quot;);
+
+			errorMessage = errorShape.text;
+			errorMessage[2] = &quot;\&quot;&quot; + dpName + &quot;\&quot;&quot;;
+			errorShape.text = errorMessage;
+			errorShape.visible = TRUE;
+		}
+	}
+
+	pageButton.enableItem(CASCADE_SAVE, (isConnected &amp;&amp; g_bAccessGranted));
+}
+
+pageDisplay_update(string pagesDpe, dyn_string pages)
+{
+	time timeStamp;
+	string shouldRefresh, dpName;
+	dyn_string exceptionInfo, plots;
+	dyn_dyn_string pageData;
+  int iEmptyPlotCount;
+
+	pagesDpe = dpSubStr(pagesDpe, DPSUB_SYS_DP_EL);
+	dpName   = dpSubStr(pagesDpe, DPSUB_SYS_DP);
+  
+  if( (pagesDpe != &quot;&quot;) &amp;&amp; (dpExists(pagesDpe + &quot;:_online.._stime&quot;)) )
+  {
+  	dpGet(pagesDpe + &quot;:_online.._stime&quot;, timeStamp);
+  }
+  else
+  {
+    DebugTN(&quot;Error in &quot; + myPanelName() + &quot; -&gt; pageDisplay_update() -&gt; pagesDpe = &quot; + pagesDpe + &quot;:_online.._stime, doesn't exist&quot;);
+    return;
+  }
+
+	if(timeStamp == LAST_CONFIG_UPDATE)
+		return;
+
+	shouldRefresh = refreshPage.text;
+	if(shouldRefresh != &quot;TRUE&quot;)
+		return;
+
+	pageButton.enabled = TRUE;
+
+// here get all data from PVSS DB. isLog should be set. and initialize all the local data.
+//DebugN(&quot;DPGET and draw page&quot;);
+	fwTrending_getPage(dpName, pageData, exceptionInfo);
+	fwTrending_simplifyPagePlotList(pageData[fwTrending_PAGE_OBJECT_PLOTS],
+					pageData[fwTrending_PAGE_OBJECT_NROWS][1],
+					pageData[fwTrending_PAGE_OBJECT_NCOLS][1], plots, exceptionInfo);
+//DebugN(pageData);
+	if(dynlen(pageData) == fwTrending_SIZE_PAGE_OBJECT)
+		fwTrending_setRuntimePageDataWithObject(pageData, exceptionInfo);
+
+  for ( int i = 1; i &lt;= dynlen(plots); i++)
+  {
+    iEmptyPlotCount += (plots[i] == &quot;&quot; ? 1 : 0);
+  }
+
+  if ( iEmptyPlotCount &gt; 0)
+  {
+    throwError(makeError(&quot;&quot;, PRIO_WARNING, ERR_PARAM, 51, &quot;The trending page contains &quot; + iEmptyPlotCount + &quot; empty trending plot(s) out of a total of &quot; + dynlen(plots) + &quot;.&quot;));
+  }
+
+	drawPage(pageData[fwTrending_PAGE_OBJECT_TITLE][1], plots);
+
+	LAST_CONFIG_UPDATE = timeStamp;
+	dpNotExist.visible = FALSE;
+	dpNotAvailable.visible = FALSE;
+}
+
+drawPage(string pageTitle, dyn_string plots)
+{
+	bool isOk;
+	int i, length;
+	string parameterString, finalParameterList;
+	dyn_float df;
+	dyn_string exceptionInfo, ds, parameters, parameterList;
+	dyn_dyn_string configurationData;
+	shape cascadeButton;
+
+	if(parameterValues.text == parameterValues.name)
+	{
+		if(isDollarDefined(&quot;$templateParameters&quot;))
+			parameterValues.text = $templateParameters;
+		else
+			parameterValues.text = &quot;&quot;;
+	}
+		
+	parameterString = parameterValues.text;
+
+	if(!LOADED_PAGE_CONFIG)
+		fwTrending_getPage(PAGE_DP_NAME, configurationData, exceptionInfo);
+	else
+		fwTrending_getRuntimePageDataWithObject(configurationData, exceptionInfo);
+
+	LOADED_PAGE_CONFIG = TRUE;
+	
+	fwTrending_simplifyPagePlotList(configurationData[fwTrending_PAGE_OBJECT_PLOT_TEMPLATE_PARAMETERS],
+																	configurationData[fwTrending_PAGE_OBJECT_NROWS][1],
+																	configurationData[fwTrending_PAGE_OBJECT_NCOLS][1],
+																	parameterList,
+																	exceptionInfo);
+																	
+	if(dynlen(plots) &gt; dynlen(parameterList))
+		parameterList[dynlen(plots)] = &quot;&quot;;
+//DebugN(plots, parameterList);
+	fwTrending_checkAndGetAllTemplateParameters(pageTitle, configurationData, fwTrending_PAGE, parameterString, exceptionInfo, FALSE, TRUE);
+
+	parameterValues.text = parameterString;
+// DebugN(&quot;	parameterString: &quot; +parameterString);
+	_fwTrending_evaluateTemplate(parameterString, pageTitle, exceptionInfo);    
+//	_fwTrending_evaluateTemplate(parameterString, plots, exceptionInfo);    
+	
+	length = dynlen(g_dsReference);
+	for(i=1; i&lt;=length; i++)
+	{
+		removeSymbol(myModuleName(), myPanelName(), g_dsReference[i]);
+		removeSymbol(myModuleName(), myPanelName(), g_dsReference[i] + &quot;trend&quot;);
+	}
+
+	pageButton.textItem(CASCADE_PAGE_CONFIG, &quot;Page configuration: &quot;+pageTitle);
+
+	dynClear(parameters);
+	for(i=1; i&lt;=dynlen(plots); i++)
+	{
+		fwTrending_mergeParameterLists(parameterList[i],
+																		parameterString, finalParameterList, exceptionInfo);
+
+		dynAppend(parameters, finalParameterList);
+	}
+
+	fwTrending_showPlot(dynlen(plots), plots, g_dsReference, parameters);
+
+	for(i=1; i&lt;=dynlen(g_dsReference); i++)
+	{
+		cascadeButton = getShape(g_dsReference[i] + &quot;.OtherCascadeButton&quot;);
+		cascadeButton.enableItem(&quot;2&quot;, FALSE);
+	}
+}
+
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	bool isConnected, isRemote, hasPageNameDollarParam, hasDpNameDollarParam;
+	string dpName, systemName;
+	dyn_string exceptionInfo, texts = makeDynString(&quot;10 minutes&quot;, &quot;1 hour&quot;, &quot;8 hours&quot;, &quot;1 day&quot;, &quot;10 days&quot;, &quot;User Specified&quot;);
+	int i, iRes, len;
+
+	hasPageNameDollarParam = isDollarDefined(&quot;$PageName&quot;);
+	if( hasPageNameDollarParam )
+	{
+		anytype aTemp = $PageName;
+		dpName = getDollarValue(&quot;$PageName&quot;);
+	}
+	else
+	{
+		hasDpNameDollarParam = isDollarDefined(&quot;$sDpName&quot;);
+		if( hasDpNameDollarParam )
+		{
+			anytype aTemp = $sDpName;
+			dpName = getDollarValue(&quot;$sDpName&quot;);
+		}
+	}
+
+	PAGE_DP_NAME = dpName;
+
+//CG
+//	if(isDollarDefined(&quot;$PageBackColor&quot;))
+//  {
+//CG Otherwise it doesn't get imported...
+//    DebugTN($PageBackColor);
+//		this.backCol = getDollarValue(&quot;$PageBackColor&quot;);
+//  }
+
+// disable time back/forward and jump
+	pageButton.enableItem(CASCADE_TIME_JUMP, TRUE);
+	pageButton.enableItem(CASCADE_TIME_BACK, TRUE);
+	pageButton.enableItem(CASCADE_TIME_FWD, TRUE);
+// disable Y zoom in/out
+	pageButton.enableItem(CASCADE_TIME_ZOOM, TRUE);
+// disable 1:1
+	pageButton.enableItem(CASCADE_UNZOOM, TRUE);
+// disable Xzoom in/out
+	pageButton.enableItem(CASCADE_Y_ZOOM, TRUE);
+//	DebugN($PageName, $OpenPageName, $PlotName, $bEdit);
+	pageHiddenTime.text = &quot;&quot;;
+
+// reset the cascade button menu.
+	len = dynlen(texts);
+	for(i=1;i&lt;=len;i++) {
+		pageButton.textItem( &quot;0.&quot;+(i-1), texts[i]);
+	}
+
+	if(isFunctionDefined(&quot;unGenericDpFunctionsHMI_setCallBack_user&quot;))
+	{
+		unGenericDpFunctionsHMI_setCallBack_user(&quot;unGenericButtonFunctionsHMI_TrendingPageselectCB&quot;, iRes, exceptionInfo);
+	}
+	else if(isFunctionDefined(&quot;fwAccessControl_setupPanel&quot;))
+          fwAccessControl_setupPanel(&quot;checkHasSaveRights&quot;, exceptionInfo);
+        else
+	  g_bAccessGranted = TRUE;
+
+	if(PAGE_DP_NAME != &quot;&quot;)
+	{
+		fwGeneral_getSystemName(PAGE_DP_NAME, systemName, exceptionInfo);
+		unDistributedControl_isRemote(isRemote, systemName);
+
+//DebugN(systemName);
+		if((systemName == &quot;&quot;) || !isRemote)
+		{
+			PAGE_DP_NAME = dpSubStr(PAGE_DP_NAME, DPSUB_SYS_DP);
+			pageDisplay_configDpSystemConnect(&quot;&quot;, TRUE);
+		}
+		else
+			unDistributedControl_register(&quot;pageDisplay_configDpSystemConnect&quot;, iRes, isConnected, systemName, exceptionInfo);
+	}
+
+	pageButton.enableItem(CASCADE_SAVE, FALSE);
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="pageHiddenTime" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1120 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">1122 2</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">pageHiddenTime</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="refreshPage" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">620 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">622 42</prop>
+    <prop name="Size">157 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">TRUE</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="dpNotExist" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">525 283</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">635 298</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">The page configuration data point
+{name}
+does not exist.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">15</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="dpNotAvailable" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">485 283</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">635 298</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">The page configuration data point
+{name}
+is from a remote system which is not available.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">15</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="parameterValues" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">370 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">372 42</prop>
+    <prop name="Size">157 17</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">parameterValues</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="pageInfo" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">370 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">370 70</prop>
+    <prop name="Size">551 181</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+  </shape>
+  <shape Name="pageButton" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1193 -1</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1193 -1</prop>
+    <prop name="Size">77 23</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Page plots</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">Time range</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Time range</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">10 minutes</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">10 minutes</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">1 hour</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">1 hour</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">8 hours</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">8 hours</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">1 day</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">1 day</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">10 days</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">10 days</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">User Specified</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">User Specified</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">new_sep</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">___</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">Xzoom</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Zoom</prop>
+        </prop>
+        <prop name="PopupMenu">
+         <prop name="PopupItem">
+          <prop name="PopupItemId">XZoom in</prop>
+          <prop name="Text">
+           <prop name="en_US.utf8">Zoom in</prop>
+          </prop>
+         </prop>
+         <prop name="PopupItem">
+          <prop name="PopupItemId">XZoom out</prop>
+          <prop name="Text">
+           <prop name="en_US.utf8">Zoom out</prop>
+          </prop>
+         </prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">jump</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Jump to time...</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">new_sep</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">___</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">backwards</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Step Backwards</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">forwards</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Step Forwards</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">Y Axes</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Y Axes</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">YZoom</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Zoom</prop>
+        </prop>
+        <prop name="PopupMenu">
+         <prop name="PopupItem">
+          <prop name="PopupItemId">YZoom in</prop>
+          <prop name="Text">
+           <prop name="en_US.utf8">Zoom in</prop>
+          </prop>
+         </prop>
+         <prop name="PopupItem">
+          <prop name="PopupItemId">YZoom out</prop>
+          <prop name="Text">
+           <prop name="en_US.utf8">Zoom out</prop>
+          </prop>
+         </prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1:1</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">1:1</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">new_sep</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">___</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">showallgrids</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Show grids on all plots</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">hideallgrids</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Hide grids on all plots</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">other</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Other</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">Run all plots</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Run all histograms</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">Stop all plots</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Freeze all histograms</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">new_sep</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">___</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">Export all plots data</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Export all plots to CSV...</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">printPage</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Print page</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">Save all plots settings</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Save all plot settings</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">new_sep</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">___</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">Page configuration</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Page configuration</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">save</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Save settings</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">saveas</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Save page settings as...</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[string previousText = &quot;&quot;;
+int previous = 0;
+
+main(string id)
+{
+	bool changed, isConnected, dpNotAvailable, dpNotExist;
+	string sDpName, sTimeRange, proposedName;
+	dyn_string ds, pageData, modifiedPageData, plots;
+	dyn_float df;
+	int d, h, m, t;
+	long midTime, startTime;
+	int i, len;
+	string ref, model, isRunning;
+	dyn_string panelsList, plotData, plotShapes, exceptionInfo, referenceNames;
+	dyn_dyn_string pageDataObject;
+
+	if(isDollarDefined(&quot;$PageName&quot;))
+		sDpName = getDollarValue(&quot;$PageName&quot;);
+	else
+		if(isDollarDefined(&quot;$sDpName&quot;))
+			sDpName = getDollarValue(&quot;$sDpName&quot;);
+
+	this.enabled(false);
+	len = dynlen(g_dsReference);
+	referenceNames = g_dsReference;
+
+	for(i=1; i&lt;=len; i++)
+	{
+		getValue(referenceNames[i] + &quot;trend.dpNotExist&quot;, &quot;visible&quot;, dpNotExist);
+		getValue(referenceNames[i] + &quot;trend.dpNotAvailable&quot;, &quot;visible&quot;, dpNotAvailable);
+
+		if(dpNotExist || dpNotAvailable)
+		{
+			dynRemove(referenceNames, i);
+			len = dynlen(referenceNames);
+			i--;
+		}
+	}
+
+	switch(id) {
+		case &quot;printPage&quot; : 
+			printPanel(myModuleName(), myPanelName());
+			break;
+		case &quot;10 minutes&quot;:
+			if(previousText != &quot;&quot;) {
+				this.textItem(&quot;0.&quot;+previous, previousText);
+			}
+			previousText = &quot;10 minutes&quot;;
+			previous = 0;
+			this.textItem(CASCADE_10MIN, &quot;10 minutes  *&quot;);
+			t = 10*60;
+			pageHiddenTime.text = t;
+			for(i=1;i&lt;=len;i++) {
+				ref=referenceNames[i];
+				if(ref != &quot;&quot;)
+					ref+=&quot;.&quot;;
+				fwTrending_changeTrendTimeRange(referenceNames[i], t, ref, &quot;  0 d  0 h 10 m&quot;, 0, &quot;10 minutes  *&quot;);
+			}
+//DebugN(referenceNames);
+			break;
+		case &quot;1 hour&quot;:
+			if(previousText != &quot;&quot;) {
+				this.textItem(&quot;0.&quot;+previous, previousText);
+			}
+			previousText = &quot;1 hour&quot;;
+			previous = 1;
+			this.textItem(CASCADE_1HOUR, &quot;1 hour  *&quot;);
+			t = 60*60;
+			pageHiddenTime.text = t;
+			for(i=1;i&lt;=len;i++) {
+				ref=referenceNames[i];
+				if(ref != &quot;&quot;)
+					ref+=&quot;.&quot;;
+				fwTrending_changeTrendTimeRange(referenceNames[i], t, ref, &quot;  0 d  1 h  0 m&quot;, 1, &quot;1 hour  *&quot;);
+			}
+			break;
+		case &quot;8 hours&quot;:
+			if(previousText != &quot;&quot;) {
+				this.textItem(&quot;0.&quot;+previous, previousText);
+			}
+			previousText = &quot;8 hours&quot;;
+			previous = 2;
+			this.textItem(CASCADE_8HOUR, &quot;8 hours  *&quot;);
+			t =  8*60*60;
+			pageHiddenTime.text = t;
+			for(i=1;i&lt;=len;i++) {
+				ref=referenceNames[i];
+				if(ref != &quot;&quot;)
+					ref+=&quot;.&quot;;
+				fwTrending_changeTrendTimeRange(referenceNames[i], t, ref, &quot;  0 d  8 h  0 m&quot;, 2, &quot;8 hours  *&quot;);
+			}
+			break;
+		case &quot;1 day&quot;:
+			if(previousText != &quot;&quot;) {
+				this.textItem(&quot;0.&quot;+previous, previousText);
+			}
+			previousText = &quot;1 day&quot;;
+			previous = 3;
+			this.textItem(CASCADE_1DAY, &quot;1 day  *&quot;);
+			t = 24*60*60;
+			pageHiddenTime.text = t;
+			for(i=1;i&lt;=len;i++) {
+				ref=referenceNames[i];
+				if(ref != &quot;&quot;)
+					ref+=&quot;.&quot;;
+				fwTrending_changeTrendTimeRange(referenceNames[i], t, ref, &quot;  1 d  0 h  0 m&quot;, 3, &quot;1 day  *&quot;);
+			}
+			break;
+		case &quot;10 days&quot;:
+			if(previousText != &quot;&quot;) {
+				this.textItem(&quot;0.&quot;+previous, previousText);
+			}
+			previousText = &quot;10 days&quot;;
+			previous = 4;
+			this.textItem(CASCADE_10DAY, &quot;10 days  *&quot;);
+			t = 10*24*60*60;
+			pageHiddenTime.text = t;
+			for(i=1;i&lt;=len;i++) {
+				ref=referenceNames[i];
+				if(ref != &quot;&quot;)
+					ref+=&quot;.&quot;;
+				fwTrending_changeTrendTimeRange(referenceNames[i], t, ref, &quot; 10 d  0 h  0 m&quot;, 4, &quot;10 days  *&quot;);
+			}
+			break;
+		case &quot;User Specified&quot;:
+			sTimeRange = pageHiddenTime.text;
+			sscanf(sTimeRange,&quot;%d&quot;,t);
+			decodeTime(t, d, h, m);
+			ChildPanelOnCentralModalReturn(&quot;fwTrending/fwTrendingTimeSpec.pnl&quot;, &quot;Specify a Time Period&quot;,
+				makeDynString(&quot;$iDays:&quot;+d,&quot;$iHours:&quot;+h,&quot;$iMins:&quot;+m), df, ds);
+			if(dynlen(ds) &gt; 0 &amp;&amp; ds[1] == &quot;ok&quot;) {
+				d = df[1]; h = df[2]; m = df[3];
+				//this.textItem(prev - 1, texts[prev] + &quot;  *&quot;);
+				encodeTime(t, d, h, m);
+				decodeTime(t, d, h, m);
+				if(t &gt; 0) {
+
+					if(previousText != &quot;&quot;) {
+						this.textItem(&quot;0.&quot;+previous, previousText);
+					}
+					previousText = &quot;User Specified&quot;;
+					previous = 5;
+					this.textItem(CASCADE_USER_SPEC, &quot;User Specified&quot;+ &quot; (&quot; + d + &quot;d &quot; + h + &quot;h &quot; + m + &quot;m)  *&quot;);
+
+					sprintf(sTimeRange,&quot;%3d d %2d h %2d m&quot;,d,h,m);
+					pageHiddenTime.text = t;
+					for(i=1;i&lt;=len;i++) {
+						ref=referenceNames[i];
+						if(ref != &quot;&quot;)
+							ref+=&quot;.&quot;;
+						fwTrending_changeTrendTimeRange(referenceNames[i], t, ref, sTimeRange, 5, &quot;User Specified&quot;+ &quot; (&quot; + d + &quot;d &quot; + h + &quot;h &quot; + m + &quot;m)&quot;+&quot;  *&quot;);
+					}
+				}
+			}
+			break;
+		case &quot;jump&quot;:
+			sTimeRange = pageHiddenTime.text;
+			sscanf(sTimeRange,&quot;%d&quot;,t);
+			decodeTime(t, d, h, m);
+			ChildPanelOnCentralModalReturn(&quot;fwTrending/fwTrendingTimeJumpSpec.pnl&quot;, &quot;Specify a Time Range to Display&quot;,
+				makeDynString(&quot;$iDays:&quot;+d,&quot;$iHours:&quot;+h,&quot;$iMins:&quot;+m, &quot;$iMidTime:&quot;+(long)getCurrentTime()), df, ds);
+			if(dynlen(ds) &gt; 0 &amp;&amp; ds[1] == &quot;ok&quot;) {
+				d = df[1]; h = df[2]; m = df[3]; midTime = df[4];
+				//this.textItem(prev - 1, texts[prev] + &quot;  *&quot;);
+				encodeTime(t, d, h, m);
+				decodeTime(t, d, h, m);
+
+				startTime = midTime - (t/2);
+				if((startTime + t) &gt; getCurrentTime())
+					startTime = getCurrentTime() - t;
+
+				if(t &gt; 0) {
+
+					if(previousText != &quot;&quot;) {
+						this.textItem(&quot;0.&quot;+previous, previousText);
+					}
+					previousText = &quot;User Specified&quot;;
+					previous = 5;
+					this.textItem(CASCADE_USER_SPEC, &quot;User Specified&quot;+ &quot; (&quot; + d + &quot;d &quot; + h + &quot;h &quot; + m + &quot;m)  *&quot;);
+
+					sprintf(sTimeRange,&quot;%3d d %2d h %2d m&quot;,d,h,m);
+					pageHiddenTime.text = t;
+					for(i=1;i&lt;=len;i++) {
+						fwTrending_getRuntimePlotDataWithStrings(referenceNames[i], isRunning, plotShapes, plotData, exceptionInfo, FALSE);
+						if(plotData[fwTrending_PLOT_OBJECT_MODEL] == fwTrending_HISTOGRAM_PLOT_MODEL)
+							continue;
+
+						ref=referenceNames[i];
+						if(ref != &quot;&quot;)
+							ref+=&quot;.&quot;;
+
+						fwTrending_changeTrendTimeRange(referenceNames[i], t, ref, sTimeRange, 5, &quot;User Specified&quot;+ &quot; (&quot; + d + &quot;d &quot; + h + &quot;h &quot; + m + &quot;m)&quot;+&quot;  *&quot;);
+						setValue(referenceNames[i] + &quot;trend.standardTrend&quot;, &quot;timeBegin&quot;, startTime);
+//						setValue(referenceNames[i] + &quot;trend.logTrend&quot;, &quot;timeBegin&quot;, startTime);
+					}
+				}
+			}
+			break;
+		case &quot;XZoom in&quot;:
+			for(i=1;i&lt;=len;i++) {
+				fwTrending_trendZoomX(referenceNames[i], false);
+			}
+			break;
+		case &quot;XZoom out&quot;:
+			for(i=1;i&lt;=len;i++) {
+				fwTrending_trendZoomX(referenceNames[i], true);
+			}
+			break;
+		case &quot;backwards&quot;:
+			for(i=1;i&lt;=len;i++) {
+				fwTrending_trendTimeBack(referenceNames[i], true);
+			}
+			break;
+		case &quot;forwards&quot;:
+			for(i=1;i&lt;=len;i++) {
+				fwTrending_trendTimeBack(referenceNames[i], false);
+			}
+			break;
+		case &quot;YZoom in&quot;:
+			for(i=1;i&lt;=len;i++) {
+				fwTrending_trendZoomY(referenceNames[i], false);
+			}
+			break;
+		case &quot;YZoom out&quot;:
+			for(i=1;i&lt;=len;i++) {
+				fwTrending_trendZoomY(referenceNames[i], true);
+			}		
+			break;
+		case &quot;1:1&quot;:
+			for(i=1;i&lt;=len;i++) {
+				fwTrending_trendUnzoom(referenceNames[i]);
+			}		
+			break;
+		case &quot;refresh&quot;:
+			for(i=1;i&lt;=len;i++) {
+				fwTrending_trendRefresh(referenceNames[i]);
+			}		
+			break;
+		case &quot;Stop all plots&quot;:
+// enable 1:1
+			this.enableItem(CASCADE_UNZOOM, true);
+// enable X zoom
+			this.enableItem(CASCADE_TIME_ZOOM, true);
+// enable Y zoom
+			this.enableItem(CASCADE_Y_ZOOM, true);
+// enable back and forward and jump
+			this.enableItem(CASCADE_TIME_JUMP, true);
+			this.enableItem(CASCADE_TIME_BACK, true);
+			this.enableItem(CASCADE_TIME_FWD, true);
+
+			for(i=1;i&lt;=len;i++) {
+				ref=referenceNames[i];
+				if(ref != &quot;&quot;)
+					ref+=&quot;.&quot;;
+				fwTrending_trendRun(referenceNames[i], false, ref);
+			}
+
+			break;
+		case &quot;Run all plots&quot;:
+// disable 1:1
+			this.enableItem(CASCADE_UNZOOM, false);
+// disable X zoom
+			this.enableItem(CASCADE_TIME_ZOOM, false);
+// disable Y zoom
+			this.enableItem(CASCADE_Y_ZOOM, false);
+// disable back and forward and jump
+			this.enableItem(CASCADE_TIME_JUMP, false);
+			this.enableItem(CASCADE_TIME_BACK, false);
+			this.enableItem(CASCADE_TIME_FWD, false);
+
+			for(i=1;i&lt;=len;i++) {
+				ref=referenceNames[i];
+				if(ref != &quot;&quot;)
+					ref+=&quot;.&quot;;
+				fwTrending_trendRun(referenceNames[i], true, ref);
+			}
+			break;
+		case &quot;Page configuration&quot;:
+			fwTrending_getRuntimePageDataWithStrings(pageData, exceptionInfo);
+
+			fwDevice_getDefaultConfigurationPanels(fwTrending_PAGE, panelsList, exceptionInfo);
+
+			ChildPanelOnModalReturn(panelsList[1] + &quot;.pnl&quot;,&quot;Page Configuration&quot;,
+				makeDynString(&quot;$Command:onlineedit&quot;, &quot;$sDpName:&quot; + sDpName,
+											&quot;$dsPageData:&quot; + pageData, &quot;$dsShowButtons:&quot; + makeDynString(&quot;ok&quot;, &quot;cancel&quot;)),0,0, df, ds);
+
+			if(ds[1] != &quot;Cancel&quot;)
+			{
+				strreplace(ds[3], &quot; | &quot;, &quot;|&quot;);
+				modifiedPageData = strsplit(ds[3], &quot;|&quot;);
+    // if last element of array delivered as string by ds[3] only contains an empty string, the conversion into a real array loses this empty string
+    // in this case, it has to be attached again manually
+    if(dynlen(modifiedPageData) &lt; 8) 
+    {
+      dynAppend(modifiedPageData, &quot;&quot;);
+    }
+				for(i=1; i&lt;=fwTrending_SIZE_PAGE_OBJECT; i++)
+				{
+					modifiedPageData[i] = strltrim(modifiedPageData[i], &quot; &quot;);
+					modifiedPageData[i] = strrtrim(modifiedPageData[i], &quot; &quot;);
+				}
+
+				fwTrending_setRuntimePageDataWithStrings(modifiedPageData, exceptionInfo);
+				fwTrending_getRuntimePageDataWithObject(pageDataObject, exceptionInfo);
+				fwTrending_simplifyPagePlotList(pageDataObject[fwTrending_PAGE_OBJECT_PLOTS],
+																				pageDataObject[fwTrending_PAGE_OBJECT_NROWS][1],
+																				pageDataObject[fwTrending_PAGE_OBJECT_NCOLS][1], plots, exceptionInfo);
+				_fwTrending_evaluateTemplate(parameterValues.text, pageDataObject[fwTrending_PAGE_OBJECT_TITLE], exceptionInfo);
+//DebugN(pageDataObject[fwTrending_PAGE_OBJECT_PLOT_TEMPLATE_PARAMETERS]);
+
+				changed = FALSE;
+				for(i=1; i&lt;=fwTrending_SIZE_PAGE_OBJECT; i++)
+				{
+					if(pageData[i] != modifiedPageData[i])
+						changed = TRUE;
+				}
+				if(changed)
+					drawPage(pageDataObject[fwTrending_PAGE_OBJECT_TITLE][1], plots);
+			}				
+			break;
+		case &quot;Save all plots settings&quot;:
+			for(i=1;i&lt;=len;i++)
+			{
+				setValue(referenceNames[i] + &quot;trend.refreshTrend&quot;, &quot;text&quot;, &quot;FALSE&quot;);
+			}
+			
+			for(i=1;i&lt;=len;i++)
+			{
+				getValue(referenceNames[i]+&quot;trend.dpNameText&quot;, &quot;text&quot;, sDpName);
+				_fwTrending_isSystemForDpeConnected(sDpName, isConnected, exceptionInfo);
+				if(isConnected)
+					fwTrending_pageSavePlotSettings(referenceNames[i]);
+				else
+					fwException_raise(exceptionInfo, &quot;ERROR&quot;, &quot;Settings could not be saved for \&quot;&quot; +
+																	sDpName + &quot;\&quot; because the remote system is unavailable&quot;, &quot;&quot;);
+			}
+			
+			if(dynlen(exceptionInfo)&gt;0)
+				fwExceptionHandling_display(exceptionInfo);
+				
+			delay(0,REFRESH_DELAY);
+			for(i=1;i&lt;=len;i++) {
+				setValue(referenceNames[i] + &quot;trend.refreshTrend&quot;, &quot;text&quot;, &quot;TRUE&quot;);
+			}
+			break;
+		case &quot;Export all plots data&quot;:
+			fwTrending_pageExportTrend(referenceNames, parameterValues.text);
+			break;
+ 		case &quot;showallgrids&quot;:
+			for(i=1;i&lt;=len;i++) {
+				ref=referenceNames[i];
+				if(ref != &quot;&quot;)
+					ref+=&quot;.&quot;;
+				fwTrending_gridOnOff(referenceNames[i], TRUE, ref, exceptionInfo);
+			}
+			break;
+		case &quot;hideallgrids&quot;:
+			for(i=1;i&lt;=len;i++) {
+				ref=referenceNames[i];
+				if(ref != &quot;&quot;)
+					ref+=&quot;.&quot;;
+				fwTrending_gridOnOff(referenceNames[i], FALSE, ref, exceptionInfo);
+			}
+			break;
+		case &quot;save&quot;:
+			refreshPage.text = &quot;FALSE&quot;;
+			fwTrending_saveCurrentSettings(&quot;&quot;, sDpName, fwTrending_PAGE, FALSE, TRUE, exceptionInfo);
+			delay(0,REFRESH_DELAY);
+			refreshPage.text = &quot;TRUE&quot;;
+			break;
+		case &quot;saveas&quot;:
+			refreshPage.text = &quot;FALSE&quot;;
+			proposedName = dpGetAlias(sDpName + &quot;.&quot;);
+			if(proposedName == &quot;&quot;)
+				proposedName = dpSubStr(sDpName, DPSUB_DP);
+			ChildPanelOnCentralReturn(&quot;fwTrending/fwTrendingSaveAsSelector.pnl&quot;, &quot;Save page settings as...&quot;,
+																	makeDynString(&quot;$sDpType:&quot; + fwTrending_PAGE, &quot;$sProposedName:&quot; + proposedName), df, ds);
+			if(ds[1] == &quot;ok&quot;)
+				fwTrending_saveCurrentSettings(&quot;&quot;, ds[2], fwTrending_PAGE, TRUE, TRUE, exceptionInfo, TRUE);		
+			delay(0,REFRESH_DELAY);
+			refreshPage.text = &quot;TRUE&quot;;
+			break;
+		default:
+//			DebugN(id);
+			break;
+	}
+	this.enabled(true);
+}
+
+encodeTime(int &amp;t, int d, int h, int m)
+{
+	t = d * 86400 + h * 3600 + m * 60;
+}
+
+decodeTime(int t, int &amp;d, int &amp;h, int &amp;m)
+{
+	d = t / 86400;
+	h = t % 86400 / 3600;
+	m = t % 3600 / 60;
+}
+
+checkPlotType(string ref, string model)
+{
+	string isRunning;
+	dyn_string plotShapes, plotData, exceptionInfo;
+
+	fwTrending_getRuntimePlotDataWithStrings(ref, isRunning, plotShapes, plotData, exceptionInfo, FALSE);
+	model = plotData[fwTrending_PLOT_OBJECT_MODEL];
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

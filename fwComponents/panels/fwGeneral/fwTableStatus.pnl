@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.iso88591">(NoName)</prop>
+  </prop>
+  <prop name="Size">522 110</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="Initialize" isEscaped="1"><![CDATA[/**
+  @deprecated 2018-06-22
+  */
+main()
+{
+  FWDEPRECATED();
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="table" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Size">501 81</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">25</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">element</prop>
+     <prop name="Width">400</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">element name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">status</prop>
+     <prop name="Width">70</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">status</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[dyn_string gListOfDpElementToConnect;
+
+main()
+{
+	dyn_string listOfElement, exception;
+	int i, lenDpe, lenDp, rowNbr;
+	
+//	this.tableMode(TABLE_SELECT_BROWSE);
+//	this.selectByClick(TABLE_SELECT_LINE);
+	this.columnVisibility(0,$bColumn1);
+	this.columnVisibility(1,$bColumn2);
+	this.columnHeader(0,$sColumn1Title);
+	this.columnHeader(1,$sColumn2Title);
+	
+	setValue(&quot;&quot;,&quot;sortOnClick&quot;, false);	
+	
+	listOfElement = strsplit($sListOfElement,&quot;;&quot;);
+	gListOfDpElementToConnect = strsplit($sListOfDpElementToConnect,&quot;;&quot;);
+
+	lenDpe = dynlen(gListOfDpElementToConnect);
+	lenDp = dynlen(listOfElement);
+	
+	if(lenDpe &gt; lenDp)
+		rowNbr = lenDpe;
+	else
+		rowNbr = lenDp;
+		
+	this.deleteAllLines;
+	this.appendLines(rowNbr,&quot;element&quot;,listOfElement);
+
+	if($bColumn2)
+		fwColourTable_connectCellBackColToStatus(exception);
+//DebugN(gListOfDpElementToConnect);
+}
+]]></script>
+    <script name="DoubleClicked" isEscaped="1"><![CDATA[main()
+{
+	string scriptToExecute;
+	scriptToExecute = $sScriptToExecute;
+	if(scriptToExecute != &quot;&quot;)
+		startThread(scriptToExecute);
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

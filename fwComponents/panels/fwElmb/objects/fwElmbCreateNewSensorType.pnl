@@ -1,0 +1,1285 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">570 475</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">27 38</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[
+#uses &quot;fwGeneral/fwGeneral.ctl&quot;
+
+#uses &quot;fwElmb/fwElmb.ctl&quot;
+//*****************************************************************************
+// @name Function: userFunctionInvalid
+//
+// Checks whether the user function given is valid or not.
+//
+// Returns: true is user function is invalid
+//					false otherwise
+//
+// @param sFct: The user function entered is given her
+//
+// Modification History: None
+//
+// Constraints:
+//
+// Usage: Public
+//
+// PVSS manager usage: VISION
+//
+// @author Jim Cook
+//*****************************************************************************
+bool userFunctionInvalid(string sFct)
+{
+// Local Variables
+// ---------------
+	bool bValid;
+	
+	int i, j;
+
+	dyn_string dsTmp;
+	
+	dyn_int diVariableNumbers;
+	
+	const dyn_string dsValidVariables = makeDynString(&quot;c&quot;, &quot;x&quot;);
+	const dyn_string dsValidOperators = makeDynString(&quot;+&quot;, &quot;-&quot;, &quot;*&quot;, &quot;/&quot;, &quot;(&quot;, &quot;&quot;);
+
+// Executable Code
+// --------------
+	// Split the string at the variable points
+	dsTmp = strsplit(sFct, &quot;%&quot;);
+	
+	// Loop through all variable
+	for (i = 2; i &lt;= dynlen(dsTmp); i++) {
+	
+		// Firstly check that correct variable names have been entered
+		bValid = false;
+		for (j = 1; j &lt;= dynlen(dsValidVariables); j++) {
+			if (substr(dsTmp[i], 0, strlen(dsValidVariables[j])) == dsValidVariables[j]) {
+				if (dynlen(diVariableNumbers) &gt;= j)
+					diVariableNumbers[j] = diVariableNumbers[j] + 1;
+				else
+					diVariableNumbers[j] = 1;
+				bValid = true;
+				break;
+			}
+		}
+	
+		// Now check that the preceding operators are valid
+		bValid = false;
+		for (j = 1; j &lt;= dynlen(dsValidOperators); j++) {
+			if (substr(dsTmp[i-1], strlen(dsTmp[i-1]), strlen(dsValidOperators[j])) == dsValidOperators[j]) {
+				bValid = true;
+				break;
+			}
+		}
+		
+		// Check if valid so far
+		if (!bValid)
+			break;
+	}
+	
+	// Return to calling routine
+	return (!bValid);
+}
+
+//*****************************************************************************
+// @name Function: modUpdateRawSensors
+//
+// Updates the combo box for selection of a raw value sensor. This sensor may
+// then be used as input in the formula.
+//
+// Returns: None
+//
+// @param sFct: The user function entered is given her
+//
+// Modification History: None
+//
+// Constraints:
+//
+// Usage: Public
+//
+// PVSS manager usage: VISION
+//
+// @author Jim Cook
+//*****************************************************************************
+void modUpdateRawSensors()
+{
+// Local Variables
+// ---------------
+	dyn_string dsPDOdps;
+	dyn_string dsRawPDOs;
+
+// Executable Code
+// ---------------
+	// Get all input PDO types defined
+	fwElmb_getRawSensors(dsRawPDOs, dsPDOdps, &quot;IN&quot;);
+	
+	// Enter information into combo box
+	if (dynlen(dsRawPDOs) &gt; 0) {
+		cmbRawInput.items = dsRawPDOs;
+		lstPDOdps.items = dsPDOdps;
+	} else {
+		cmbRawInput.deleteAllItems();
+		cmbRawInput.enabled = false;
+	}
+
+	// Return to calling routine
+	return;
+}
+
+//*****************************************************************************
+// @name Function: modSetControls
+//
+// Sets control sensitivity depending upon values given
+//
+// Returns: None
+//
+// @param sFct: The user function entered is given her
+//
+// Modification History: None
+//
+// Constraints:
+//
+// Usage: Public
+//
+// PVSS manager usage: VISION
+//
+// @author Jim Cook
+//*****************************************************************************
+void modSetControls(string sRawSensorName = &quot;&quot;)
+{
+// Local Variables
+// ---------------
+	bool bUseFormula;
+	
+	int iPos;
+	
+	dyn_string dsItems;
+
+// Executable Code
+// ---------------
+	if (chkUseFormula.state(0))
+		bUseFormula = true;
+	else
+		bUseFormula = false;
+	
+	// Check for default PDO
+	dsItems = cmbRawInput.items;
+	if (strlen(sRawSensorName) == 0) {
+		iPos = cmbRawInput.selectedPos;
+		if (iPos &lt;= 0) {
+			iPos = 1;
+			cmbRawInput.selectedPos = iPos;
+		}
+	} else {
+		iPos = dynContains(dsItems, sRawSensorName);
+		if (iPos &gt; 0) {
+			cmbRawInput.selectedPos = iPos;
+		} else {
+			iPos = 1;
+			cmbRawInput.selectedPos = iPos;
+		}
+	}
+	sRawSensorName = dsItems[iPos];
+	
+	if (sRawSensorName == ELMB_AI_PREFIX) {
+		setValue(&quot;cmdTxPDO&quot;, &quot;enableItem&quot;, &quot;1&quot;, false);
+		setValue(&quot;cmdTxPDO&quot;, &quot;enableItem&quot;, &quot;2&quot;, false);
+	} else {
+		setValue(&quot;cmdTxPDO&quot;, &quot;enableItem&quot;, &quot;1&quot;, true);
+		setValue(&quot;cmdTxPDO&quot;, &quot;enableItem&quot;, &quot;2&quot;, true);
+	}
+		
+	// Check whether raw value or not and set controls as necessary
+	if (bUseFormula) {
+		// This sensor will use a formula
+		frmSensorFormula.enabled = true;
+		lblSensorFormula.enabled = true;
+		txtSensorFormula.enabled = true;
+		cmdSyntaxCheck.enabled = true;
+		lblSyntaxExample.enabled = true;
+		lblDefaultPrefix.enabled = true;
+		txtDefaultPrefix.enabled = true;
+		lblCanBeChanged.enabled = true;
+	} else {
+		frmSensorFormula.enabled = false;
+		lblSensorFormula.enabled = false;
+		txtSensorFormula.enabled = false;
+		txtSensorFormula.text = &quot;%c1&quot;;
+		cmdSyntaxCheck.enabled = false;
+		lblSyntaxExample.enabled = false;
+		lblDefaultPrefix.enabled = false;
+		txtDefaultPrefix.enabled = false;
+		txtDefaultPrefix.text = sRawSensorName;
+		lblCanBeChanged.enabled = false;
+	}
+
+	// Return to calling routine
+	return;
+}
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	bool bEdit = false;
+	bool bIsRaw = false;
+	
+	int iIndex;
+	
+	string sSensorTypeName;
+	string sPDOName = ELMB_AI_PREFIX;
+	
+	dyn_bool dbIsRaw;
+	
+	dyn_string dsPDOdps;
+	dyn_string dsExistingSensorTypes;
+
+// Executable Code
+// ---------------
+	// Update list of raw sensors
+	modUpdateRawSensors();
+	
+	// Check if $params given
+	if (isDollarDefined(&quot;$bEdit&quot;))
+		bEdit = $bEdit;
+	
+	if (bEdit) {
+		sSensorTypeName = $sSensorName;
+			
+		dpGet(ELMB_SENSOR_INFO_NAME + &quot;.types&quot;, dsExistingSensorTypes,
+					ELMB_SENSOR_INFO_NAME + &quot;.isRaw&quot;, dbIsRaw,
+					ELMB_SENSOR_INFO_NAME + &quot;.pdoDp&quot;, dsPDOdps);
+	  iIndex = dynContains(dsExistingSensorTypes, sSensorTypeName);
+			
+		if (iIndex &lt;= dynlen(dbIsRaw))
+			bIsRaw = dbIsRaw[iIndex];
+			
+		if (iIndex &lt;= dynlen(dsPDOdps)) {
+			if (dsPDOdps[iIndex] != ELMB_NO_INFO)
+				dpGet(dsPDOdps[iIndex] + &quot;.name&quot;, sPDOName);
+		}
+		
+		chkUseFormula.state(0) = !bIsRaw;
+					
+		txtSensorTypeName.text = sSensorTypeName;
+		txtSensorTypeName.enabled = false;
+		txtSensorFormula.text = $sSensorFormula;
+		txtDefaultPrefix.text = $sSensorPrefix;
+	}
+	
+	// Set other controls
+	modSetControls(sPDOName);
+
+	// Return to calling routine
+	return;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="lblSensorFormula" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 230</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 232</prop>
+    <prop name="Size">92 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Sensor formula:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblSensorTypeName" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 13</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 15</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Sensor type name:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblSyntaxExample" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">120 260</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">122 262</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Syntax example: %x2/(%x1*(27.9*%c1+(18.7/(1.0-1.0/%c2))))
+
+where:
+   - %c1, %c2..., %cN will be substituted by the corresponding
+ELMB channels when the sensor is created.
+   - %x1, %x2..., %xM will be parameters that you can change 
+from the panels when the sensors will be created. Default values
+must be assigned.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblDefaultPrefix" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 192</prop>
+    <prop name="Size">80 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Default prefix:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblCanBeChanged" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">280 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">282 192</prop>
+    <prop name="Size">257 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">(It can be changed when the sensor is created)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtMessage" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 400</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">Rot</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">22 402</prop>
+    <prop name="Size">527 27</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">    </prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="frmSensorFormula" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 430</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Sensor Formula:</prop>
+    </prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 170</prop>
+    <prop name="Size">550 260</prop>
+   </properties>
+  </shape>
+  <shape Name="lblSensorUsesFormula" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">170 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">172 42</prop>
+    <prop name="Size">317 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">(If no formula is applied, the raw ADC value will be used)</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 82</prop>
+    <prop name="Size">517 37</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">You may select any 'raw' value sensor as input to the formula. You may create a new
+'raw' sensor for this calculated sensor by clicking on the button 'TxPDO'.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lblRawValueSensors" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 130</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 132</prop>
+    <prop name="Size">107 17</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Raw value sensor:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtSensorTypeName" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">143 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">143 10</prop>
+    <prop name="Size">141 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtDefaultPrefix" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">120 190</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">120 190</prop>
+    <prop name="Size">151 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtSensorFormula" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">120 230</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">120 230</prop>
+    <prop name="Size">418 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="cmdOK" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">430 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">430 440</prop>
+    <prop name="Size">61 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+	bool bEdit = false;
+	bool bIsRaw = !chkUseFormula.state(0);
+	
+	int i;
+	int iIndex;
+	int iPos;
+	
+	string sSensorTypeName = txtSensorTypeName.text;
+	string sSensorFct = txtSensorFormula.text;
+	string sPrefix = txtDefaultPrefix.text;
+	string sDefaultParameters;
+	string sParamDescriptions;
+	string sPDOdp;
+	
+	dyn_bool dbIsStandard;
+	dyn_bool dbIsRaw;
+
+	dyn_float df;
+
+	dyn_string dsExistingSensorTypes;
+	dyn_string dsExistingSensorFcts;
+	dyn_string dsExistingParameters;
+	dyn_string dsExistingSensorPrefixes;
+	dyn_string dsExistingParameterDescriptions;
+	dyn_string dsReturnedValues;
+	dyn_string dsParameters;
+	dyn_string dsDescriptions;
+	dyn_string dsDollarParams;
+	dyn_string dsPDOdps;
+	dyn_string dsItems;
+
+// Executable Code
+// ---------------
+	// Check sensor name and function have some text
+	if ((sSensorTypeName == &quot;&quot;) || (sSensorFct == &quot;&quot;)) {
+		ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+												&quot;Warning&quot;,
+												makeDynString(&quot;Check sensor name and sensor formula&quot;));
+		return;
+	}
+	
+	// Check if $params given
+	if (isDollarDefined(&quot;$bEdit&quot;))
+		bEdit = $bEdit;
+
+	// Get existing sensor type information
+	dpGet(ELMB_SENSOR_INFO_NAME + &quot;.types&quot;, dsExistingSensorTypes,
+	      ELMB_SENSOR_INFO_NAME + &quot;.prefix&quot;, dsExistingSensorPrefixes,
+	      ELMB_SENSOR_INFO_NAME + &quot;.functions&quot;, dsExistingSensorFcts,
+	      ELMB_SENSOR_INFO_NAME + &quot;.parameters&quot;, dsExistingParameters,
+	      ELMB_SENSOR_INFO_NAME + &quot;.parameterDescriptions&quot;, dsExistingParameterDescriptions,
+	      ELMB_SENSOR_INFO_NAME + &quot;.isStandard&quot;, dbIsStandard,
+	      ELMB_SENSOR_INFO_NAME + &quot;.isRaw&quot;, dbIsRaw,
+	      ELMB_SENSOR_INFO_NAME + &quot;.pdoDp&quot;, dsPDOdps);
+  
+  // Get the index of this sensor in the types (if it exists)
+  iIndex = dynContains(dsExistingSensorTypes, sSensorTypeName);
+  
+  if (bEdit) {
+  	if (iIndex &lt;= 0) {
+			ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+													&quot;Warning&quot;,
+													makeDynString(&quot;Sensor type not found in this system\nSensor cannot be updated&quot;));
+			return;
+  	}
+  } else {
+	  // Ensure that no sensor of this name already exists    
+		if (iIndex != 0) {
+			ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+													&quot;Warning&quot;,
+													makeDynString(&quot;This sensor type already exists.\nPlease enter a different sensor type name.&quot;));
+			return;
+		}
+	}
+
+	// Check the formula entered by the user:
+	/* Currently not done!!!!!!!!!!!!!!!!!!!
+	if (userFunctionInvalid(sSensorFct)) {
+		ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;Warning&quot;, makeDynString(&quot;Invalid formula syntax. Check for errors!&quot;));
+		txtDisplay.text = &quot;Info: Incorrect formula!&quot;;
+		return;
+	}
+	*/
+
+	// Does it contain any %x??
+	if (!bIsRaw &amp;&amp; (patternMatch(&quot;*%x*&quot;, sSensorFct))) {
+		// Create required dollar parameter string
+		if (bEdit) {
+			dsDollarParams = makeDynString(	&quot;$sFct:&quot; + sSensorFct,
+																			&quot;$sParams:&quot; + dsExistingParameters[iIndex],
+																			&quot;$sDescriptions:&quot; + dsExistingParameterDescriptions[iIndex]);
+		} else {
+			dsDollarParams = makeDynString(&quot;$sFct:&quot; + sSensorFct);
+		}
+		
+		// Get default parameters
+		ChildPanelOnCentralReturn(&quot;fwElmb/objects/fwElmbUserSensorDefaultParameters.pnl&quot;,
+															&quot;Enter default values of parameters %x&quot;,
+															dsDollarParams,
+															df, dsReturnedValues);
+
+		if (df[1] &gt; 0.0) {
+			txtMessage.text = &quot;&quot;;
+			
+			// Set the values into the local variables
+			for (i = 1; i &lt;= df[1]; i++) {
+				if ((i % 2) == 0)
+					dynAppend(dsParameters, dsReturnedValues[i]);
+				else
+					dynAppend(dsDescriptions, dsReturnedValues[i]);
+			}
+		} else {
+			txtMessage.text = &quot;You must set default values for the parameters&quot;;
+			return;
+		}
+		
+		//Convert parameters from dyn_string to string.
+		fwGeneral_dynStringToString(dsParameters, sDefaultParameters);
+		fwGeneral_dynStringToString(dsDescriptions, sParamDescriptions);
+	} else {
+		sDefaultParameters = ELMB_NO_INFO;
+		sParamDescriptions = ELMB_NO_INFO;
+		txtMessage.text = &quot;&quot;;
+	}
+	
+	// Check sensor prefix
+	if (!fwElmb_checkSensorPrefix(sPrefix)) {
+		if (!bIsRaw) {
+			ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+													&quot;Warning&quot;,
+													makeDynString(&quot;Prefix '&quot; + sPrefix + &quot;' is reserved for a raw sensor and cannot be used&quot;));
+			return;
+		}
+	}
+	
+	// Get information about which PDO to use as input
+	iPos = cmbRawInput.selectedPos;
+	dsItems = lstPDOdps.items;
+	sPDOdp = dsItems[iPos];
+	
+	// Remove system name from DP
+	if (dpExists(sPDOdp))
+		sPDOdp = dpSubStr(sPDOdp, DPSUB_DP);
+	
+	// Check for raw sensor
+	if (bIsRaw) {
+		sDefaultParameters = ELMB_NO_INFO;
+		sParamDescriptions = ELMB_NO_INFO;
+		sSensorFct = ELMB_NO_INFO;
+	}
+	
+	if (bEdit) {
+		// Update new information to variables
+		dsExistingSensorFcts[iIndex] = sSensorFct;
+		dsExistingParameters[iIndex] = sDefaultParameters;
+		dsExistingSensorPrefixes[iIndex] = sPrefix;
+		dsExistingParameterDescriptions[iIndex] = sParamDescriptions;
+		dbIsRaw[iIndex] = bIsRaw;
+		dsPDOdps[iIndex] = sPDOdp;
+	} else {
+		// Append new information to variables
+		dynAppend(dsExistingSensorTypes, sSensorTypeName);
+		dynAppend(dsExistingSensorFcts, sSensorFct);
+		dynAppend(dsExistingParameters, sDefaultParameters);
+		dynAppend(dsExistingSensorPrefixes, sPrefix);
+		dynAppend(dsExistingParameterDescriptions, sParamDescriptions);
+		dynAppend(dbIsStandard, false);
+		dynAppend(dbIsRaw, bIsRaw);
+		dynAppend(dsPDOdps, sPDOdp);
+	}
+
+	// Set the information into the sensorinfo DP
+	dpSet(ELMB_SENSOR_INFO_NAME + &quot;.types&quot;, dsExistingSensorTypes,
+	      ELMB_SENSOR_INFO_NAME + &quot;.functions&quot;, dsExistingSensorFcts,
+	      ELMB_SENSOR_INFO_NAME + &quot;.parameters&quot;, dsExistingParameters,
+	      ELMB_SENSOR_INFO_NAME + &quot;.prefix&quot;, dsExistingSensorPrefixes,
+	      ELMB_SENSOR_INFO_NAME + &quot;.parameterDescriptions&quot;, dsExistingParameterDescriptions,
+	      ELMB_SENSOR_INFO_NAME + &quot;.isStandard&quot;, dbIsStandard,
+	      ELMB_SENSOR_INFO_NAME + &quot;.isRaw&quot;, dbIsRaw,
+	      ELMB_SENSOR_INFO_NAME + &quot;.pdoDp&quot;, dsPDOdps);
+
+	// Return to calling routine
+	PanelOffReturn(makeDynFloat(1.0), makeDynString(&quot;OK&quot;));
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">500 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">500 440</prop>
+    <prop name="Size">61 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	// Return to calling routine
+	PanelOffReturn(makeDynFloat(0.0), makeDynString(&quot;Cancel&quot;));
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdSyntaxCheck" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">20 260</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 260</prop>
+    <prop name="Size">91 31</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Check Syntax</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	bool bInvalid;
+	string sSensorFct = txtSensorFormula.text;
+	dyn_string dsText;
+	
+	bInvalid = userFunctionInvalid(sSensorFct);
+	
+	if (bInvalid) {
+		dsText = makeDynString(&quot;Syntax error in formula&quot;);
+	} else {
+		dsText = makeDynString(&quot;Syntax of formula is OK&quot;);
+	}
+	ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;,
+											&quot;Warning&quot;,
+											dsText);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="chkUseFormula" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 40</prop>
+    <prop name="Size">151 21</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">Sensor uses formula?</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+	modSetControls();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmdTxPDO" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">270 130</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">270 130</prop>
+    <prop name="Size">61 24</prop>
+    <prop name="PopupItemId"/>
+    <prop name="Text">
+	<prop name="en_US.utf8">TxPDO</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">add</prop>
+      <prop name="Text">
+	<prop name="en_US.utf8">Create New...</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">configure</prop>
+      <prop name="Text">
+	<prop name="en_US.utf8">Edit...</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">delete</prop>
+      <prop name="Text">
+	<prop name="en_US.utf8">Delete...</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id)
+{
+// Local Variables
+// ---------------
+	int i;
+	int iPos;
+	
+	string sDpName;
+	string sSensorName;
+	
+	dyn_float df;
+
+	dyn_string dsItems;	
+	dyn_string dsPDOdps;
+	dyn_string ds;
+
+// Executable Code
+// ---------------
+	// Check whether editing or creating a new raw value sensor
+	switch (id) {
+		case &quot;configure&quot;: // Raw value sensor is to be edited
+			iPos = cmbRawInput.selectedPos;
+			dsItems = lstPDOdps.items;
+			sDpName = dsItems[iPos];
+		
+			// Get default parameters
+			ChildPanelOnCentralReturn(&quot;fwElmb/objects/fwElmbPDOConfigurationRef.pnl&quot;,
+																&quot;Alter settings for PDO&quot;,
+																makeDynString(&quot;$sDpName:&quot; + sDpName,
+																							&quot;$bEdit:&quot; + true,
+																							&quot;$sDirection:IN&quot;),
+																df, ds);
+			break;
+		case &quot;add&quot;: // New raw value sensor to be created
+		
+			// Get default parameters
+			ChildPanelOnCentralReturn(&quot;fwElmb/objects/fwElmbPDOConfigurationRef.pnl&quot;,
+																&quot;Settings for new PDO&quot;,
+																makeDynString(&quot;$bEdit:&quot; + false,
+																							&quot;$sDirection:IN&quot;),
+																df, ds);
+																
+			if (df[1] &gt; 0.0) {
+				modUpdateRawSensors();
+				modSetControls(ds[1]);
+			}
+			break;
+		case &quot;delete&quot;:
+			// Get which PDO is currently selected
+			iPos = cmbRawInput.selectedPos;
+			dsItems = cmbRawInput.items;
+			sSensorName = dsItems[iPos];
+			dsItems = lstPDOdps.items;
+			sDpName = dsItems[iPos];
+			
+			// Display panel for confirmation
+			ChildPanelOnCentralModalReturn(	&quot;vision/MessageInfo&quot;,
+																			&quot;Confirm Deletion&quot;,
+																			makeDynString(&quot;Are you sure you wish to delete the\nPDO '&quot; + sSensorName + &quot;'?\nSensors using this PDO will be set to default input&quot;, &quot;OK&quot;, &quot;Cancel&quot;),
+																			df, ds);
+			if (df[1] == 1.0) {
+				// Delete datapoint
+				dpDelete(sDpName);
+				
+				// Get information
+				dpGet(ELMB_SENSOR_INFO_NAME + &quot;.pdoDp&quot;, dsPDOdps);
+				
+				for (i = 1; i &lt;= dynlen(dsPDOdps); i++) {
+					if (dsPDOdps[i] == sDpName)
+						dsPDOdps[i] = ELMB_NO_INFO;
+				}
+			  
+				// Set new information back into datapoint
+				dpSet(ELMB_SENSOR_INFO_NAME + &quot;.pdoDp&quot;, dsPDOdps);
+				modUpdateRawSensors();
+				modSetControls();
+			}
+			break;
+	}
+
+	// Return to calling routine
+	return;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmbRawInput" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">130 130</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">130 130</prop>
+    <prop name="Size">131 24</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+	modSetControls();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="lstPDOdps" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">430 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">18</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">430 100</prop>
+    <prop name="Size">81 51</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

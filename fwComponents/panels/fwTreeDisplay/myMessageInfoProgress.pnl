@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">information</prop>
+   <prop name="en_US.iso88591">information</prop>
+   <prop name="de_AT.iso88591">Information</prop>
+  </prop>
+  <prop name="Size">390 105</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">251 55</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+  <script name="Terminate" isEscaped="1"><![CDATA[main()
+{
+	int i;
+}]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="text" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">73 15</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_3DFace</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,twoColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">73 15</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,10,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">question
+
+</prop>
+     <prop name="en_US.iso88591">question
+
+</prop>
+     <prop name="de_AT.iso88591">Frage
+
+</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">0</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  setValue(&quot;&quot;,&quot;text&quot;,$1);
+  if($2 != &quot;&quot;)
+  	setValue(&quot;ok&quot;,&quot;visible&quot;,1);
+  else
+  	setValue(&quot;ok&quot;,&quot;visible&quot;,0);
+  dpConnect(&quot;update&quot;,0,&quot;ToDo.action:_online.._value&quot;);
+}
+
+update(string dp, string action)
+{
+dyn_string params;
+string msg;
+
+ 	dpGet(&quot;ToDo.params:_online.._value&quot;, params);
+	msg = &quot;Please Wait - &quot;;
+	if(dynlen(params))
+		msg += params[1]+&quot; &quot;;
+	if(action == &quot;FwCreateObject&quot;)
+	{
+		msg += &quot;Type Being Generated ...&quot;;
+	}
+	else if(action == &quot;FwCreateDomain&quot;)
+	{
+		msg += &quot;Being SetUp ...&quot;;
+	}
+	else if(action == &quot;FwRestartDomain&quot;)
+	{
+		msg += &quot;Starting Up ...&quot;;
+	}
+	else if(action == &quot;FwRestartTreeDomains&quot;)
+	{
+		msg += &quot;Tree Starting Up ...&quot;;
+	}
+	else if(action == &quot;FwStopDomain&quot;)
+	{
+		msg += &quot;Stopping ...&quot;;
+	}
+	else if(action == &quot;FwStopTreeDomains&quot;)
+	{
+		msg += &quot;Tree Stopping ...&quot;;
+	}
+	else if(action == &quot;FwRestartAllDomains&quot;)
+	{
+		msg += &quot;All Domains Starting Up ...&quot;;
+	}
+	else if(action == &quot;FwStopAllDomains&quot;)
+	{
+		msg += &quot;All Domains Stopping ...&quot;;
+	}
+	else if(action == &quot;FwCreateScripts&quot;)
+	{
+		msg += &quot;Installing Devices ...&quot;;
+	}
+	else
+	{
+		msg += action;
+	}
+	setValue(&quot;&quot;,&quot;text&quot;,msg);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="Border1" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">14 14</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DFace</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[tile,any,pictures/msg_info.bmp]]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">14 14</prop>
+    <prop name="Size">41 40</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="ok" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">299 68</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,10,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">-microsoft windows-arial-medium-r-normal-*-*-120-100-100-*-*-iso8859-1</prop>
+    </prop>
+    <prop name="Location">300 70</prop>
+    <prop name="Size">71 22</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Ok</prop>
+     <prop name="en_US.iso88591">Ok</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() 
+{ 
+	PanelOff();
+} 
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

@@ -1,0 +1,974 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">1500 848</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwAlarmHandling/fwAlarmHandling.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmHandlingScreenGroups.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreen.ctl&quot;
+#uses &quot;fwAlarmHandling/fwAlarmScreenGeneric.ctl&quot;
+
+int g_iToolBoxBot, g_iGroupBoxBot;
+
+void showModeShapes(bool show)
+{
+  string sMode;
+  int xFrame, yFrame, wFrame, hFrame;  
+   setValue(&quot;aesModeSelector&quot;,&quot;visible&quot;,show);
+   setValue(&quot;startHistoricalTime&quot;,&quot;visible&quot;,show &amp;&amp; aesModeSelector.number==1);
+   setValue(&quot;endHistoricalTime&quot;,&quot;visible&quot;,show &amp;&amp; aesModeSelector.number==1);
+   setValue(&quot;selectHistoricalTimes&quot;,&quot;visible&quot;,show);   
+   setValue(&quot;applyMode&quot;,&quot;visible&quot;,show); 
+   sMode = show? &quot;Mode [-]&quot; : &quot;Mode [+]&quot;;
+   setValue(&quot;vFrame&quot;,&quot;text&quot;,sMode);     
+   getValue(&quot;vFrame&quot;,&quot;size&quot;,wFrame,hFrame);
+   hFrame = show?  145 : 20;
+   setValue(&quot;vFrame&quot;,&quot;size&quot;,wFrame,hFrame);
+   getValue(&quot;vFrame&quot;,&quot;size&quot;,wFrame,hFrame);
+   getValue(&quot;vFrame&quot;,&quot;position&quot;,xFrame,yFrame);
+   g_iToolBoxBot = yFrame+hFrame;
+   rearrangeTablePosition();
+}
+
+void rearrangeTablePosition()
+{  
+  int x,y,x1,y1,x2,y2,x0,y0;
+  int yOffset;
+  string table = &quot;table_top&quot;;
+  yOffset = g_iToolBoxBot &gt; g_iGroupBoxBot ? g_iToolBoxBot : g_iGroupBoxBot;
+  
+     //Move the table a bit upper and rearrange it     
+     getValue(table,&quot;position&quot;,x0,y0);
+     y = yOffset;
+     setValue(table,&quot;position&quot;,10,y );
+     getValue(table,&quot;size&quot;,x1,y1);
+     y1 = y1-(yOffset-y0);
+     x1 = x1;
+     setValue(table,&quot;size&quot;,x1,y1);    
+}
+
+void openGroupsSetup()
+{
+  ModuleOnWithPanel(&quot;fwASGroupsConfig&quot;,
+                    0, 0, 0, 0, 1, 1, &quot;&quot;,
+                    &quot;fwAlarmHandling/fwAlarmHandlingGroupsConfiguration.pnl&quot;,
+                    &quot;&quot;,
+                    makeDynString(&quot;$bCalledFromAS:true&quot;));
+  PanelOff();
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[/*
+@name  fwAlarmHandlingGroups
+@author Marco Boccioli (EN/ICE) based on the original project from Giovanni Polese (CMS)
+*/
+
+/***************************************************************/
+
+const unsigned fwAlarmHandlingGroups_AlertNumber = 1;
+const unsigned fwAlarmHandlingGroups_UnAckNumber = 2;
+const unsigned fwAlarmHandlingGroups_LastAlert = 3;
+const unsigned fwAlarmHandlingGroups_Severity = 4;
+const unsigned fwAlarmHandlingGroups_Blinking = 5;
+const unsigned fwAlarmHandlingGroups_Colour = 6;
+const unsigned fwAlarmHandlingGroups_Ack = 7;
+const unsigned fwAlarmHandlingGroups_Direction = 8;
+const unsigned fwAlarmHandling_COLOUR_INDEX = 99;
+const int borderX = 10;
+const int borderY = 10;
+int playSound;
+string confDp;
+dyn_int colIdx;
+dyn_string hiddenObjects;
+dyn_string tshapes;
+dyn_string groupIdx;
+dyn_string groupDescription;
+dyn_dyn_string filtersMap;
+dyn_mixed dmFiltersMap, dmAliasMap;
+dyn_dyn_anytype subMap;
+dyn_dyn_string temp_g_alertsPerSys;
+int panelCustomW;
+int panelCustomH;
+bool g_bSoundEnabled;
+string g_sSoundPath;
+int g_iSoundType, g_iSoundInhibit;
+time g_tSoundLastPlayed;
+
+main()
+{
+  dyn_int lines;
+  int i, x,y;
+  int ret;
+  dyn_string dsDollarParams, exceptionInfo;
+  fwOpenProgressBar(&quot;Initializing Groups...&quot;, &quot;Initializing Groups...&quot;, 1);
+//   string uiDp = myUiDpName()+&quot;.Zoom.Factor&quot;;
+  setScaleStyle(SCALE_SCALE);
+  panelSize(myPanelName(),panelCustomW,panelCustomH);  
+  if(isFunctionDefined(&quot;fwAccessControl_setupPanel&quot;))
+    fwAccessControl_setupPanel(&quot;accessControlGroupCB&quot;, exceptionInfo);
+  else
+    accessControlGroupCB(&quot;&quot;, getUserName());
+  dsDollarParams = initDollarParams();
+  addSymbol(myModuleName(),myPanelName(),&quot;fwAlarmHandling/fwAlarmHandlingScreen.pnl&quot;,&quot;FWARC&quot;,dsDollarParams,0,0,0,1,1);
+  hideClassicObjects();  
+  do 
+  {
+    delay(1);
+  }
+  while (! shapeExists(&quot;currentUser&quot;));
+ 
+  //New Alert panel part  
+  addGlobal(&quot;fwAlarmHandling_g_alertsPerSys&quot;,DYN_DYN_STRING_VAR);
+  addGlobal(&quot;fwAlarmHandling_g_rows&quot;,DYN_DYN_STRING_VAR);
+  addGlobal(&quot;fwAlarmHandling_g_centralTable&quot;,STRING_VAR);
+  addGlobal(&quot;fwAlarmHandling_g_alarmColour&quot;,DYN_STRING_VAR);
+  dynClear(fwAlarmHandling_g_rows);
+  dynClear(fwAlarmHandling_g_alertsPerSys);
+  fwAlarmHandling_g_centralTable = &quot;&quot;;
+
+  removeSymbol(myModuleName(), myPanelName(), &quot;currentUser&quot;);
+  showNeededObjects();  
+  getObjsInPanel();//Called first to get the table attributes
+   
+  fwAlarmHandling_g_centralTable = dynPatternMatch(&quot;*table_top*&quot;,tshapes);
+  arrangeWidgetsPosition();
+  rearrangeTablePosition(); 
+  loadAlertSound();
+  setValue(&quot;lblInit&quot;,&quot;visible&quot;,false); 
+  
+  getTablerows(fwAlarmHandling_g_centralTable,fwAlarmHandling_g_rows, fwAlarmHandling_g_alarmColour);
+  int dim = dynlen(fwAlarmHandling_g_rows);
+  colIdx[1] = idxInTable(fwAlarmHandlingScreen_COLUMN_SHORT_SIGN,fwAlarmHandling_g_rows[dim]);//Severity
+  colIdx[2] = idxInTable(&quot;sysName&quot;,fwAlarmHandling_g_rows[dim]);//Sys
+  colIdx[3] = idxInTable(fwAlarmHandlingScreen_COLUMN_TIME_STANDARD,fwAlarmHandling_g_rows[dim]);//time
+  colIdx[4] = idxInTable(&quot;ackable&quot;,fwAlarmHandling_g_rows[dim]);//ack  
+  colIdx[5] = idxInTable(&quot;direction&quot;,fwAlarmHandling_g_rows[dim]);//dir 
+  colIdx[6] = idxInTable(fwAlarmHandlingScreen_COLUMN_DP_NAME,fwAlarmHandling_g_rows[dim]);//dp
+  colIdx[7] = idxInTable(fwAlarmHandlingScreen_COLUMN_COMMENT,fwAlarmHandling_g_rows[dim]);//comments
+  colIdx[8] = idxInTable(fwAlarmHandlingScreen_COLUMN_LOGICAL_NAME,fwAlarmHandling_g_rows[dim]);//alias
+  colIdx[9] = idxInTable(fwAlarmHandlingScreen_COLUMN_PRIORITY,fwAlarmHandling_g_rows[dim]);//priority
+  colIdx[10] = fwAlarmHandling_COLOUR_INDEX;//bg colour. it is not a standard column, but needed ofor the groups colour
+  //1; Sev, 2: sys, 3:time, 4:ack, 5:dir, 6:dp, 7:comments, 8:alias, 9:prio, 10:colour
+  ret = initMap();
+ 
+  if(ret==-1)
+  {
+    bool ok;
+    fwGeneral_openMessagePanel(&quot;No Groups were found. To create some groups,\nclick on the button 'Groups Setup'&quot;, ok, exceptionInfo,&quot;&quot;,true);
+    return;
+  }
+  addGroups();
+
+  getObjsInPanel();//Called again to update the obj list with the widgets  
+  arrangeTableLayout(fwAlarmHandling_g_centralTable);
+  fwCloseProgressBar();
+  //Here the loop starts
+ 
+  playSound = dim;
+
+  ////////////////////////////////////////////////////////////LOOP
+  int timeout = 0;//This is used to unselect the table row after 16 sec  
+  while(1)
+  {   
+    for(i = 1;i&lt;dynlen(fwAlarmHandling_g_rows);i++)
+    {  
+      if(colIdx[2]&gt;0)
+      {
+        updateMap(fwAlarmHandling_g_rows[i]);           
+      }              
+    }
+    displayMap();   
+    delay(2,0);//Every two sec
+    initMap();
+    getTablerows(fwAlarmHandling_g_centralTable,fwAlarmHandling_g_rows, fwAlarmHandling_g_alarmColour);
+    if((dynlen(fwAlarmHandling_g_rows)&gt;playSound))
+      playAlertSound();      
+    playSound = dynlen(fwAlarmHandling_g_rows); 
+    //Patch to deselect the lines from the alert table after 16 sec
+    getValue (fwAlarmHandling_g_centralTable , &quot;getSelectedLines&quot;, lines);
+    if(dynlen(lines)&gt;0)
+    {
+        if(timeout&gt;8)
+        {
+          setValue (fwAlarmHandling_g_centralTable, &quot;removeSelectLines&quot;, lines);
+          timeout = 0;  
+        }
+        timeout++;
+     }
+  }
+  //Loop ends
+}
+
+
+void addGroups()
+{
+  dyn_string obj, exceptionInfo;
+  string panel = &quot;fwAlarmHandling\\fwAlarmHandlingGroupsSubAlert.pnl&quot;;
+  dyn_int size = getPanelSize(panel);
+  int y,x, xOrig, yOrig;
+  int h,v,ha,va;
+  int i, lines;
+
+  obj=groupIdx;
+  //Align the frame with the table
+  getValue(fwAlarmHandling_g_centralTable,&quot;position&quot;,xOrig,yOrig);
+  x = xOrig;
+  y = yOrig;
+  getValue(fwAlarmHandling_g_centralTable,&quot;size&quot;,h,v);
+  string ackbutt = dynPatternMatch(&quot;*aesModeSelector*&quot;,tshapes);
+  getValue(ackbutt,&quot;position&quot;,ha,va);  
+  y = 3;
+  //make new lines 
+  int totObj = dynlen(obj);
+  for(i=1 ; i&lt;=totObj ; i++)
+  {
+      addSymbol(myModuleName(),myPanelName(),panel,obj[i],makeDynString(&quot;$name:&quot;+obj[i],&quot;$pos:&quot;+i,&quot;$xzoom:&quot;+size[1],&quot;$description:&quot;+groupDescription[i]),x,y,0,0,0); 
+      x = x + size[1];
+      if(i&lt;totObj &amp;&amp; x+size[1]&gt;=ha-15)//new line
+      {
+        y = y+size[2];
+        if(panelCustomH-(y+size[2])&lt;300)
+        {
+          fwException_raise(exceptionInfo, &quot;WARNING&quot;, &quot;fwAlarmHandlingGroups - Too many alert groups. Not all of them will be displayed.&quot;, &quot;&quot;);
+          fwExceptionHandling_display(exceptionInfo);
+          break;
+        }
+        x = xOrig;
+        showModeShapes(true);//if more than 1 line, show the mode box
+        lines++;
+      }
+      g_iGroupBoxBot = y+size[2];
+  }
+  //resize alarm table
+  rearrangeTablePosition();
+
+}
+
+
+void arrangeWidgetsPosition()
+{
+  string ackbutt = dynPatternMatch(&quot;*acknowledgeButton*&quot;,tshapes);
+  int xFrame, yFrame, wFrame, hFrame, lastX, lastY;  
+  const int buttonH = 30;
+  const int buttonW = 30;
+  if(strlen(ackbutt)&gt;0)
+  {
+     //Move the Mode widgets
+     //add toolbar buttons
+     dyn_string dsToolBarButtons;
+     dyn_int dsToolBarButtonsW;
+     int i,totalW;
+     //define toolbar buttons names and width
+     dsToolBarButtons = makeDynString(&quot;Button1&quot;,&quot;manageDisplayButton&quot;,&quot;cmGroupsSetup&quot;,&quot;applyFilter&quot;,&quot;printButton&quot;, ackbutt);//Button1=help
+     dsToolBarButtonsW = makeDynInt   (buttonW, buttonW, buttonW, buttonW, buttonW, 3.2*buttonW);//width of each button     
+     for(i=1 ; i&lt;=dynlen(dsToolBarButtons) ; i++)
+     {
+       if(shapeExists(dsToolBarButtons[i]))
+       {
+         totalW+=dsToolBarButtonsW[i];
+         setMultiValue(dsToolBarButtons[i],&quot;size&quot;,dsToolBarButtonsW[i],buttonH,
+                       dsToolBarButtons[i],&quot;position&quot;,panelCustomW-borderX-i-totalW,2,
+                       dsToolBarButtons[i],&quot;visible&quot;,true);
+       }
+     }
+     //add the historical mode frame
+     getValue(&quot;vFrame&quot;,&quot;size&quot;,wFrame,hFrame);   
+     setValue(&quot;vFrame&quot;,&quot;position&quot;,panelCustomW-borderX-i+1-totalW,2+buttonH+5);   
+     setValue(&quot;vFrame&quot;,&quot;size&quot;,i+totalW,hFrame);   
+     getValue(&quot;vFrame&quot;,&quot;position&quot;,xFrame,yFrame);   
+     getValue(&quot;vFrame&quot;,&quot;size&quot;,wFrame,hFrame);   
+     setValue(&quot;vFrame&quot;,&quot;visible&quot;,true);     
+     //visible widgets must be inside this frame
+     setValue(&quot;aesModeSelector&quot;,&quot;position&quot;,xFrame+10,yFrame+16);
+     setValue(&quot;startHistoricalTime&quot;,&quot;position&quot;,xFrame+10,yFrame+64);
+     setValue(&quot;endHistoricalTime&quot;,&quot;position&quot;,xFrame+10,yFrame+83);
+     setValue(&quot;selectHistoricalTimes&quot;,&quot;position&quot;,xFrame+10,yFrame+hFrame-0-buttonH);   
+     setValue(&quot;applyMode&quot;,&quot;size&quot;,buttonW,buttonH);      
+     setValue(&quot;applyMode&quot;,&quot;position&quot;,xFrame+wFrame-5-buttonW,yFrame+hFrame-0-buttonH);      
+     //expand/collapse mode frame
+     showModeShapes(false);
+  }  
+}
+
+
+void arrangeTableLayout(string tableName)
+{
+  dyn_string temp;
+  dyn_int size;
+  int x,y;
+  int len,tot;
+  int value,recoverLenght;
+  string nameColumn;
+  string checkedColumnName;
+  int tH, tW;
+
+  getValue(tableName,&quot;size&quot;,x,y);
+  getValue(tableName,&quot;position&quot;,tW,tH);
+  setValue(tableName,&quot;size&quot;,x+20,y+30);
+  setValue(tableName,&quot;size&quot;,panelCustomW-tW-borderX,panelCustomH-tH-borderY);//////////////////
+  getValue(tableName,&quot;size&quot;,x,y);
+
+//   getValue(tableName,&quot;namedColumnHeader&quot;,&quot;columnWidth&quot;,value);
+//   setValue(tableName,&quot;namedColumnHeader&quot;,&quot;columnWidth&quot;,value-30);
+  
+  //Scan the cols and add the checked at the first column free
+  getValue (tableName, &quot;columnCount&quot;, len);
+   for(int i = 0; i&lt;len;i++)
+   {    
+    getValue(tableName,&quot;columnName&quot;, i,nameColumn) ;
+    getValue(tableName,&quot;columnWidth&quot;, i,value) ;
+    if(nameColumn==&quot;__V_comments&quot;)
+    {     
+     checkedColumnName =  &quot;__V_comments&quot;;
+     setValue(tableName,&quot;namedColumnHeader&quot;,nameColumn,&quot;Checked by shifter at&quot;);
+     setValue(tableName,&quot;columnVisibility&quot;,i,true);
+     //try to add additional lenght left from the comment column
+     if(recoverLenght)
+     {
+       setValue(tableName,&quot;columnWidth&quot;,i, recoverLenght);
+       value = recoverLenght;
+     }
+    }
+    if(nameColumn==fwAlarmHandlingScreen_COLUMN_COMMENT)
+    {//Hide the comment column
+      getValue(tableName,&quot;columnWidth&quot;,i, recoverLenght);
+      setValue(tableName,&quot;columnVisibility&quot;,i,false);  
+      setValue(tableName,&quot;columnWidth&quot;,i, 1);
+      value = 1;
+    }
+    dynAppend(size,value);
+    tot = tot + value;
+    dynAppend(temp,nameColumn);
+    
+   }
+
+   if(x&gt;tot)
+   {//Share the remaining space among 3 columns             
+     int addendum = 0;
+     int widhtCol;
+     dyn_int pos;
+   
+     pos[1] = dynContains(temp,fwAlarmHandlingScreen_COLUMN_DESCRIPTION);
+     if(pos[1]&gt;0){
+       getValue(tableName,&quot;columnWidth&quot;, pos[1]-1,widhtCol);
+       if(widhtCol&gt;2) addendum++;
+       else pos[1] = 0;       
+     }
+    
+     pos[2] = dynContains(temp,checkedColumnName);
+     if(pos[2]&gt;0)
+     {
+       getValue(tableName,&quot;columnWidth&quot;, pos[2]-1,widhtCol);
+       if(widhtCol&gt;2) addendum++;
+       else pos[2] = 0;       
+     }
+    
+     pos[3] = dynContains(temp,&quot;alertText&quot;);
+     if(pos[3]&gt;0)
+     {
+       getValue(tableName,&quot;columnWidth&quot;, pos[3]-1,widhtCol);
+       if(widhtCol&gt;2) addendum++;
+       else pos[3] = 0;       
+     }
+  
+     pos[4] = dynContains(temp,&quot;elementName&quot;);
+     if(pos[3]&gt;0)
+     {
+       getValue(tableName,&quot;columnWidth&quot;, pos[4]-1,widhtCol);
+       if(widhtCol&gt;2) addendum++;
+       else pos[4] = 0;       
+     }
+  
+     pos[5] = dynContains(temp,&quot;logicalName&quot;);
+     if(pos[5]&gt;0)
+     {
+       getValue(tableName,&quot;columnWidth&quot;, pos[5]-1,widhtCol);
+       if(widhtCol&gt;2) addendum++;
+       else pos[5] = 0;       
+     }
+  
+     if(addendum&gt;0)
+     {
+	   delay(2);
+       addendum = ((x-tot)/addendum)-5;
+       for(int i = 1;i&lt;=dynlen(pos);i++)
+       {     
+         if(pos[i]&gt;0)
+           setValue(tableName,&quot;columnWidth&quot;, pos[i]-1,addendum + size[pos[i]]);
+       }
+     }
+ }
+}
+
+
+void hideClassicObjects()
+{
+    dyn_string obj;    
+    dynClear(hiddenObjects);
+    obj = getShapes(myModuleName(),myPanelName(),&quot;visible&quot;,true);   
+
+    for(int i = 1;i&lt;=dynlen(obj);i++)
+    {      
+      strreplace(obj[i],&quot;..&quot;,&quot;.&quot;);
+      if(obj[i]!=&quot;lblInit&quot;)
+      {
+        setValue(obj[i],&quot;visible&quot;,false); 
+        dynAppend(hiddenObjects,obj[i]);
+      }
+    }
+}
+
+
+void showNeededObjects()
+{
+    dyn_string visibleObjects;
+    int i;
+    
+    visibleObjects = makeDynString(&quot;table_top&quot;,&quot;acknowledgeButton&quot;,
+                                          &quot;aesModeSelector&quot;,&quot;selectHistoricalTimes&quot;,
+                                          &quot;applyMode&quot;,&quot;vFrame&quot;,&quot;applyFilter&quot;, 
+                                          &quot;cmGroupsSetup&quot;, &quot;printButton&quot;);    
+    for(int j = 1;j&lt;=dynlen(visibleObjects);j++)
+    {
+        setValue(visibleObjects[j],&quot;visible&quot;,true); 
+        i=dynContains(hiddenObjects,visibleObjects[j]);
+        if(i&gt;0)
+          dynRemove(hiddenObjects,i);
+    }
+}
+
+
+void getObjsInPanel()
+{
+  dynClear(tshapes);
+  dynAppend(tshapes,getShapes(myModuleName(),myPanelName(),&quot;visible&quot;,true));
+
+  for(int i = 1;i&lt;=dynlen(tshapes);i++)
+  {
+    tshapes[i]= myModuleName()+&quot;.&quot;+myPanelName()+&quot;:&quot;+tshapes[i];  
+  }
+}
+
+
+void displayMap()
+{
+  string obj;
+  dyn_string exception;
+  for(int i = 1;i&lt;=dynlen(subMap);i++)
+  {
+  //object to set
+    obj = dynPatternMatch(&quot;*&quot;+groupIdx[i]+&quot;.SUB*&quot;,tshapes);
+    if(strpos(obj,&quot;|&quot;)&gt;0) 
+      obj = dynPatternMatch(&quot;*:&quot;+groupIdx[i]+&quot;.SUB*&quot;,tshapes);
+//    DebugN(&quot;groupIdx[i]:&quot;,groupIdx[i]);
+//    DebugN(&quot;obj:&quot;,obj);
+    if(obj!=&quot;&quot;)
+    {
+    //Set Box colour
+      string color;
+      if(subMap[i][fwAlarmHandlingGroups_AlertNumber]&gt;0)
+      {
+         color = subMap[i][fwAlarmHandlingGroups_Colour];
+         setValue(obj,&quot;backCol&quot;,color);
+      }
+      else
+      { 
+         setValue(obj,&quot;backCol&quot;,&quot;FwStateOKPhysics&quot;);
+      }      
+      strreplace(obj,&quot;SUB&quot;,&quot;INFO&quot;);         
+      printGroupSummary(obj,i);
+//       DebugN(&quot;fwAlarmHandling_g_alarmColour:&quot;,dynlen(fwAlarmHandling_g_alarmColour), &quot;subMap:&quot;,dynlen(subMap));
+    }
+  }  
+}
+
+void printGroupSummary(string obj,int i)
+{
+  string button=obj;
+  string sPreviousText, sTimeStamp;
+  bool buttonsEnabled;
+  anytype text;
+  
+  strreplace(button,&quot;INFO&quot;,&quot;SUB&quot;);
+  if(dynlen(subMap[i])&gt;2)
+  {
+    text = &quot;&quot;+(string)subMap[i][fwAlarmHandlingGroups_AlertNumber] +&quot; alerts\n&quot;;
+    if(subMap[i][fwAlarmHandlingGroups_AlertNumber]&gt;0)
+    {
+      text = text + &quot;&quot;+ (string)subMap[i][fwAlarmHandlingGroups_UnAckNumber]+&quot; unack; &quot;;
+      if(dynlen(subMap[i])&gt;=5) 
+        text = text + &quot;&quot;+ (string)subMap[i][fwAlarmHandlingGroups_Blinking]+&quot; new\n&quot;;
+      else 
+        text = text + &quot;0 new\n&quot;;
+      if(subMap[i][fwAlarmHandlingGroups_AlertNumber]&gt;0)  
+      {   
+        sTimeStamp = subMap[i][fwAlarmHandlingGroups_LastAlert];
+        if(strpos(sTimeStamp,&quot;.&quot;,strlen(sTimeStamp)-4))
+          sTimeStamp = substr(sTimeStamp,0,strpos(sTimeStamp,&quot;.&quot;,strlen(sTimeStamp)-4));
+        text = text + &quot;&quot;+ sTimeStamp;
+      }
+    }
+    buttonsEnabled = true;
+  }
+  else 
+  {
+    text = &quot;0 alerts\n0 unack; 0 new&quot;;
+    buttonsEnabled = false;
+  }
+  setValue(button, &quot;enableItemId&quot;, 1, buttonsEnabled);
+  setValue(button, &quot;enableItemId&quot;, 2, buttonsEnabled);
+  getValue(obj, &quot;text&quot;, sPreviousText);
+  if(sPreviousText != text)
+    setValue(obj, &quot;text&quot;, text);  
+}
+
+
+int idxInTable(string pattern,dyn_string array)
+{
+  string pat = dynPatternMatch(&quot;*&quot;+pattern+&quot;*&quot;,array);
+  return dynContains(array,pat);
+}
+
+
+int initMap()
+{
+  dyn_dyn_string sysFilters;
+  dyn_mixed dpFilters, aliasFilters; 
+  dyn_string temp, groupsDescr,exc;
+  int res;
+  dynClear(subMap);  
+  if(dynlen(groupIdx)==0)
+  {
+    res =  fwAlarmHandlingScreenGroups_getConfig(sysFilters, dpFilters, aliasFilters, groupsDescr);
+    if(res ==-1)
+    {
+      fwException_raise(exc, &quot;WARNING&quot;,&quot;fwAlarmHandlingScreenGroups - Could not initialize groups filters&quot;,&quot;&quot;);
+      return res;
+    }
+    dynClear(filtersMap);
+    dynClear(dmFiltersMap);
+    dynClear(dmAliasMap);
+    dynClear(groupDescription);
+    filtersMap = sysFilters;  
+    dmFiltersMap = dpFilters;     
+    dmAliasMap = aliasFilters;   
+    groupDescription = groupsDescr;
+//   DebugN(&quot;  dmAliasMap:&quot;,dmAliasMap);
+  }
+ 
+//  DebugN(&quot;fwAlarmHandlingScreenGroups.pnl&quot;, &quot;groupIdx:&quot;,groupIdx,&quot;sysFilters:&quot;,sysFilters,&quot;dpFilters:&quot;,dpFilters);
+  
+ for(int i = 1; i&lt;=dynlen(groupIdx);i++)
+ {
+  dynAppend(subMap[i],0);  
+ }
+//  DebugN(&quot;groupIdx:&quot;,groupIdx);
+//  DebugN(&quot;subMap:&quot;,subMap);
+
+ dynClear(fwAlarmHandling_g_alertsPerSys);
+ return res;
+}
+
+
+void handleGroup(string sub,dyn_anytype row)
+{
+    string ack = row[colIdx[4]];
+    string lastTs = row[colIdx[3]];
+    string dir = row[colIdx[5]]; 
+    int prio = row[colIdx[9]];    
+    strreplace(dir,&quot; &quot;,&quot;&quot;);
+//     DebugN(&quot;roW,prio,col,ack,dir&quot;,row[colIdx[6]],row[colIdx[9]],row[colIdx[10]],ack,dir);
+    int idx = dynContains(groupIdx,sub);
+    if(idx&gt;0)
+    {
+      dynAppend(fwAlarmHandling_g_alertsPerSys[idx],row[colIdx[6]]);    
+    
+      if(dynlen(subMap[idx])&lt;2)
+      {
+        dyn_anytype temp;
+        temp[fwAlarmHandlingGroups_AlertNumber] = 1;
+        if(ack == &quot;FALSE&quot;)
+          temp[fwAlarmHandlingGroups_UnAckNumber] = 0;
+        else
+          temp[fwAlarmHandlingGroups_UnAckNumber] = 1;
+    
+        temp[fwAlarmHandlingGroups_LastAlert] = lastTs;
+    
+        temp[fwAlarmHandlingGroups_Severity] = prio;
+        
+        temp[fwAlarmHandlingGroups_Colour] = row[colIdx[10]];
+   
+        temp[fwAlarmHandlingGroups_Ack] = ack;
+        
+        temp[fwAlarmHandlingGroups_Direction] = dir;
+        
+        subMap[idx]=temp;
+      }
+      else
+      {
+         subMap[idx][fwAlarmHandlingGroups_AlertNumber]++;
+   
+         if(lastTs&gt;subMap[idx][fwAlarmHandlingGroups_LastAlert])
+           subMap[idx][fwAlarmHandlingGroups_LastAlert] = lastTs;
+  
+         if((prio&gt; subMap[idx][fwAlarmHandlingGroups_Severity] &amp;&amp; subMap[idx][fwAlarmHandlingGroups_Direction]==dir) || //alarm of higher prio
+            (prio==subMap[idx][fwAlarmHandlingGroups_Severity] &amp;&amp; ack == &quot;FALSE&quot; &amp;&amp; dir==&quot;CAME&quot;) || //alarm of same prio, came
+            (prio&lt; subMap[idx][fwAlarmHandlingGroups_Severity] &amp;&amp; subMap[idx][fwAlarmHandlingGroups_Direction]==&quot;WENT&quot; &amp;&amp; dir==&quot;CAME&quot;) || //alarm of lower prio, but only one came
+            (prio==subMap[idx][fwAlarmHandlingGroups_Severity] &amp;&amp; subMap[idx][fwAlarmHandlingGroups_UnAckNumber]==0))
+         {
+           subMap[idx][fwAlarmHandlingGroups_Severity] = prio;
+           subMap[idx][fwAlarmHandlingGroups_Colour] = row[colIdx[10]];
+           subMap[idx][fwAlarmHandlingGroups_Ack] = ack;
+           subMap[idx][fwAlarmHandlingGroups_Direction] = dir;
+        }    
+         
+         if(ack == &quot;TRUE&quot;)
+           subMap[idx][fwAlarmHandlingGroups_UnAckNumber]++;
+         
+      }
+    //Blinking 
+      if((row[colIdx[7]]==&quot;&quot;)&amp;&amp;(row[colIdx[5]][0]!=&quot;W&quot;))
+      {  
+        subMap[idx][fwAlarmHandlingGroups_Blinking] ++;
+      }   
+   }
+
+}
+
+//select the alarms according to the group filtering settings
+void updateMap(dyn_anytype row)
+{ 
+  dyn_dyn_string ddsDpFilterPatterns, ddsAliasFilterPatterns;
+  string sDpName, sPattern;
+  dyn_string exc;
+  int i,j,k;
+   //1; Sev, 2: sys, 3:time, 4:ack, 5:dir, 6:dp   
+  for(i = 1;i&lt;=dynlen(filtersMap);i++)//for each group
+  {
+// DebugN(&quot;group:&quot;,groupIdx[i]);
+    ddsDpFilterPatterns = dmFiltersMap[i];
+    ddsAliasFilterPatterns = dmAliasMap[i];
+// DebugN(&quot;ddsDpFilterPatterns:&quot;,ddsDpFilterPatterns);    
+// DebugN(&quot;ddsAliasFilterPatterns:&quot;,ddsAliasFilterPatterns);    
+    for(j = 1; j&lt;=dynlen(filtersMap[i]);j++)//for each system pattern
+    {
+      //check if the alarm system belongs to the group name
+// DebugN(&quot;sys match:&quot;,filtersMap[i][j],&quot;with:&quot;,row[colIdx[2]]);
+      if(patternMatch(filtersMap[i][j],row[colIdx[2]]))//for each dpe pattern
+      { 
+// DebugN(&quot;sys matched!!&quot;);        
+        for(k = 1; k&lt;=dynlen(ddsDpFilterPatterns[j]);k++)
+        {
+          //check if the alarm dpe belongs to the group name
+          fwGeneral_getNameWithoutSN(ddsDpFilterPatterns[j][k],sPattern, exc);
+          if(ddsDpFilterPatterns[j][k]==sPattern)//no sys name in the pattern: add it
+          {
+            ddsDpFilterPatterns[j][k] = filtersMap[i][j] + ddsDpFilterPatterns[j][k];
+          }
+// DebugN(&quot;dp match:&quot;,ddsDpFilterPatterns[j][k],&quot;with:&quot;,row[colIdx[6]]);
+          if(patternMatch(ddsDpFilterPatterns[j][k], row[colIdx[6]]))
+          { 
+// DebugN(&quot;dp matched!!&quot;);
+// DebugN(&quot;handle sub with group&quot;,groupIdx[i]);
+            //pass the group name and the alarm line
+//             DebugN(&quot;groupIdx[i],filtersMap[i][j]:&quot;,groupIdx[i],filtersMap[i][j]);
+            handleGroup(groupIdx[i],row);
+            dynClear(ddsDpFilterPatterns);
+            dynClear(ddsAliasFilterPatterns);
+            return;
+          }
+        }
+        //if dp pattern did not match, try with alias pattern
+        if(dynlen(ddsAliasFilterPatterns)&gt;=j)
+        {
+          for(k = 1; k&lt;=dynlen(ddsAliasFilterPatterns[j]);k++)
+          {
+            //check if the alarm dpe belongs to the group name
+// DebugN(&quot;alias match:&quot;,ddsAliasFilterPatterns[j][k],&quot;with:&quot;,row[colIdx[8]]);
+            if(strlen(row[colIdx[8]]) &amp;&amp; strlen(ddsAliasFilterPatterns[j][k]) &amp;&amp; patternMatch(ddsAliasFilterPatterns[j][k], row[colIdx[8]]))
+            { 
+// DebugN(&quot;alias matched!!&quot;);
+// DebugN(&quot;handle sub with group&quot;,groupIdx[i]);
+              //pass the group name and the alarm line
+  //             DebugN(&quot;groupIdx[i],filtersMap[i][j]:&quot;,groupIdx[i],filtersMap[i][j]);
+              handleGroup(groupIdx[i],row);
+              dynClear(ddsDpFilterPatterns);
+              dynClear(ddsAliasFilterPatterns);
+              return;
+            }
+          } 
+        }     
+      }
+    }
+  }
+  dynClear(ddsDpFilterPatterns);
+  dynClear(ddsAliasFilterPatterns);  
+}
+
+
+int getTablerows(string tableName,dyn_dyn_anytype &amp; rows, dyn_string &amp;alarmColour)
+{
+    dynClear(rows);
+    dynClear(alarmColour);
+    int len ;
+    getValue (tableName, &quot;lineCount&quot;, len);
+    dyn_string temp;
+    string colour;
+    int i;
+    for(i = 0; i&lt;len;i++)
+    {
+     getValue(tableName,&quot;getLineN&quot;, i,temp) ;
+     getValue (tableName, &quot;cellBackColRC&quot;, i, &quot;abbreviation&quot;, colour);
+     temp[fwAlarmHandling_COLOUR_INDEX]=colour;
+     dynAppend(rows,temp);
+     dynAppend(alarmColour, colour);
+     dynClear(temp);
+    }
+  
+    len = 0;
+    string nameColumn;
+    getValue (tableName, &quot;columnCount&quot;, len);
+  
+    for(i = 0; i&lt;len;i++)
+    {
+     getValue(tableName,&quot;columnName&quot;, i,nameColumn) ;
+     dynAppend(temp,nameColumn);
+    
+    }
+    dynAppend(rows,temp);
+}
+
+
+dyn_string initDollarParams()
+{
+    dyn_dyn_anytype aesFilter;
+  	dyn_string dsDollarParams, exceptionInfo;
+    string tmp;
+  
+  	_fwAlarmHandlingScreen_getDefaultFilter(aesFilter, exceptionInfo);
+
+		 dynAppend(dsDollarParams,&quot;$sDeviceNameFilter:&quot;+ aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_DP_NAME]);
+		 dynAppend(dsDollarParams,&quot;$sDeviceAliasFilter:&quot;+ aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_DP_ALIAS]);
+		 dynAppend(dsDollarParams,&quot;$sDeviceTypeFilter:&quot;+ aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_DP_TYPE]);
+		 dynAppend(dsDollarParams,&quot;$sDeviceDescriptionFilter:&quot;+ aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_DESCRIPTION]);
+		 dynAppend(dsDollarParams,&quot;$sAlertTextFilter:&quot;+ aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_ALERT_TEXT]);
+     fwGeneral_dynStringToString(aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SYSTEM],tmp, &quot;|&quot;, TRUE);
+		 dynAppend(dsDollarParams,&quot;$dsSystemNames:&quot;+tmp);
+		 dynAppend(dsDollarParams,&quot;$bShowWarnings:&quot;+ aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SEVERITY][fwAlarmHandlingScreen_SEVERITY_FILTER_OBJECT_WARNING]);
+		 dynAppend(dsDollarParams,&quot;$bShowErrors:&quot;+ aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SEVERITY][fwAlarmHandlingScreen_SEVERITY_FILTER_OBJECT_ERROR]);
+		 dynAppend(dsDollarParams,&quot;$bShowFatals:&quot;+ aesFilter[fwAlarmHandlingScreen_CONFIG_OBJECT_FILTER_SEVERITY][fwAlarmHandlingScreen_SEVERITY_FILTER_OBJECT_FATAL] );
+     return dsDollarParams;
+}
+
+
+synchronized playAlertSound()
+{
+  if(g_bSoundEnabled &amp;&amp; getCurrentTime()-g_tSoundLastPlayed&gt;g_iSoundInhibit)
+  {
+    switch(g_iSoundType)
+    {
+      case fwAlarmHandlingGroups_SOUNDSOURCE_FILE:
+        startSound(g_sSoundPath);
+      break;
+      default:
+        beep(250,250);
+      break;
+    }
+    g_tSoundLastPlayed = getCurrentTime();
+  }
+}
+
+    
+void loadAlertSound()
+{
+  dyn_string exception;
+  if(dpExists(fwAlarmHandlingGroups_SOUNDENABLED_DP))
+  {
+    dpGet(fwAlarmHandlingGroups_SOUNDENABLED_DP, g_bSoundEnabled);
+    if(g_bSoundEnabled)
+    {
+      dpGet(fwAlarmHandlingGroups_SOUNDINHIBIT_DP, g_iSoundInhibit);
+      dpGet(fwAlarmHandlingGroups_SOUNDSOURCE_DP, g_iSoundType);
+      if(g_iSoundType==fwAlarmHandlingGroups_SOUNDSOURCE_FILE)//file
+      {
+        dpGet(fwAlarmHandlingGroups_SOUNDFILE_DP, g_sSoundPath);
+        if(!isfile(g_sSoundPath))
+          g_sSoundPath = fwAlarmHandlingScreenGroups_getDefaultSoundPath();
+        if(!isfile(g_sSoundPath))
+        {
+          fwException_raise(exception, &quot;WARNING&quot;, &quot;fwAlarmHandlingGroupsScreen.pnl - Could not find the sound file&quot;,&quot;&quot;);
+          g_iSoundType = fwAlarmHandlingGroups_SOUNDSOURCE_PCSPEAKER;//wav file not found -&gt; use beep
+        }
+      }
+    }
+  }
+  else
+  {
+    fwException_raise(exception, &quot;WARNING&quot;, &quot;fwAlarmHandlingGroupsScreen.pnl - dp does not exists: &quot;+fwAlarmHandlingGroups_SOUNDENABLED_DP,&quot;&quot;);
+    g_bSoundEnabled = false;
+  }
+}
+
+      
+accessControlGroupCB(string dp, string value)
+{
+  bool isGranted;
+  dyn_string accessRights, exceptionInfo;
+  isGranted = TRUE;  
+
+  if(isFunctionDefined(&quot;fwAccessControl_isGranted&quot;))
+  {
+    fwAlarmHandlingScreen_getAccessControlOptions(accessRights, exceptionInfo);    if(accessRights[fwAlarmHandlingScreen_ACCESS_MANAGE_DISPLAY] != &quot;&quot;)
+    fwAccessControl_isGranted(accessRights[fwAlarmHandlingScreen_ACCESS_MANAGE_DISPLAY], isGranted, exceptionInfo);
+  }
+  cmGroupsSetup.enabled = isGranted;
+}
+
+
+onPanelResize(string dp, anytype val)
+{
+  int w,h;
+  panelSize(myPanelName(),w,h);
+//   DebugN(w,h);  
+  rearrangeTablePosition(); 
+}
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="vFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">93</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">799.9999999999999 1.999999999999986</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Click to show/hide the Mode options</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.8707574612067491 0 0 0.4729409267223713 123.3940310346007 39.05411814655526</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">MS Shell Dlg 2,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">800 2</prop>
+    <prop name="Size">221 279</prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  showModeShapes(this.text != &quot;Mode [-]&quot;);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="cmGroupsSetup" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">186</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">820 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Groups Setup</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">820 10</prop>
+    <prop name="Size">22 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">SysMgm/16x16/FolderSettings.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[// SimpleCtrlScriptStart {invalid}
+main()
+{
+  openGroupsSetup();
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="lblInit" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">187</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">390 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">390 10</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Initializing...</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="cmHelp" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">604 10</prop>
+    <prop name="Geometry">0.8518518518518519 0 0 0.92 275.4814814814815 0.8</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwAlarmHandling/fwAlarmHandlingGroupsScreen</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+ </shapes>
+</panel>

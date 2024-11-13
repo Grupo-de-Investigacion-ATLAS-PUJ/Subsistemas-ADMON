@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='ASCII'?>
+<!DOCTYPE configuration [
+<!ENTITY STDELMB_FOUNDATIONS SYSTEM "/opt/CanOpenOpcUa/example_config/CANopen_def_STDELMB_FOUNDATIONS.xmle">
+<!ENTITY STDELMB_DI_TPDO1_C SYSTEM "/opt/CanOpenOpcUa/example_config/CANopen_def_STDELMB_DI_TPDO1_C.xmle">
+<!ENTITY STDELMB_AI_TPDO3 SYSTEM "/opt/CanOpenOpcUa/example_config/CANopen_def_STDELMB_AI_TPDO3.xmle">
+]
+>
+<configuration xmlns="http://cern.ch/quasar/Configuration" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://cern.ch/quasar/Configuration /opt/CanOpenOpcUa/Configuration/Configuration.xsd">
+  <StandardMetaData>
+    <Log>
+      <ComponentLogLevels>
+        <ComponentLogLevel logLevel="ERR" componentName="CanModule"/>
+        <ComponentLogLevel logLevel="INF" componentName="CalcVars"/>
+        <ComponentLogLevel logLevel="TRC" componentName="Sdo"/>
+      </ComponentLogLevels>
+    </Log>
+  </StandardMetaData>
+  <GlobalSettings name="GlobalSettings"/>
+  <Bus name="bus1" provider="sock" port="can0" syncIntervalMs="10000" settings="DontConfigure" spyMode="inheritFromGlobalSettings" nodeGuardIntervalMs="10000">
+    <Node name="elmb1" requestedState="OPERATIONAL" id="1" stateInfoSource="NodeGuard">
+      &STDELMB_FOUNDATIONS;
+      &STDELMB_DI_TPDO1_C;
+      &STDELMB_AI_TPDO3;
+      
+   	<CalculatedVariable name="voltage_0" value="  1*$_.TPDO3.ch0.value" status="$_.TPDO3.ch0.adcFlag&lt;128"/>
+   	<CalculatedVariable name="voltage_1" value="  1*$_.TPDO3.ch1.value" status="$_.TPDO3.ch1.adcFlag&lt;128"/>
+      	<CalculatedVariable name="voltage_2" value="  1*$_.TPDO3.ch2.value" status="$_.TPDO3.ch2.adcFlag&lt;128"/>
+      	
+      	<!--
+      	<CalculatedVariable name="PT_0" value="  1*$._TPDO3.ch0.value  "/>
+      	-->
+      
+      	<!--
+      	name="voltage_00" value=" TPDO3.Value_0*1"
+      	-->
+      
+	<!--
+	<ITEM name="voltage_0" value=" TPDO3.Value_0*1"/>
+	-->
+	
+      <SdoVariable index="1234" subIndex="1" name="NONEXISTENT" dataType="Byte" access="R"/>
+    </Node>
+  </Bus>
+</configuration>

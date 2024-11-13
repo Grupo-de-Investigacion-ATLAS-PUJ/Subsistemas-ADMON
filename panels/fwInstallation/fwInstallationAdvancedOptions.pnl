@@ -1,0 +1,2735 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">550 777</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">28 56</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwInstallation/fwInstallation.ctl&quot;
+#uses &quot;fwInstallation/fwInstallationDB.ctl&quot;
+
+bool gConnectionInProgress; // Flag that indicates if DB connection initialization is in progress
+                            // (true when transient state between 'disconnected' and 'connected')
+
+// Returns flag indicating if connection is currently in progress.
+bool isConnectionInProgress(){
+  return gConnectionInProgress;
+}
+
+// Sets flag indicating if connection is in progress. If setting to false, triggers refreshig of the information displayed on a panel.
+setConnectionInProgress(bool inProgress){
+  gConnectionInProgress = inProgress;
+  if(!inProgress){
+    fwInstallationDB_setUseDB(fwInstallationDB_getUseDB()); // trigger callback to refresh displayed information
+  }
+}
+
+//---------------------------------------
+const string DB_AGENT_DP = fwInstallation_getAgentDp();
+
+// Sets specific value in given fwInstallation_agentParametrization dpe.
+int setDbAgentDpeVal(string dpe, anytype val)
+{
+  return dpSet(DB_AGENT_DP + dpe, val);
+}
+
+//Returns value of given fwInstallation_agentParametrization dpe.
+anytype getDbAgentDpeVal(string dpe)
+{
+  anytype val;
+  if(dpGet(DB_AGENT_DP + dpe, val) != 0){
+    DebugTN(&quot;Failed to retrieve data from: &quot; + dpe + &quot; dpe of DB agent dp&quot;);
+  }
+  return val;
+}
+
+//---------------------------------------
+// Checks if redundant system and if yes then shows additional redu settings.
+void initReduncancyDisplay()
+{
+  bool enabled = false;
+  if(fwInstallationRedu_isRedundant()){
+    // we shouldn't use DB or we should use it but the project is not centrally managed
+    enabled = (!fwInstallationDB_getUseDB() || !fwInstallationDB_getCentrallyManaged());
+  }
+  showRedundancySettings(enabled);
+  rbReduProjInst.number = fwInstallation_getInstallOnlyInSplit();
+}
+
+// Returns information if additional redu settings are visible.
+bool isRedundancyDisplayVisible()
+{
+  return rbReduProjInst.visible;
+}
+
+//---------------------------------------
+// Add Unicos OWS widget on a panel
+displayUnicosOwsFrame()
+{
+  addSymbol(myModuleName(), myPanelName(), &quot;fwInstallation/fwInstallation_unicosOWS.pnl&quot;, &quot;UNICOS OWS&quot;, makeDynString(), 10, 736, 0, 1, 1);
+  setPanelSize(myModuleName(), myPanelName(), false, 550, 845);
+  PUSH_BUTTON1.position(300, 812);
+  btnOKAll.position(382, 812);
+  btnCancelAll.position(464, 812);
+}
+
+//---------------------------------------
+// Enbles and initiates DB connection
+void initDbConnection()
+{
+  setConnectionInProgress(true);
+  if(fwInstallationDB_setUseDB(true) != 0){
+    setConnectionInProgress(false);
+    return;
+  }
+  checkDbConnection();
+  setConnectionInProgress(false);
+}
+
+// Modifies displayed connection information depending if DB connection is enabled and active
+void initDbDisplay()
+{
+  if(fwInstallationDB_getUseDB()){
+    checkDbConnection();
+  }else{
+    showDbConnectionState(false);
+    enableConfigurationDbOptions(false);
+  }
+  setConnectionInProgress(false);
+}
+
+// Checks if DB connection is active and if schema is correct. If not it disables connection.
+// If connection is active it checks if project is registered. If not it attempts to register it.
+// Modifies displayed information about project synchronization configuration.
+checkDbConnection()
+{
+  if(connectToDb() != 0){
+    disconnectDb();
+    return;
+  }
+  if(checkDbSchema() != 0){
+    disconnectDb();
+    return;
+  }
+  if(checkIfProjectRegistered() == -1 &amp;&amp; isAutoregistrationEnabled()){
+    if(registerProjectIfUserAccepts() == 0){
+      showProjectSyncMode();
+    }
+  }
+  showSyncInterval();
+}
+
+// Attempts to connect to DB if not connected yet.
+int connectToDb()
+{
+  if(fwInstallationDB_connect() != 0){
+    ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;DB ERROR&quot;, makeDynString(&quot;$1:Could not connect to DB. Check log-viewer for error details.&quot;));
+    return -1;
+  }
+  return 0;
+}
+
+// Disconnects DB connection and then disables it.
+void disconnectDb()
+{
+  setConnectionInProgress(true);
+  fwInstallationDB_setUseDB(false);
+  fwInstallationDB_closeDBConnection();
+  setConnectionInProgress(false);
+}
+
+// Checks if DB schema version is correct.
+int checkDbSchema()
+{
+  string version = &quot;&quot;;
+  int getSchemaRetVal = fwInstallationDB_getSchemaVersion(version);
+  bool compareSchemaRetVal = (getSchemaRetVal == 0)?fwInstallationDB_compareSchemaVersion():false;
+  if(!compareSchemaRetVal)//disconnect DB as DB schema is wrong or has wrong version
+  {
+    string errMessage;
+    if(getSchemaRetVal != 0)//schema not found
+      errMessage = &quot;Failed to retrieve version of the DB schema. Please check if Configuration DB System Information schema is present in the DB&quot;;
+    else//wrong schema version
+      errMessage = &quot;Current DB schema version: &quot; + version + &quot; is lower than required: &quot; + FW_INSTALLATION_DB_REQUIRED_SCHEMA_VERSION + &quot;. Please upgrade the DB schema&quot;;
+
+    ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;DB ERROR&quot;, makeDynString(&quot;$1:&quot; + errMessage));
+    return -1;
+  }
+  return 0;
+}
+
+// Checks if project is registered.
+// Returns projectId &gt; 0 if project is registered, -1 if not, -2 in case when failed to check if project is registered.
+int checkIfProjectRegistered()
+{
+  //Check if the project is properly registered in the DB:
+  int projectId;
+  if(fwInstallationDB_isProjectRegistered(projectId) != 0){
+    ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;DB ERROR&quot;, makeDynString(&quot;$1:Could not connect to DB.\nCheck connection parameters.&quot;));
+    return -2;
+  }
+  return projectId;
+}
+
+// Returns the state of project autoregistration flag.
+bool isAutoregistrationEnabled()
+{
+  int regEnabled;
+  fwInstallationDB_getProjectAutoregistration(regEnabled);
+  return (regEnabled == 1);
+}
+
+// Asks user whether to register project. If yes then attempts to register it.
+int registerProjectIfUserAccepts()
+{
+  dyn_string ds;
+  dyn_float df;
+  bool projectRegistered;
+  ChildPanelOnCentralReturn(&quot;fwInstallation/fwInstallation_messageInfo.pnl&quot;, &quot;Project Registration ...&quot;,
+                            makeDynString(&quot;$text:Project &quot; + PROJ + &quot; not registered in DB.\nDo you want to register it now?&quot;),
+                            df, ds);
+  if(dynlen(df) &amp;&amp; df[1] &gt;= 1.){
+    openProgressBar(&quot;FW Component Installation&quot;, &quot;copy.gif&quot;, &quot;Exporting project configuration to DB. This may take a few seconds...&quot;,&quot;&quot;, &quot;Please wait&quot;, 1);
+    bool restartProject;
+    if(fwInstallationDBAgent_synchronize(restartProject) != 0){
+      ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:Could not export project configuration to DB.\nCheck DB connection.&quot;));
+    }
+    else{
+      ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;ERROR&quot;, makeDynString(&quot;$1:Project configuration successfully exported to DB.&quot;));
+      projectRegistered = true;
+      if(restartProject){
+        ChildPanelOnCentralModal(&quot;fwInstallation/fwInstallation_projectRestart.pnl&quot;, &quot;Project restart required&quot;, makeDynString(&quot;&quot;));
+      }
+    }
+    closeProgressBar();
+  }
+  return projectRegistered?0:-1;
+}
+
+//---------------------------------------
+// Based on the current connection state modifies panel content.
+void showDbConnectionState(bool isConnected){
+  if(isConnected){
+    btnUseDB.text = &quot;Disconnect&quot;;
+    if(isConnectionInProgress()){
+      btnUseDB.enabled = false;
+      dbConnectedRectangle.backCol = &quot;yellow&quot;;
+      dbConnectedLabel.text = &quot;Connecting...&quot;;
+    }else{
+      btnUseDB.enabled = true;
+      dbConnectedRectangle.backCol = &quot;green&quot;;
+      dbConnectedLabel.text = &quot;Connected&quot;;
+    }
+  }else{ // !isConnected
+    btnUseDB.text = &quot;Connect&quot;;
+    dbConnectedRectangle.backCol = &quot;red&quot;;
+    dbConnectedLabel.text = &quot;Disconnected&quot;;
+  }
+  if(!isAutoconfigActive()){
+    enableConnAutoconfigButton(isConnected &amp;&amp; !isConnectionInProgress());
+  }
+}
+
+// Enables/disables widgets in 'DB Agent options' frame.
+void enableConfigurationDbOptions(bool enable = true)
+{
+  rbManagement.enabled = enable;
+  managementModeLabel.enabled = enable;
+  cbUnitSel.enabled = enable;
+  sbSyncPeriod.enabled = enable;
+  syncPeriodLabel.enabled = enable;
+}
+
+// Shows/hides a frame with additional redundancy settings.
+void showRedundancySettings(bool bState)
+{
+  rbReduProjInst.visible(bState);
+  installComponentsLabel.visible(bState);
+  reduFrame.visible(bState);
+  noReduBg.visible(!bState);
+  noReduText.visible(!bState);
+}
+
+// Clears warning message concerning project path.
+void resetProjPathWarningMessage()
+{
+  showProjPathWarningMessage(&quot;&quot;);
+}
+
+// Displays given warning message (if not an empty string) concerning project path.
+void showProjPathWarningMessage(string message)
+{
+  txtWarning.text = message;
+  bool visible = (message != &quot;&quot;);
+  txtWarning.visible = visible;
+  warningArrow.visible = visible;
+}
+
+// Enables/Disables DB Connection Autoconfiguration button.
+void enableConnAutoconfigButton(bool enable)
+{
+  btnConnAutoconfig.enabled = enable;
+}
+
+// Modifies content of System Configuration DB frame depending on whether or not DB connection autoconfiguration is enabled.
+void showAutoconfigState(bool isActive)
+{
+  if(isActive){
+    dbConnAutoconfigLabel.text = &quot;Active&quot;;
+    dbConnAutoconfigRectangle.backCol = &quot;green&quot;;
+    connectDbButton.enabled = false;
+
+    setDbConnAutoconfigButtonMode(false);
+    enableConnAutoconfigButton(true);
+  }else{
+    dbConnAutoconfigLabel.text = &quot;Disabled&quot;;
+    dbConnAutoconfigRectangle.backCol = &quot;red&quot;;
+    connectDbButton.enabled = true;
+
+    setDbConnAutoconfigButtonMode(true);
+    enableConnAutoconfigButton(fwInstallationDB_getUseDB() &amp;&amp; !isConnectionInProgress());
+  }
+}
+
+// Sets the label and tooltip text of DB connection autoconfiguration button according to the given mode: create autoconfig file (true) or disable autoconfig (false)
+void setDbConnAutoconfigButtonMode(bool createFileMode)
+{
+  if(createFileMode){
+    btnConnAutoconfig.text = &quot;Create autoconfig file&quot;;
+    btnConnAutoconfig.toolTipText = &quot;Creates fwInstallationInit.config file in config/ folder, that contains credentials to connect with DB. &quot; +
+                                    &quot;When this file exists, the DB connection is autoconfigured each time the Installation panel is opened or DB-Agent is started.&quot;;
+  }else{
+    btnConnAutoconfig.text = &quot;Disable&quot;;
+    btnConnAutoconfig.toolTipText = &quot;Removes fwInstallationInit.config file from config/ folder. Note that when this file is present, &quot; +
+                                    &quot;the DB connection is autoconfigured each time the Installation panel is opened or DB-Agent is started, &quot; +
+                                    &quot;regardless of other settings.&quot;;
+  }
+}
+
+// Returns information if panel shows that the DB connection autoconfiguration is active.
+bool isAutoconfigActive(){
+  return (dbConnAutoconfigRectangle.backCol == &quot;green&quot;);
+}
+
+// Displays information about current project synchronization mode in a panel.
+void showProjectSyncMode()
+{
+  rbManagement.number(fwInstallationDB_getCentrallyManaged());
+}
+
+// Displays configured synchronization period time.
+void showSyncInterval()
+{
+  cbUnitSel.items = FW_INSTALLATION_SYNC_INTERVAL_UNITS;
+  int syncInterval = fwInstallationDBAgent_getSyncInterval();
+  string unit;
+  sbSyncPeriod.text = convertFromSeconds(syncInterval, unit);
+  cbUnitSel.selectedPos(dynContains(FW_INSTALLATION_SYNC_INTERVAL_UNITS, unit));
+}
+
+//---------------------------------------
+
+const dyn_string FW_INSTALLATION_SYNC_INTERVAL_UNITS = makeDynString(&quot;seconds&quot;,&quot;minutes&quot;,&quot;hours&quot;,&quot;days&quot;,&quot;weeks&quot;);
+const dyn_int TIME_CONVERSION_TABLE = makeDynInt(60, 60, 24, 7);
+
+// Returns the factor of conversion to seconds for given time uint
+int getConversionToSecondFactor(string unit)
+{
+  int elemToMultiply = dynContains(FW_INSTALLATION_SYNC_INTERVAL_UNITS, unit) - 1;
+  if(dynlen(TIME_CONVERSION_TABLE) &lt; elemToMultiply || elemToMultiply &lt; 0)
+  {
+    fwInstallation_throw(&quot;Conversion to given time unit: &quot; + unit + &quot; not possible - this unit is not handled. Fallback to seconds&quot;, &quot;WARNING&quot;);
+    elemToMultiply = 0;
+  }
+  int factor = 1;
+  for(int i=1;i&lt;=elemToMultiply;i++)
+    factor *= TIME_CONVERSION_TABLE[i];
+  return factor;
+}
+
+// Converts the value of given time unit to seconds.
+int convertToSeconds(int value, string unit)
+{
+  return value * getConversionToSecondFactor(unit);
+}
+
+// Attempts to convert value expressed in seconds to the highest possible unit where the value is integer.
+// For example: 7200 seconds are converted to 2 hours, 7320 seconds are converted to 122 minutes, 7325 seconds are not converted.
+int convertFromSeconds(int value, string &amp;unit)
+{
+  for(int i=dynlen(FW_INSTALLATION_SYNC_INTERVAL_UNITS);i&gt;=2;i--)
+  {
+    string currUnit = FW_INSTALLATION_SYNC_INTERVAL_UNITS[i];
+    int conversionFactor = getConversionToSecondFactor(FW_INSTALLATION_SYNC_INTERVAL_UNITS[i]);
+    if(conversionFactor &gt; 1 &amp;&amp; value % conversionFactor == 0)
+    {
+      unit = currUnit;
+      return value/conversionFactor;
+    }
+  }
+  unit = FW_INSTALLATION_SYNC_INTERVAL_UNITS[1];//seconds
+  return value;
+}
+
+//---------------------------------------
+// Saves configuration from a panel to config file and dps.
+void saveConfiguration()
+{
+  saveInstallationDir();
+  saveProjPathsOrder();
+  saveSyncInterval();
+  saveAutomaticActionSettings();
+  if(isRedundancyDisplayVisible()){
+    saveReduSettings();
+  }
+}
+
+// Saves selected installation directory in an internal dpe.
+void saveInstallationDir()
+{
+  string installationDir = sliProjPaths.selectedText();
+  dpSet(fwInstallation_getInstallationDp() + &quot;.installationDirectoryPath:_original.._value&quot;, installationDir);
+}
+
+// Saves order of project paths to the config file.
+void saveProjPathsOrder()
+{
+  fwInstallation_changeProjPaths(sliProjPaths.items);
+}
+
+// Saves selection of automatic actions (adding and activating managers, finding file issues).
+void saveAutomaticActionSettings()
+{
+  string installationDp = fwInstallation_getInstallationDp();
+  string fileIssueDisabledDpe = fwInstallation_getAgentDp() + &quot;.&quot; + fwInstallation_getFileIssuesSyncDpElem();
+  dpSetWait(installationDp + &quot;.addManagersDisabled&quot;, !addManagerEnabled.state(0),
+            installationDp + &quot;.activateManagersDisabled&quot;, !activateManagerEnabled.state(0),
+            fileIssueDisabledDpe, !findFileIssues.state(0));
+}
+
+// Saves settings for installation in redundant project.
+void saveReduSettings()
+{
+  int newInstallOnlyInSplit = rbReduProjInst.number;
+  if(fwInstallation_getInstallOnlyInSplit() != newInstallOnlyInSplit){
+    fwInstallation_setInstallOnlyInSplit(newInstallOnlyInSplit);
+  }
+}
+
+// Takes synchronization interval set on a panel and saves it in internal dp. If interval is incorrect, default value is saved and shown on panel.
+void saveSyncInterval()
+{
+  int newInterval = convertToSeconds(sbSyncPeriod.text, cbUnitSel.selectedText());
+  if(newInterval &lt; 30)
+    newInterval = 30;
+
+  fwInstallationDBAgent_setSyncInterval(newInterval);
+  showSyncInterval();
+}
+
+//---------------------------------------
+// Callback on useDB dpe
+void setUseDBCB(string dpe, bool useDB)
+{
+  showDbConnectionState(useDB);
+  enableConfigurationDbOptions(useDB &amp;&amp; !isConnectionInProgress());
+}
+
+//---------------------------------------
+const int MONITOR_INIT_FILE_PERIOD = 5; // seconds
+
+// Runs in a thread and periodically checks if fwInstallationInit.config file exists in a project, if file is created or deleted updates information on a panel.
+void monitorDbInitFileState(string fileName)
+{
+  bool dbInitFileExistedPreviously = false;
+  while(true){
+    bool dbInitFileExistsNow = dbInitFileExists();
+    if(dbInitFileExistedPreviously != dbInitFileExistsNow){
+      showAutoconfigState(dbInitFileExistsNow);
+      dbInitFileExistedPreviously = dbInitFileExistsNow;
+    }
+    delay(MONITOR_INIT_FILE_PERIOD);
+  }
+}
+
+// Checks if fwInstallationInit.config file exists
+bool dbInitFileExists()
+{
+  const string asciiFile = getPath(CONFIG_REL_PATH, gFwInstallationInitFile); // try to find fwInstallationInit.config ASCII file
+  return (asciiFile != &quot;&quot; &amp;&amp; access(asciiFile, R_OK) == 0);
+}
+
+//---------------------------------------
+const int MOVE_UP = 1;
+const int MOVE_DOWN = -1;
+
+// Moves currently selected path up or down in the list
+void movePathInHierarchy(int move)
+{
+  dyn_string listStrings = sliProjPaths.items;
+  string selectedString = sliProjPaths.selectedText;
+  int selectedPosition = sliProjPaths.selectedPos;
+
+  if(isProjectPath(selectedString)){
+    ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;Action not permitted&quot;, makeDynString(&quot;This project path cannot be moved.&quot;));
+    return;
+  }
+
+  if(move == MOVE_UP &amp;&amp; selectedPosition != 1 ||
+     move == MOVE_DOWN &amp;&amp; selectedPosition != dynlen(listStrings)){
+    dynRemove(listStrings, selectedPosition);
+    dynInsertAt(listStrings, selectedString, selectedPosition - move);
+  }
+
+  sliProjPaths.items = listStrings;
+  selectPathInList(selectedString);
+}
+
+// Check if given path is a main project path (PROJ_PATH)
+bool isProjectPath(string path)
+{
+  string projPath = PROJ_PATH;
+  fwInstallation_normalizePath(path);
+  fwInstallation_normalizePath(projPath);
+  if(_WIN32){
+    return (strtolower(path) == strtolower(projPath));
+  } // else
+  return (path == projPath);
+}
+
+// Selects given path in the list, modifies possibility of moving path up or down.
+selectPathInList(string path)
+{
+  selectPathIfAllowed(path);
+  enablePathMoving(sliProjPaths.selectedPos());
+}
+
+int gSelectedPathPosition;
+
+// Performs selection of path in the list if allowed, otherwise shows overlay box with warning and resets selection to the previous one
+void selectPathIfAllowed(string path)
+{
+  if(isPathSelectable(path)){
+    sliProjPaths.selectedText = path;
+    gSelectedPathPosition = sliProjPaths.selectedPos();
+  }else{
+    sliProjPaths.selectedPos = gSelectedPathPosition;
+    showNonSelectablePathWarning();
+  }
+}
+
+// Returns information whether the given path can be selected on the list.
+bool isPathSelectable(string path)
+{
+  return !isProjectPath(path);
+}
+
+// Enables/disables possibility of moving path up or down in the list depending on the position of the path in the list.
+enablePathMoving(int pathPosition)
+{
+  int pathListLen = sliProjPaths.itemCount();
+  upButton.enabled = (pathPosition &gt; 1) &amp;&amp; (pathPosition &lt; pathListLen);
+  downButton.enabled = (pathPosition &gt;= 1) &amp;&amp; (pathPosition &lt; pathListLen - 1);
+}
+
+//---------------------------------------
+// Struct to store coordinates
+struct Coord{
+  int x, y;
+  Coord(int _x = 0, int _y = 0){
+    x = _x;
+    y = _y;
+  }
+};
+
+// Retrieves current cursor postion as coordinates
+shared_ptr&lt;Coord&gt; getCursorCoord()
+{
+  int x, y;
+  getCursorPosition(x, y);
+  return new Coord(x, y);
+}
+
+// Struct to store object size
+struct Size{
+  int w, h;
+  Size(int _w = 0, int _h = 0){
+    w = _w;
+    h = _h;
+  }
+};
+
+// Retrieves panel size as Size object
+shared_ptr&lt;Size&gt; getMyPanelSize()
+{
+  int px, py;
+  getValue(self, &quot;size&quot;, px, py);
+  return new Size(px, py);
+}
+
+// Struct to store RGB components of a color
+struct RGB{
+  int r, g, b, a;
+  RGB(int _r = 0, int _g = 0, int _b = 0, int _a = 0){
+    r = _r;
+    g = _g;
+    b = _b;
+    a = _a;
+  }
+};
+
+// Converts color string into RBG object
+shared_ptr&lt;RGB&gt; colorToRgbStruct(string color)
+{
+  int r, g, b, a;
+  colorToRgb(color, r, g, b, a);
+  return new RGB(r, g, b, a);
+}
+
+// Converts RBG object into color string
+string rgbStructToColor(RGB rgb)
+{
+  return rgbToColor(rgb.r, rgb.g, rgb.b, rgb.a);
+}
+
+// Creates color string base on given RGB components values.
+string rgbToColor(int r, int g, int b, int a)
+{
+  string color;
+  sprintf(color, &quot;{%d,%d,%d,%d}&quot;, r, g, b, a);
+  return color;
+}
+
+// Sets transparency of given color. a = 0 - transparent, a = 255 - fully opaque
+string setColorAlpha(string color, int a)
+{
+  RGB rgb = colorToRgbStruct(color);
+  rgb.a = a;
+  return rgbStructToColor(rgb);
+}
+
+// Class to display overlay text box with given text in a specified position.
+// It is visible for a certain period of time, then is being hidden progressively until it disappears.
+class OverlayTextBox{
+  static const int INNER_HORIZONTAL_MARGIN = 2;
+  static const int INNER_VERTICAL_MARGIN = 2;
+
+  static mapping s_allTextBoxObjects;
+
+  public shape tbShape;
+  private Coord position;
+  private Size size;
+  private string idName;
+  private int dispThreadId;
+
+  protected OverlayTextBox(){}
+
+  // Displays overlay text box of givent id. Uses object of given idName if exists already.
+  public static synchronized void display(string idName, string text, Coord position, int layer = 1){
+    shared_ptr&lt;OverlayTextBox&gt; otb = getExistingInstance(idName);
+    if(otb == nullptr){
+      otb = createNewInstance(idName);
+      otb.initialize(position, layer);
+    }else{
+      otb.reset();
+    }
+    otb.position = position;
+    otb.setText(text);
+    otb.startDisplayingThread();
+  }
+
+  private static shared_ptr&lt;OverlayTextBox&gt; getExistingInstance(string idName){
+    if(mappingHasKey(s_allTextBoxObjects, idName)){
+      return s_allTextBoxObjects[idName];
+    }
+    return nullptr;
+  }
+
+  private static shared_ptr&lt;OverlayTextBox&gt; createNewInstance(string idName){
+    shared_ptr&lt;OverlayTextBox&gt; otb = new OverlayTextBox();
+    s_allTextBoxObjects[idName] = otb;
+    otb.idName = idName;
+    return otb;
+  }
+
+  private void initialize(Coord _position, int layer){
+    //idName = _idName;
+    position = _position;
+    size = new Size();
+    tbShape = createTextBox(layer);
+    initTextBoxProperties();
+  }
+
+  private shape createTextBox(int layer = 1){
+    return addShape(self, layer, &quot;TEXT_EDIT&quot;, idName);
+  }
+
+  private void initTextBoxProperties(){
+    tbShape.transparentForMouse = true;
+    tbShape.horizontalScrollBarPolicy = &quot;ScrollBarAlwaysOff&quot;;
+    tbShape.verticalScrollBarPolicy = &quot;ScrollBarAlwaysOff&quot;;
+    tbShape.wrapPolicy = &quot;NoWrap&quot;;
+    tbShape.font = &quot;Arial,-1,13,5,50,0,0,0,0,0&quot;;
+  }
+
+  private void reset(){
+    stopDisplayingThread();
+    hideForConfiguration();
+    tbShape.backCol = setColorAlpha(tbShape.backCol(), 255);
+    tbShape.foreCol = setColorAlpha(tbShape.foreCol(), 255);
+  }
+
+  private void hideForConfiguration(){
+    tbShape.visible = false;
+  }
+
+  private void setText(string newText){
+    hideForConfiguration();
+    tbShape.text = newText;
+    adjustTextBox();
+    tbShape.text = newText; // intentional - scroll bar is added, when not disabled, after adjusting text box size. Reassigning text prevents it.
+  }
+
+  private void adjustTextBox(){
+    adjustTextBoxSize();
+    adjustTextBoxPosition();
+  }
+
+  private void adjustTextBoxSize(){
+    size = getRequiredBoxSize();
+    tbShape.size(size.w, size.h);
+  }
+
+  private shared_ptr&lt;Size&gt; getRequiredBoxSize(){
+    return new Size(tbShape.contentsWidth() + INNER_HORIZONTAL_MARGIN,
+                    tbShape.contentsHeight() + INNER_VERTICAL_MARGIN);
+  }
+
+  private void adjustTextBoxPosition(){
+    Size myPanelSize = getMyPanelSize();
+    position.x = getValueNotHigherThanLimit(position.x, myPanelSize.w - size.w);
+    position.y = getValueNotHigherThanLimit(position.y, myPanelSize.h - size.h);
+    tbShape.position(position.x, position.y);
+  }
+
+  private int getValueNotHigherThanLimit(int value, int limit){
+    if(value &gt; limit){
+      return limit;
+    }
+    return value;
+  }
+
+  // Note: check if in the newest WinCC OA patch, the non static function can be called with startThread
+  private static void progressivelyHideShape(shape sh, string idName){
+    sh.visible = true;
+    delay(0, 500); // initial delay
+
+    RGB bgColRgb = colorToRgbStruct(sh.backCol());
+    RGB fgColRgb = colorToRgbStruct(sh.foreCol());
+    for(int fill = 250;fill&gt;0;fill-=10){
+      bgColRgb.a = fill;
+      fgColRgb.a = fill;
+      sh.backCol = rgbStructToColor(bgColRgb);
+      sh.foreCol = rgbStructToColor(fgColRgb);
+      delay(0, 50);
+    }
+    sh.visible = false; // Note: In 3.16 shape can be removed from panel (but in 3.15 not)
+
+    // workaround to reset dispThreadId when thread stops:
+    shared_ptr&lt;OverlayTextBox&gt; otb = getExistingInstance(idName);
+    otb.dispThreadId = -1;
+  }
+
+  private void startDisplayingThread(){
+    //dispThreadId = startThread(OverlayTextBox::progressivelyHideShape, getExistingInstance(this.idName));
+    dispThreadId = startThread(&quot;progressivelyHideShape&quot;, this.tbShape, this.idName);
+  }
+
+  private void stopDisplayingThread(){
+    if(dispThreadId &gt;= 0){
+      stopThread(dispThreadId);
+      dispThreadId = -1;
+    }
+  }
+};
+
+// Displays overlay box with warning about an attempt to select non-allowed path.
+void showNonSelectablePathWarning()
+{
+  OverlayTextBox::display(&quot;nonSelectablePathWarningTextBox&quot;,
+                          &quot;This path (PROJ_PATH) cannot be selected&quot;,
+                          getCursorCoord());
+}
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[/**
+
+fwInstallationAdvandedOptions.pnl
+
+This panel is used for creating the new installation directory.
+If the directory does not exist - it is created and added to the project config file.
+The user can also change the installation directory to one of the directories contained in the proj_path of a config file.
+The panel also displays the information about the current installation directory.
+
+Required $-parameters:
+
+none
+
+Panels called from this panel:
+
+none
+
+*/
+main()
+{
+  string dp = fwInstallation_getInstallationDp();
+  if(dpExists(dp + &quot;.installationDirectoryPath&quot;))
+  {
+    string destinationDir;
+    dpGet(dp + &quot;.installationDirectoryPath:_original.._value&quot;, destinationDir);
+    dyn_string proj_paths;
+    fwInstallation_getProjPaths(proj_paths);
+    sliProjPaths.items = proj_paths;
+    fwInstallation_normalizePath(destinationDir);
+    selectPathInList(destinationDir);
+
+    dpConnect(&quot;fwInstallation_changeTxtDestinationDir&quot;, dp + &quot;.installationDirectoryPath:_original.._value&quot;);
+  }
+
+  dpConnect(&quot;setUseDBCB&quot;, fwInstallation_getAgentDp() + &quot;.db.useDB&quot;);
+  initDbDisplay();
+
+  initReduncancyDisplay();
+  //show symbol for OWS synchronization if UNICOS is installed:
+  if(isFunctionDefined(&quot;unConfigGenericFunctions_Create_Config_ows&quot;))
+  {
+    displayUnicosOwsFrame();
+  }
+  startThread(&quot;monitorDbInitFileState&quot;);
+
+  if (fwInstallationQtHelp_projectHasCollection())
+  {
+    textDocStatus.text(&quot;Documentation collection exists for this project.&quot;);
+  }
+  else
+  {
+    textDocStatus.text(&quot;No documentation collection exists for this project. &quot;
+                       &quot;Click the button to force collection generation.&quot;);
+  }
+}
+
+
+fwInstallation_changeTxtDestinationDir(string dp1, string destinationDir)
+{
+  fwInstallation_normalizePath(destinationDir);
+  selectPathInList(destinationDir);
+}
+
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="rbReduProjInst" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">48</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">28 567</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">39</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">28 567</prop>
+    <prop name="Size">243 50</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Only in active peer</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Only in split passive peer</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="newPathLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">19 208.9999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">21 184.9999999999999</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Add new project path:</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="txtWarning" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">31 259.9999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{255,0,51}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">33 236.9999999999999</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Warning message</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="installDirectoryFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 411</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.233100233100235 0 0 1.349397590361446 -2.331002331002338 -289.2530120481928</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Installation directory</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 244</prop>
+    <prop name="Size">430 167</prop>
+   </properties>
+  </shape>
+  <shape Name="configDBFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 521</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.4032634032634033 0 0 2.414141414141416 5.967365967365952 -741.3535353535364</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">System Configuration DB</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 421</prop>
+    <prop name="Size">430 100</prop>
+   </properties>
+  </shape>
+  <shape Name="btnCancelAll" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">463.9999999999999 740</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">464 740</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOffReturn(makeDynFloat(0.), makeDynString(&quot;Cancel&quot;));
+
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnOKAll" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">382 740</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">382 740</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Apply</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() // Apply button
+{
+  saveConfiguration();
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="txtDestinationDir" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 204.9999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 205</prop>
+    <prop name="Size">397 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="btnSelectSourceDir" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">421 130.9999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select the directory</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">421 203</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/Open_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  resetProjPathWarningMessage();
+  string sPath = txtDestinationDir.text; // Content of textfield
+  int iErr = folderSelector(sPath);
+
+  if(iErr &gt;= 1 &amp;&amp; strlen(sPath) &gt; 0){
+    fwInstallation_normalizePath(sPath, true);
+    txtDestinationDir.text = sPath;
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnOK" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">454 131.9999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Adds path and creates new directory if necessary</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">454 204</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Add</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() // Add path
+{
+  string path = txtDestinationDir.text;
+  if(path == &quot;&quot;)
+    return;
+
+  fwInstallation_normalizePath(path);
+  if(fwInstallation_createPath(path)){
+    showProjPathWarningMessage(&quot;Failed to register the new project path. Check log-viewer for details.&quot;);
+    return;
+  }
+
+  resetProjPathWarningMessage();
+  dyn_string projPaths = sliProjPaths.items;
+  dynInsertAt(projPaths, path, 1);
+  sliProjPaths.items = projPaths;
+  selectPathInList(path);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="addManagerEnabled" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">378.0666666666667 533.9999999999993</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">WARNING! If you disable the automatic addition of managers, component might not work correctly. This function is intended for NON-STANDARD JCOP Framework projects only!</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">387 440</prop>
+    <prop name="Size">135 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Add managers</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  if(!state){
+    activateManagerEnabled.state(0) = FALSE;
+  }
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  bool disabled;
+  dpGet(fwInstallation_getInstallationDp() + &quot;.addManagersDisabled&quot;, disabled);
+
+  this.state(0) = !disabled;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="sliProjPaths" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20.99999999999999 81.99999999999994</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Define order of different project paths</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 82</prop>
+    <prop name="Size">479 98</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  string selectedPath = sliProjPaths.selectedText();
+  if(selectedPath != &quot;&quot;){
+    selectPathInList(selectedPath);
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="upButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">503 80.99999999999994</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Move selected path up</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">503 81</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/arrow_top_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  movePathInHierarchy(MOVE_UP);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="downButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">503 154.9999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Move selected path down</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">503 155</prop>
+    <prop name="Size">26 26</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">StandardIcons/arrow_bottom_20.png</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  movePathInHierarchy(MOVE_DOWN);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="activateManagerEnabled" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">381.0444444444441 992.9999999999993</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">WARNING! If you disable the automatic addition of managers, component might not work correctly. This function is intended for NON-STANDARD JCOP Framework projects only!</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">387 463</prop>
+    <prop name="Size">135 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Activate managers</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  bool disabled;
+  string dp = fwInstallation_getInstallationDp();
+
+  dpGet(dp + &quot;.activateManagersDisabled&quot;, disabled);
+
+  this.state(0) = !disabled;
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnUseDB" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">29.8613445378151 388.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">27 299</prop>
+    <prop name="Size">140 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Disconnect</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  bool newUseDB = !fwInstallationDB_getUseDB();
+  if(newUseDB){
+    initDbConnection();
+  }else{
+    disconnectDb();
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="rbManagement" shapeType="RADIO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">162.3793103448276 387.479166666667</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Choose DB agent synchronization mode.
+Local - project data stored in DB is synchronized by DB Agent with the current WinCC OA project state (e.g list of installed components, dist connections, etc.).
+Central - project data stored in DB is propagated to the WinCC OA project (e.g. components can be remotely installed or removed from project)
+Note: This change is immediate - does not require acceptance with OK/Apply buttons</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">208.0000000000001 342</prop>
+    <prop name="Size">190 38</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Local (WinCC OA is master)</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Central (DB is master)</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button)
+{
+  string msg = &quot;Changing management mode to \&quot;&quot; + ((button == 0)?&quot;Local&quot;:&quot;Central&quot;) + &quot;\&quot;overwrites \n&quot; +
+               ((button == 0)?&quot;DB&quot;:&quot;project&quot;) + &quot; content. Proceed?&quot;;
+  dyn_float df;
+  dyn_string ds;
+  ChildPanelOnCentralReturn(&quot;fwInstallation/fwInstallation_messageInfo.pnl&quot;, &quot;Change Mode ...&quot;, makeDynString(&quot;$text:&quot; + msg), df, ds);
+  if(dynlen(df) &amp;&amp; df[1] &gt; 0.){
+    fwInstallationDB_setCentrallyManaged(button);
+    fwInstallationDBAgent_checkIntegrity();
+  }else{
+    this.number = (button == 0)?1:0;
+  }
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="connectDbButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">22.49999999999999 411.4999999999994</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Opens a panel to configure DB connection.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">27 354</prop>
+    <prop name="Size">140 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Setup DB</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  setConnectionInProgress(true);
+  dyn_float df;
+  dyn_string ds;
+  ChildPanelOnCentralModalReturn(&quot;fwInstallation/fwInstallationDB_connectionSetup.pnl&quot;, &quot;DB Connection Setup&quot;,makeDynString(&quot;&quot;), df, ds);
+
+  if(dynlen(df) &amp;&amp; df[1] &gt;= 1.){
+    initDbDisplay();
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="cbDist" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">41</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">222 536.9999999999993</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">WARNING! If you disable the automatic addition of managers, component might not work correctly. This function is intended for NON-STANDARD JCOP Framework projects only!</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">213 440</prop>
+    <prop name="Size">61 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Dist</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  setDbAgentDpeVal(&quot;.managers.stopDist&quot;, state);
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.state(0) = getDbAgentDpeVal(&quot;.managers.stopDist&quot;);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="uiManagerCheckbox" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">42</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">222 559.9999999999993</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">WARNING! If you disable the automatic addition of managers, component might not work correctly. This function is intended for NON-STANDARD JCOP Framework projects only!</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">213 463</prop>
+    <prop name="Size">41 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">UIs</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  setDbAgentDpeVal(&quot;.managers.stopUIs&quot;, state);
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.state(0) = getDbAgentDpeVal(&quot;.managers.stopUIs&quot;);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="ctrlManagerCheckbox" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">43</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">222 582.9999999999993</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">WARNING! If you disable the automatic addition of managers, component might not work correctly. This function is intended for NON-STANDARD JCOP Framework projects only!</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">213 486</prop>
+    <prop name="Size">51 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Ctrl</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  setDbAgentDpeVal(&quot;.managers.stopCtrl&quot;, state);
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.state(0) = getDbAgentDpeVal(&quot;.managers.stopCtrl&quot;);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="managersFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">44</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 521</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">35</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.8111888111888131 0 0 1.171717171717171 182.8881118881119 -95.2929292929289</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Managers</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 421</prop>
+    <prop name="Size">430 100</prop>
+   </properties>
+  </shape>
+  <shape Name="reduFrame" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">46</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 564</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">37</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.037254901960784 0 0 1.714285714285718 -0.3725490196078404 -441.8571428571453</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Redundancy</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 564</prop>
+    <prop name="Size">511 57</prop>
+   </properties>
+  </shape>
+  <shape Name="directoryLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">49</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 61.99999999999994</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">40</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">21 61.99999999999994</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Select directory to install components in:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="warningArrow" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">50</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 770</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">red</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">41</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.7259259259259259 0 0 0.6825000000000002 13.74074074074074 -287.5250000000003</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+     <prop name="Location">20 780</prop>
+     <prop name="Location">10 770</prop>
+     <prop name="Location">10 790</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="dbConnectedRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">51</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">270 310</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">42</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.9891304347826086 0 0 1 22.38043478260869 41</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 290</prop>
+    <prop name="Size">16 16</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="dbConnectedLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">52</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">64 331</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">43</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">64 331</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Connected</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="managementModeLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">53</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">206.0000000000001 324.0000000000006</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">44</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">206.0000000000001 324.0000000000006</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Mode:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="stopManagerLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">54</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">206 420.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">45</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">206 420.0000000000002</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Stop during installation:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="automaticLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">55</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">380 420.0000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">46</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">380 420.0000000000002</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Automatically:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="installComponentsLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">56</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 547</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">47</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">21 547</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Install components:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="noReduBg" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">58</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 48</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">49</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_WindowAlternate</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 1 0 41.99999999999994</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">10 483</prop>
+    <prop name="Size">530 97</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="noReduText" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">59</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">273 561</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">50</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">275 563</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">No redundant connection.</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">60</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">51</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">61</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">7.999999999999986 2</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">52</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">9.999999999999986 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Advanced Options</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PUSH_BUTTON1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">62</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">300 740</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">53</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">300 740</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() // Ok button
+{
+  saveConfiguration();
+  PanelOffReturn(makeDynFloat(), makeDynString(&quot;OK&quot;));
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="findFileIssues" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">63</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">381.0444444444441 1015.999999999999</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">54</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Enable/disable file issues scanning and synchronizing with database</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">387 486</prop>
+    <prop name="Size">135 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">Find file issues</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  bool disabled;
+  string fileIssueDisabledDp = fwInstallation_getAgentDp() + &quot;.&quot; + fwInstallation_getFileIssuesSyncDpElem();
+  dpGet(fileIssueDisabledDp, disabled);
+
+  this.state(0) = !disabled;
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="syncPeriodLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">64</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30.99999999999999 384.9999999999992</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">55</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.221117851851044 0 0 1 168.1453465926177 -85.99999999999841</prop>
+    <prop name="Location">30.99999999999999 384.9999999999992</prop>
+    <prop name="Size">120 16</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Synchronization period:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="cbUnitSel" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">65</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">421.9999999999999 300.5000000000008</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">56</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Select time unit. The following are available:
+s - seconds, m - minutes, h - hours, d - days, w - weeks.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">421.9999999999999 294.5000000000008</prop>
+    <prop name="Size">79 25</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">seconds</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">minutes</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">hours</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">days</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">weeks</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+    <prop name="Editable">False</prop>
+   </properties>
+  </shape>
+  <shape Name="sbSyncPeriod" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">66</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">355 299.9545454545461</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">57</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Choose delay between two agent runs. The default value is 5 minutes. Minimum delay is 30 seconds, if shorter delay is specified, it will be set to 30 seconds when applied.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">355 294.5000000000003</prop>
+    <prop name="Size">62 25</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">99999</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+  </shape>
+  <shape Name="agentOptions" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">67</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 521</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">58</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.8111888111888116 0 0 1.131313131313133 182.8881118881119 -201.2828282828294</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">DB Agent options</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 421</prop>
+    <prop name="Size">430 100</prop>
+   </properties>
+  </shape>
+  <shape Name="btnSyncConfig" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">68</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">421 347.5135135135135</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">59</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Opens a panel, that allows to select which project information are synchronized with DB in central and local mode.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">421 331</prop>
+    <prop name="Size">110 48</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Synchronization
+Configuration</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  ChildPanelOnCentralModal(&quot;fwInstallation/fwInstallation_dbSynchronizationComponentsSelector.pnl&quot;,
+                           &quot;DBSynchronizationComponentsSelector&quot;, makeDynString());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">69</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">31 408</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">60</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">31 408</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">DB Connection
+Autoconfiguration</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="dbConnAutoconfigRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">70</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">270 310</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">61</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.9891304347826086 0 0 1 21.93478260869568 161</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">20 290</prop>
+    <prop name="Size">16 16</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="dbConnAutoconfigLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">71</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">63.554347826087 451</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">62</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">63.554347826087 451</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Disabled</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="btnConnAutoconfig" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">74</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">27.8613445378151 386.5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">65</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Creates fwInstallationInit.config file in config/ folder, that contains credentials to connect with DB. When this file exists, the DB connection is autoconfigured each time the Installation panel is opened or DB-Agent is started.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">27 477</prop>
+    <prop name="Size">140 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Create autoconfig file</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  if(isAutoconfigActive()){
+    removeConnAutoconfigFile();
+  }else{
+    createConnAutonfigFile();
+  }
+}
+
+removeConnAutoconfigFile()
+{
+  if(remove(getPath(CONFIG_REL_PATH) + gFwInstallationInitFile) == 0){
+    showAutoconfigState(false);
+  }else{
+    DebugTN(&quot;Failed to remove DB connection autoconfiguration file&quot;);
+  }
+}
+
+createConnAutonfigFile()
+{
+  if(fwInstallation_createDbInitFile() == 0){
+    showAutoconfigState(true);
+  }else{
+    DebugTN(&quot;Failed to create DB connection autoconfiguration file&quot;);
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="LINE2" shapeType="LINE" layerId="0">
+   <properties>
+    <prop name="serialId">76</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">28 395</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">grey</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">67</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">True</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="Start">167 395</prop>
+    <prop name="End">28 395</prop>
+   </properties>
+  </shape>
+  <shape Name="frameDocumentation" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">77</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 633</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">68</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">5.280000000000002 0 0 2.702702702702702 -42.80000000000003 -1080.810810810811</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Documentation</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">10 633</prop>
+    <prop name="Size">101 38</prop>
+   </properties>
+  </shape>
+  <shape Name="btnRegenDocs" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">78</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 673.3333333333333</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">69</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Force regeneration of the WinCC OA help collection.</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">20 660</prop>
+    <prop name="Size">131 51</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Regenerate
+Help Collection</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  string message;
+  textDocStatus.text(&quot;Running...&quot;);
+  try
+  {
+  int returnCode = fwInstallationQtHelp_buildCollection();
+    message = &quot;Return code &quot; + returnCode + &quot;:\n&quot;;
+    switch(returnCode)
+    {
+      case 0: message += &quot;Documentation regenerated succesfully! Please restart WinCC OA Help Viewer to view the updated collection&quot;; break;
+      case -1: message += &quot;Could find 'qhcp_template.xml', fwInstallation is broken!&quot;; break;
+      case -2: message += &quot;Could not open 'qhcp_template.xml', perhaps a permission or file system error?&quot;; break;
+      case -3: message += &quot;Failed generating &lt;file&gt; tags for QHCP XML file. (Were any *.qch files found?)&quot;; break;
+      case -4: message += &quot;Could not write QHCP file 'fwInstallationQtHelp.qhcp', perhaps a permission or file system error?&quot;; break;
+      case -5: message += &quot;Failed to build Qt Help Collection file 'WinCC_OA.qhc'.&quot;; break;
+    }
+  }
+  catch
+  {
+    dyn_errClass err = getLastException();
+    if(dynlen(err) &gt; 0)
+    {
+      DebugTN(err);
+      message = &quot;Encountered unexpected error:\n\n&quot; + getErrorText(err) + &quot;\n\nSee log for more details.&quot;;
+    }
+    else
+    {
+      message = &quot;fwInstallationQtHelp_buildCollection() failed but getLastException() was blank&quot;;
+    }
+  }
+  textDocStatus.text(message);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="textDocStatus" shapeType="TEXT_EDIT" layerId="0">
+   <properties>
+    <prop name="serialId">80</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">160 650</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">71</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">160 650</prop>
+    <prop name="Size">372 71</prop>
+    <extended>
+     <prop type="BOOL" name="readOnly">True</prop>
+     <prop type="ENUM" name="textInteractionFlags">1</prop>
+    </extended>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

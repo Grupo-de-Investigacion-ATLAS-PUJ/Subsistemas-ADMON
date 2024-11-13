@@ -1,0 +1,1461 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">919 512</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">190 130</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">0</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwInstallation/fwInstallation.ctl&quot;
+
+/**=== Panel scope variables ===**/
+shape gReportShape; /** Panel scope variable to store shape of 'Installation info' reference panel of main fwInstallation panel.
+                      * This shape is necessary to connect to events on that panel and to call public functions from ScopeLib of that panel.
+                      * Shape is assigned in panel initialize script.
+                      */
+int lastMessageId = 0; //ID of the last message added to installation log table
+dyn_int countLogMessagesTypes = makeDynInt(0, 0, 0); //Log messages counters (one for each severity type)
+dyn_bool componentFilter, severityFilter; /* Component and severity filters. Boolean arrays that for each severity ID/component ID
+                                           * indicates if messages with these IDs should be visible in the installation log table.
+                                           * Note: Components IDs starts from 0 thus it is necessary to add +1 to the component ID
+                                           * to get corresponding field in a filter array. First index in componentFilter array is
+                                           * used also to indicate if filtering is disabled (if true then all messages should be shown)
+                                           * For indexing of severityFilter see SEVERITY_FILTER_* constants, also add +1 to their values.
+                                           */
+
+
+/**=== Private ScopeLib functions ===**/
+
+/** Sets the severity filter mask.
+  * @param filteredSeverities (in)  List of severity IDs for which filter mask is set to TRUE (visible), for the rest it is set to FALSE (hidden)
+  */
+setSeverityFilter(dyn_int filteredSeverities)
+{
+  for(int i=1;i&lt;=SEVERITY_FILTER_LENGTH;i++)
+    severityFilter[i] = (dynContains(filteredSeverities, i - 1) &gt; 0);
+}
+
+/** Returns the severity filter mask.
+  * @return Array of booleans, that for each severity ID indicates if log messages with that severity ID should be visible (TRUE) or hidden (FALSE).
+  *         Note: For values of severity IDs see SEVERITY_FILTER_* constants, for corresponding field in an array it is necessary to add +1 to their value
+  */
+dyn_bool getSeverityFilter(){
+  return severityFilter;
+}
+
+/** Sets the component filter mask.
+  * @param filteredComponents (in)  List of component IDs for which filter mask is set to TRUE (visible), for the rest it is set to FALSE (hidden).
+  *        Note: when the provided list is empty then all fields are set to TRUE (filtering disabled)
+           Note2: It is not possible to set directly filtering for component ID = 0 (first position in an array) - it is set to TRUE only when filtering is disabled
+  */
+setComponentFilter(dyn_string filteredComponents)
+{
+  bool areAllTrue = (dynlen(filteredComponents) == 0);
+  int componentsNumber = gReportShape.getComponentsNumber();
+  for(int i=1;i&lt;=componentsNumber;i++)
+    componentFilter[i] = (areAllTrue || dynContains(filteredComponents, (string)i));
+  dynInsertAt(componentFilter, areAllTrue, 1);//to include componentId = 0
+}
+
+/** Returns the component filter mask.
+  * @return Array of booleans, that for each comopnent ID indicates if log messages with that component ID should be visible (TRUE) or hidden (FALSE).
+  *         Note: Since component IDs starts from 0 for corresponding field in an array it is necessary to add +1 to their value.
+  */
+dyn_bool getComponentFilter(){
+  return componentFilter;
+}
+
+/** Appends new installation log message to the log table. Updates message counter per severity.
+  * @param installationLogMessage (in)  Mapping contains installation log message (ID of component and errClass log message)
+  */
+appendInstallationLogMessage(mapping installationLogMessage)
+{
+  string componentName, severity, message;
+  int componentId, severityId;
+  resolveInstallationLogMessage(installationLogMessage, componentId, componentName, severityId, severity, message);
+
+  setSeverityCheckboxString(severityId, getSeverityMessageNumberString(severityId, ++countLogMessagesTypes[severityId + 1]));
+  appendRowToInstallationLogTable(componentId, componentName, severityId, severity, message,
+                                  matchLogMessageToFilter(componentId, severityId));
+}
+
+/** Severity filter constants: box index in cbSeverityFilter = severity ID **/
+const int SEVERITY_FILTER_INFO = 0; //INFO checkbox index
+const int SEVERITY_FILTER_WARNING = 1; //WARNING checkbox index
+const int SEVERITY_FILTER_ERROR = 2; //ERROR checkbox index
+const int SEVERITY_FILTER_LENGTH = SEVERITY_FILTER_ERROR + 1; //Number of checkboxes in cbSeverityFilter
+
+/** Resolves message details from installation log message mapping.
+  * @param installationLogMessage (in)  Mapping contains installation log message (ID of component and errClass log message)
+  * @param componentId (out)  ID of component
+  * @param componentName (out)  Component name
+  * @param severityId (out)  Severity type ID
+  * @param severity (out)  Severity type name
+  * @param message (out)  Log message
+  */
+void resolveInstallationLogMessage(mapping installationLogMessage, int &amp;componentId, string &amp;componentName, int &amp;severityId, string &amp;severity, string &amp;message)
+{
+  componentId = installationLogMessage[&quot;componentId&quot;];
+  if(componentId &gt; 0 &amp;&amp; componentId &lt;= dynlen(gReportShape.getComponentInstallationInfoMapping()))
+    componentName = gReportShape.getComponentInstallationInfoMapping()[componentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_COMPONENT];
+  else if(componentId == 0)
+    componentName = &quot;Preparing installation&quot;;
+  else
+    componentName = &quot;&quot;;
+
+  errClass logMessage = installationLogMessage[&quot;logMessage&quot;];
+  switch(getErrorPriority(logMessage))
+  {
+    case PRIO_INFO: severityId = SEVERITY_FILTER_INFO; severity = &quot;INFO&quot;; break;
+    case PRIO_WARNING: severityId = SEVERITY_FILTER_WARNING; severity = &quot;WARNING&quot;; break;
+    case PRIO_SEVERE: severityId = SEVERITY_FILTER_ERROR; severity = &quot;ERROR&quot;; break;
+    default: severityId = -1; severity = &quot;&quot;; break;
+  }
+  int errCode = getErrorCode(logMessage);
+  string errCatalog = getErrorCatalog(logMessage);
+  message = getErrorText(logMessage);
+}
+
+/** Checks if message with given severity ID and component ID matches the given filters state.
+  * @param componentId (in)  Component ID of log message
+  * @param severityId (in)  Severity type ID of log message
+  * @param currComponentFilter (in)  Component filter boolean array, default is componentFilter scopeLib array
+  * @param currSeverityFilter (in)  Severity filter boolean array, default is severityFilter scopeLib array
+  * @return TRUE if both severity ID AND component ID match corresponding filter, FALSE if not
+  */
+bool matchLogMessageToFilter(int componentId, int severityId, dyn_bool currComponentFilter = getComponentFilter(), dyn_bool currSeverityFilter = getSeverityFilter())
+{
+  int componentFilterLen = dynlen(currComponentFilter);
+  int severityFilterLen = dynlen(currSeverityFilter);
+  //currComponentFilter[1] - if true then show all, otherwise show only filtered components
+  bool match = currComponentFilter[1] || (componentId &lt; componentFilterLen &amp;&amp; currComponentFilter[componentId + 1]); // +1 as both componentId and severityId starts from 0
+  match &amp;= (severityId &gt;= severityFilterLen) || currSeverityFilter[severityId + 1];
+  return match;
+}
+
+/** Filters all messages in the log table according to provided filters.
+  * @param currComponentFilter (in)  Component filter boolean array
+  * @param currSeverityFilter (in)  Severity filter boolean array
+  */
+filterInstallationLogMessages(dyn_bool currComponentFilter, dyn_bool currSeverityFilter)
+{
+  int lineCount = getInstallationLogTableRows();
+  for(int i=0;i&lt;lineCount;i++)
+  {
+    int severityId, componentId;
+    getInstallationLogTableRowMessageIds(i, severityId, componentId);
+    setInstallationLogTableRowVisible(i, matchLogMessageToFilter(componentId, severityId, currComponentFilter, currSeverityFilter));
+  }
+}
+
+/** Returns the severity checkbox label: severity type name and number of messages of this severity type
+  * @param filterButton (in)  Index of checkbox in cbSeverityFilter
+  * @param messagesCount (in)  Number of log messages (of this severity type) that is added to the label
+  * @return String contains severity type name and number of log messages in parentheses eg. &quot;INFO (6)&quot;
+  */
+string getSeverityMessageNumberString(int filterButton, int messagesCount)
+{
+  string filterButtonText;
+  switch(filterButton)
+  {
+    case SEVERITY_FILTER_INFO: filterButtonText = &quot;INFO&quot;; break;
+    case SEVERITY_FILTER_WARNING: filterButtonText = &quot;WARNING&quot;; break;
+    case SEVERITY_FILTER_ERROR: filterButtonText = &quot;ERROR&quot;; break;
+  }
+  if(messagesCount &gt; 0)
+    filterButtonText += &quot; (&quot; + (string)messagesCount + &quot;)&quot;;
+
+  return filterButtonText;
+}
+
+/** Returns the string contains the ID of component that is being installed currently along with total number of components to be installed
+  * @param componentId (in)  ID of component
+  * @param componentsNumber (in)  Total number of components to be installed
+  * @return String with ID of current component and total number of components delimited with &quot;/&quot; eg. &quot;2/5&quot;
+  */
+string getComponentNumberString(int componentId, int componentsNumber)
+{
+  return (string)componentId + &quot;/&quot; + (string)componentsNumber;
+}
+
+/** Returns the string contains the current stage number along with total number of stages to be performed during installation of a single component
+  * @param stageNumber (in)  Current stage number
+  * @return String with current stage number and total number of stages delimited with &quot;/&quot; eg. &quot;6/15&quot;
+  */
+string getStageNumberString(int stageNumber)
+{
+  if(stageNumber &gt; 0 &amp;&amp; stageNumber &lt;= gReportShape.getTotalInstallationStages())
+    return (string)stageNumber + &quot;/&quot; + (string)gReportShape.getTotalInstallationStages();
+
+  DebugTN(&quot;Stage number: &quot; + (string)stageNumber  + &quot; outside range&quot;);
+  return &quot;&quot;;
+}
+
+/** Returns the string contains brief description of the given stage number
+  * @param stageNumber (in)  Current stage number
+  * @return String with description of given stage number eg. &quot;Copying files&quot; for stageNumber = 8
+  */
+string getStageDescriptionText(int stageNumber)
+{
+  switch(stageNumber)
+  {
+    case FW_INSTALLATION_REPORT_STEP_STARTING_INSTALLATION: return &quot;Preparing component installation&quot;;
+    case FW_INSTALLATION_REPORT_STEP_PARSING_XML: return &quot;Parsing component XML file&quot;;
+    case FW_INSTALLATION_REPORT_STEP_CHECKING_REQUIREMENTS: return &quot;Checking requirements&quot;;
+    case FW_INSTALLATION_REPORT_STEP_VERIFYING_COMPONENT_PACKAGE: return &quot;Component package verification&quot;;
+    case FW_INSTALLATION_REPORT_STEP_EXECUTING_PREINIT_SCRIPTS: return &quot;Pre-init scripts execution&quot;;
+    case FW_INSTALLATION_REPORT_STEP_INSTALLING_REQUIRED_COMPONENTS: return &quot;Installing required components&quot;;
+    case FW_INSTALLATION_REPORT_STEP_INSTALLING_SUBCOMPONENTS: return &quot;Installing sub-components&quot;;
+    case FW_INSTALLATION_REPORT_STEP_COPYING_FILES: return &quot;Copying files&quot;;
+    case FW_INSTALLATION_REPORT_STEP_INSTALL_BINARIES: return &quot;Installing binary files&quot;;
+    case FW_INSTALLATION_REPORT_STEP_IMPORTING_DPS: return &quot;Importing dplist files&quot;;
+    case FW_INSTALLATION_REPORT_STEP_CONFIGURING_PROJECT: return &quot;Configuring project&quot;;
+    case FW_INSTALLATION_REPORT_STEP_EXECUTING_INIT_SCRIPTS: return &quot;Init scripts execution&quot;;
+    case FW_INSTALLATION_REPORT_STEP_REGISTERING_INSTALLATION: return &quot;Registering installation&quot;;
+    case FW_INSTALLATION_REPORT_STEP_CALCULATING_SOURCE_FILES_HASHES: return &quot;Calculating source files hashes&quot;;
+    case FW_INSTALLATION_REPORT_STEP_VERIFYING_DEPENDENCIES: return &quot;Dependencies verification&quot;;
+    case FW_INSTALLATION_REPORT_STEP_REQUESTING_POSTINSTALLS: return &quot;Requesting post-installs&quot;;
+    case FW_INSTALLATION_REPORT_STEP_REGISTERING_INSTALLATION_IN_DB: return &quot;Registering installation in DB&quot;;//optional step, only when project should be registered in DB
+    default: DebugTN(&quot;Stage number: &quot; + stageNumber + &quot; outside range&quot;);
+  }
+  return &quot;&quot;;
+}
+/** IDs of component installation reason (stage of installation of parent component at which installation of current component was triggered) **/
+const int FW_INSTALLATION_REPORT_INSTALLATION_REASON_REQUIRED = FW_INSTALLATION_REPORT_STEP_INSTALLING_REQUIRED_COMPONENTS; //Reason of installation: required component
+const int FW_INSTALLATION_REPORT_INSTALLATION_REASON_SUBCOMPONENT = FW_INSTALLATION_REPORT_STEP_INSTALLING_SUBCOMPONENTS; //Reason of installation: subcomponent
+
+/** Returns the string with reason of the component installation when this installation was triggered by another component
+  * @param componentInstallationReason (in)  ID of the reason of component installation (stage of installation of parent component at which installation of current component was triggered)
+  * @return String with reason of installation, it can be &quot;Required components&quot;, &quot;Subcomponents&quot; or &quot;Unknown&quot; when reason ID doesn't match the previous ones
+  */
+string getComponentInstallationReasonDescription(int componentInstallationReason)
+{
+  switch(componentInstallationReason)
+  {
+    case FW_INSTALLATION_REPORT_INSTALLATION_REASON_REQUIRED: return &quot;Required components&quot;;
+    case FW_INSTALLATION_REPORT_INSTALLATION_REASON_SUBCOMPONENT: return &quot;Subcomponents&quot;;
+  }
+  return &quot;Unknown&quot;;
+}
+
+/**=== Callback functions connected with events ===**/
+
+/** This function shows information about component installation. It displays currently installed component, the current stage
+  * updates the progress bar and fills in the information in component tree.
+  * @note It is connected with eventCurrentComponentChanged() event in 'Installation info' panel
+  * @param componentId (in)  ID of the component
+  * @param componentsNumber (in)  Number of total components to be installed
+  * @param compInstallationInfo (in)  List of installation info mappings (one for each component)
+  */
+synchronized showInstallationInfo(int componentId, int componentsNumber, dyn_mapping compInstallationInfo)
+{
+  bool firstRun = isComponentTreeEmpty();//detect if this function is called for the first time after panel opening
+  if(firstRun &amp;&amp; componentId == 0)//This is for the case when funciton was called with dummy parameters during panel initialization to enforce update of installation info on the panel
+  {//Then try to get real data from 'Installation info' panel
+    componentId = gReportShape.getCurrentComponentId();
+    componentsNumber = gReportShape.getComponentsNumber();
+    compInstallationInfo = gReportShape.getComponentInstallationInfoMapping();
+  }
+  if(componentId &lt;= 0)//safety check, don't do anything when componentId is not a positive value
+    return;
+
+  string componentName = compInstallationInfo[componentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_COMPONENT];
+  int stageNumber = compInstallationInfo[componentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_STAGE];
+  bool isComponentInstallationFinished = compInstallationInfo[componentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_FINISHED];
+  bool isInstallationFinished = gReportShape.isInstallationFinished(compInstallationInfo);
+
+  if(!isInstallationFinished)
+    setComponentInfo(componentName, getComponentNumberString(componentId, componentsNumber));
+  else
+    setComponentInfo(&quot;Finished&quot;, &quot;&quot;);
+
+  if(!isComponentInstallationFinished)
+    setStageInfo(getStageDescriptionText(stageNumber), getStageNumberString(stageNumber));
+  else
+    setStageInfo(&quot;Finished&quot;, &quot;&quot;);
+
+  updateProgressBar(gReportShape.getCompletedInstallationSteps(compInstallationInfo), componentsNumber);
+
+  if(firstRun)//Function is called for the first time so the tree is empty. It is necessary to go through all components that are already in the array and show them in the tree.
+  {
+    int compInstallationInfoLen = dynlen(compInstallationInfo);
+    for(int i=1;i&lt;=compInstallationInfoLen;i++)
+    {
+      bool isNewItemCreated;
+      setItemInComponentTree(i, compInstallationInfo[i][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_PARENT],
+                             compInstallationInfo[i][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_COMPONENT],
+                             compInstallationInfo[i][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_STAGE],
+                             compInstallationInfo[i][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_REASON],
+                             compInstallationInfo[i][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_FINISHED],
+                             isNewItemCreated);
+      if(isNewItemCreated)
+        setComponentFilter(getSelectedItemsInComponentTree());//force update of component filter state when new item was added to the component tree
+    }
+  }
+  else
+  {
+    bool isNewItemCreated;
+    string parentId = compInstallationInfo[componentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_PARENT];
+    int componentInstallationReason = compInstallationInfo[componentId][FW_INSTALLATION_REPORT_VARIABLE_INSTALATION_INFO_REASON];
+    setItemInComponentTree(componentId, parentId, componentName, stageNumber, componentInstallationReason, isComponentInstallationFinished, isNewItemCreated);
+    if(isNewItemCreated)
+      setComponentFilter(getSelectedItemsInComponentTree());//force update of component filter state when new item was added to the component tree
+  }
+}
+
+/** This function displays installation log messages in the log table. It appends new messages to the table and sets their visibility according to the current filters' state
+  * @note It is connected with showInstallationLogMessages() event in 'Installation info' panel
+  * @param messageId (in)  ID of message (position in an array of installation log messages)
+  * @param installationLogMessage (in)  Mapping contains installation log message (ID of component and errClass log message)
+  */
+synchronized showInstallationLogMessages(int messageId, mapping installationLogMessage)
+{
+  if(isInstallationLogTableEmpty())//Function is called for the first time so the table is empty. It is necessary append log messages currently stored in 'Installation info' panel
+  {
+    dyn_mapping instLogMsg = gReportShape.getInstallationLogMessages();
+    int instLogMsgLen = dynlen(instLogMsg);
+    //Two cases possible here:
+    // 1) function was called during panel initialization with dummy values to enforce update of log table - then show all messages in the table
+    // 2) showInstallationLogMessages() event occured before 1) so show log messages up to the one passed as an argument to the function (rest will be added in later calls)
+    lastMessageId = (messageId == 0 || messageId &gt; instLogMsgLen)?instLogMsgLen:messageId;
+    for(int i=1;i&lt;=lastMessageId;i++)
+      appendInstallationLogMessage(instLogMsg[i]);
+  }
+  else if(messageId &gt; lastMessageId)
+  {
+    appendInstallationLogMessage(installationLogMessage);
+    lastMessageId = messageId;
+  }
+}
+
+/** This function resets (clear) panel objects and panel scope cunter variables before new installation starts.
+  * @note: It is connected with eventStartReporting() event in 'Installation info' panel.
+  */
+resetInstallationInfo()
+{
+  lastMessageId = 0;
+  countLogMessagesTypes = makeDynInt(0, 0, 0);
+  for(int i=0;i&lt;SEVERITY_FILTER_LENGTH;i++)
+    setSeverityCheckboxString(i, getSeverityMessageNumberString(i, countLogMessagesTypes[i + 1]));
+  resetComponentTree();
+  resetInstallationLogTable();
+  resetComponentInfo();
+  resetStageInfo();
+  resetProgressBar();
+  resetInstallationElapsedTime();
+}
+
+//elapsed time text field funtions
+/** This function displays installation elapsed time on a panel.
+  * @note It is connected with eventUpdateInstallationElapsedTime() event in 'Installation info' panel.
+  * @param elapsedTimeString (in)  Elapsed installation time as a string with format mm:ss
+  */
+showInstallationElapsedTime(string elapsedTimeString)
+{
+  tfElapsedTime.text = elapsedTimeString;
+}
+
+/**=== UI functions ===**/
+
+resetInstallationElapsedTime(){
+  showInstallationElapsedTime(&quot;&quot;);
+}
+
+//component info text fields functions
+setComponentInfo(string componentName, string componentNumberString)
+{
+  tfCurrComponent.text = componentName;
+  tfComponentNum.text = componentNumberString;
+}
+
+resetComponentInfo(){
+  setComponentInfo(&quot;&quot;,&quot;&quot;);
+}
+
+//stage info text fields functions
+setStageInfo(string stageDescriptionText, string stageNumberString)
+{
+  tfStageDesc.text = stageDescriptionText;
+  tfStageNum.text = stageNumberString;
+}
+
+resetStageInfo(){
+  setStageInfo(&quot;&quot;,&quot;&quot;);
+}
+
+//progress bar functions
+updateProgressBar(int completedInstallationSteps, int componentsNumber)
+{
+  const int totalSteps = componentsNumber * gReportShape.getTotalInstallationStages();
+  if(totalSteps == 0)
+    return;
+
+  pbInstallationProgress.progress((completedInstallationSteps * 100)/totalSteps);
+}
+
+resetProgressBar(){
+  pbInstallationProgress.reset();
+}
+
+//component tree functions
+bool isComponentTreeEmpty()
+{
+  return (TREE2.childCount() == 0);
+}
+
+dyn_string getSelectedItemsInComponentTree()
+{
+  dyn_string selectedComponents = TREE2.selectedItems();
+  dynUnique(selectedComponents);
+  int selectedComponentsLen = dynlen(selectedComponents);
+  for(int i=1;i&lt;=selectedComponentsLen;i++)
+  {
+    if(strpos(selectedComponents[i], &quot;_&quot;) &lt;= 0)
+      continue;
+    //add all childs of required components/subcomponents node
+    dyn_string componentsToAppend = TREE2.children(selectedComponents[i]);
+    dynAppend(selectedComponents, componentsToAppend);
+  }
+  dynUnique(selectedComponents);
+  return selectedComponents;
+}
+
+setItemInComponentTree(string componentId, string parentId, string componentName, int stageNumber, int installationReason, bool isComponentInstallationFinished, bool &amp;newItemCreated)
+{
+  //DebugTN(&quot;Setting Tree&quot;, componentId, parentId, componentName, stageNumber, installationReason, isComponentInstallationFinished);
+  newItemCreated = false;
+  if(!TREE2.itemExists(componentId))
+  {
+    if(parentId == &quot;0&quot;)
+      TREE2.appendItem(&quot;&quot;, componentId, componentName);
+    else
+    {
+      string intermediateItemId = parentId + &quot;_&quot; + (string)installationReason;
+      if(!TREE2.itemExists(intermediateItemId))
+        TREE2.appendItem(parentId, intermediateItemId, getComponentInstallationReasonDescription(installationReason));
+      TREE2.appendItem(intermediateItemId, componentId, componentName);
+    }
+    newItemCreated = true;
+  }
+  string stageNumberString = getStageNumberString(stageNumber);
+  if(isComponentInstallationFinished)
+    stageNumberString = &quot;Finished&quot;;
+
+  TREE2.setText(componentId, 1, stageNumberString);
+  TREE2.setVisible(componentId, true);//force updating tree item
+  TREE2.ensureItemVisible(componentId);
+}
+
+resetComponentTree()
+{
+  TREE2.clear();
+}
+
+//cbSeverityFilter functions
+setSeverityCheckboxString(int filterButton, string severityCheckboxString)
+{
+  cbSeverityFilter.text(filterButton, severityCheckboxString);
+}
+
+dyn_int getCheckedSeverities()
+{
+  dyn_int checkedSeverities;
+  for(int i=0;i&lt;SEVERITY_FILTER_LENGTH;i++)
+    if(cbSeverityFilter.state(i))
+      dynAppend(checkedSeverities, i);
+  return checkedSeverities;
+}
+
+//Log table functions
+int getInstallationLogTableRows()
+{
+  return tblLog.lineCount();
+}
+
+resetInstallationLogTable()
+{
+  tblLog.deleteAllLines();
+}
+
+bool isInstallationLogTableEmpty()
+{
+  return (getInstallationLogTableRows() == 0);
+}
+
+appendRowToInstallationLogTable(int componentId, string componentName, int severityId, string severity, string message, bool visible = true)
+{
+  int rowToAppend = getInstallationLogTableRows();
+  tblLog.appendLine(&quot;component_id&quot;, componentId, &quot;component&quot;, componentName, &quot;severity_id&quot;, severityId, &quot;severity&quot;, severity, &quot;message&quot;, message);
+  if(!visible)
+    setInstallationLogTableRowVisible(rowToAppend, false);
+  tblLog.adjustColumn(4);
+}
+
+getInstallationLogTableRowMessageIds(int row, int &amp;severityId, int &amp;componentId)
+{
+  severityId = tblLog.cellValueRC(row, &quot;severity_id&quot;);
+  componentId = tblLog.cellValueRC(row, &quot;component_id&quot;);
+}
+
+setInstallationLogTableRowVisible(int row, bool visible)
+{
+  if(visible)
+    tblLog.showRow(row);
+  else
+    tblLog.hideRow(row);
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  if(!fwInstallation_reportReportShapeExists())
+    return;
+
+  gReportShape = fwInstallation_reportGetReportShape();//get shape of 'Installation info' and store it in a panel scope variable
+
+  fwInstallation_ui_setTableAlternatingRowColors(getShape(&quot;tblLog&quot;));
+  tblLog.selectByClick(TABLE_SELECT_LINE);
+  tblLog.tableMode(TABLE_SELECT_MULTIPLE);
+
+  setSeverityFilter(getCheckedSeverities());//initialize severity filter
+  setComponentFilter(makeDynString());//initialize component filter
+
+  //connect UI functions with 'Installation info' panel events
+  uiConnect(&quot;showInstallationElapsedTime&quot;, gReportShape, &quot;eventUpdateInstallationElapsedTime&quot;);
+  uiConnect(&quot;showInstallationInfo&quot;, gReportShape, &quot;eventCurrentComponentChanged&quot;);
+  uiConnect(&quot;showInstallationLogMessages&quot;, gReportShape, &quot;eventInstallationLogMessageAppended&quot;);
+  uiConnect(&quot;resetInstallationInfo&quot;, gReportShape, &quot;eventStartReporting&quot;);
+
+  //initialize component tree and log table
+  showInstallationInfo(0, 0, makeDynMapping());
+  showInstallationLogMessages(0, makeMapping());
+}
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="tblLog" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">283 150</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">283 150</prop>
+    <prop name="Size">615 335</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">18</prop>
+    <prop name="RowHeaderWidth">0</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">component_id</prop>
+     <prop name="Width">120</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">component_id</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">component</prop>
+     <prop name="Width">120</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Component name</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">severity_id</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">severity_id</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">severity</prop>
+     <prop name="Width">80</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Severity</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">message</prop>
+     <prop name="Width">380</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Message</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  dyn_string menuStruct = makeDynString(
+      &quot;PUSH_BUTTON, Copy selection to clipboard, 2, 1&quot;,
+      &quot;PUSH_BUTTON, Copy visible to clipboard, 1, 1&quot;);
+  int answer;
+  popupMenu(menuStruct, answer);
+  if(answer &lt; 1){
+    return;
+  }
+  int selectionMode = (answer == 1)?1:2;
+  const dyn_string columns = makeDynString(&quot;component&quot;, &quot;severity&quot;, &quot;message&quot;);
+  string messagesListAsString =
+      fwInstallation_ui_getTableColumnsAsString(getShape(&quot;tblLog&quot;), columns, true, &quot;\t&quot;, selectionMode);
+  if(setClipboardText(messagesListAsString) != 0){
+    fwInstallation_throw(&quot;Failed to copy messages' list to clipboard&quot;, &quot;WARNING&quot;);
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="TREE2" shapeType="TREE" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">9 101</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">9 101</prop>
+    <prop name="Size">256 396</prop>
+    <extended>
+     <prop type="ENUM" name="selectionMode">1</prop>
+     <prop type="INT" name="treeStepSize">12</prop>
+     <prop type="BOOL" name="alternatingRowColors">True</prop>
+     <script name="selectionChanged" isEscaped="1"><![CDATA[selectionChanged(string id)
+{
+  setComponentFilter(getSelectedItemsInComponentTree());
+  filterInstallationLogMessages(getComponentFilter(), getSeverityFilter());
+}]]></script>
+    </extended>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.addColumn(&quot;Component&quot;);
+  this.addColumn(&quot;Stage&quot;);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="tfCurrComponent" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">249.0769230769235 86.666666666666</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">206 72</prop>
+    <prop name="Size">281 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">142 83</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.9999999999999928 0 0 1.000005946847196 -10.99999999999984 -6.500535216248108</prop>
+    <prop name="Location">142 83</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Installing component</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="tfStageDesc" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">671.5569345458825 48.952380952382</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">630 72</prop>
+    <prop name="Size">280 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT4" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">390 85</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.999999999999995 0 0 1.000005947055012 165.0000000000017 -8.500547129060868</prop>
+    <prop name="Location">390 85</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Stage</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="tfComponentNum" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">149.0835101038293 86.666666666666</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="maximumSize">60 -1</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">140 72</prop>
+    <prop name="Size">60 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="tfStageNum" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">573.1370578710764 86.666666666666</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="maximumSize">60 -1</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">564 72</prop>
+    <prop name="Size">60 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT6" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">170 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.000000000000031 0 0 1.000005947023 115.9999999999977 7.49972048991879</prop>
+    <prop name="Location">170 40</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Overall progress</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="pbInstallationProgress" shapeType="PROGRESS_BAR" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">295 43</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">295 43</prop>
+    <prop name="Size">615 23</prop>
+   </properties>
+  </shape>
+  <shape Name="tfElapsedTime" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">105.0562110418525 57.666666666666</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="maximumSize">60 -1</prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">96 43</prop>
+    <prop name="Size">60 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="ClearButtonEnabled">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT8" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-25 46</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1 0 0 1.000005946847196 -18 1.499684817098158</prop>
+    <prop name="Location">105 46</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Elapsed time</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.7234042553191411 0 0 1.199999999999985 0.7234042553191411 1.199999999999985</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">13.93380119732825 1</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.9995758286984705 0 0 1 -3.427042536136087 4.5</prop>
+    <prop name="Location">15.93380119732827 3</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Installation Details</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="cbSeverityFilter" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">341 123</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">341 123</prop>
+    <prop name="Size">218 21</prop>
+    <prop name="Vertical">False</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">INFO</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">WARNING</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">ERROR</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, int state)
+{
+  setSeverityFilter(getCheckedSeverities());
+  filterInstallationLogMessages(getComponentFilter(), getSeverityFilter());
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT9" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">142 83</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.9999999999999875 0 0 1.000003345213716 190.0000000000012 43.49969893076561</prop>
+    <prop name="Location">142 83</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Severity</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignRight]</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">177 5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">28</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">177 5</prop>
+    <prop name="Size">732 27</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER2" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">493 72</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">29</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="maximumSize">20 -1</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">493 72</prop>
+    <prop name="Size">20 23</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER3" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">162 43</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">30</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="maximumSize">20 -1</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">162 43</prop>
+    <prop name="Size">20 23</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER4" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">565 123</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">31</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">565 123</prop>
+    <prop name="Size">333 21</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="FRAME1" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">33</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">264 112</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">32</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.019169329073532 0 0 1.103351955307231 1.93929712458754 -22.57541899440989</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Installation log</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0,Κανονικά</prop>
+    </prop>
+    <prop name="Location">264 112</prop>
+    <prop name="Size">627 359</prop>
+   </properties>
+  </shape>
+  <shape Name="iconResizeable" shapeType="POLYGON" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">303.2596804880605 478.9315312476092</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{80,80,80,142}</prop>
+    <prop name="TabOrder">33</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">15 15</prop>
+    <prop name="maximumSize">15 15</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignTrailing|AlignBottom</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">True</prop>
+    <prop name="LineType">[none,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">-0.1176527493693916 0.1773866839332782 -0.1656742797242453 -0.139488015248372 1032.025971658981 512.0109796411501</prop>
+    <prop name="Closed">True</prop>
+    <prop name="Points">
+     <prop name="Location">303.2502187589321 478.9382504465556</prop>
+     <prop name="Location">344 450</prop>
+     <prop name="Location">377.2849518548865 492.7581994829599</prop>
+    </prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER_FOOTER" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 497</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">34</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">0 497</prop>
+    <prop name="Size">898 15</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="-1" Name="HEADER" serial="0">
+   <properties>
+    <prop name="shapeSerial">24</prop>
+    <prop idx="0" name="shapeSerial">25</prop>
+    <prop idx="1" name="shapeSerial">29</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">4</prop>
+    <prop name="layoutBottomMargin">4</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="10" Name="LAYOUT_GROUP4" serial="1">
+   <properties>
+    <prop idx="0" name="shapeSerial">21</prop>
+    <prop idx="1" name="shapeSerial">20</prop>
+    <prop idx="2" name="shapeSerial">31</prop>
+    <prop idx="3" name="shapeSerial">15</prop>
+    <prop idx="4" name="shapeSerial">16</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="10" Name="LAYOUT_GROUP5" serial="2">
+   <properties>
+    <prop idx="0" name="shapeSerial">5</prop>
+    <prop idx="1" name="shapeSerial">12</prop>
+    <prop idx="2" name="shapeSerial">4</prop>
+    <prop idx="3" name="shapeSerial">30</prop>
+    <prop idx="4" name="shapeSerial">11</prop>
+    <prop idx="5" name="shapeSerial">13</prop>
+    <prop idx="6" name="shapeSerial">10</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="8" Name="LAYOUT_GROUP9" serial="7">
+   <properties>
+    <prop idx="0" name="shapeSerial">27</prop>
+    <prop idx="1" name="shapeSerial">26</prop>
+    <prop idx="2" name="shapeSerial">32</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="9" Name="LAYOUT_GROUP10" serial="8">
+   <properties>
+    <prop name="shapeSerial">33</prop>
+    <prop idx="1" name="shapeSerial">2</prop>
+    <prop idx="0" name="groupSerial">7</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">4</prop>
+    <prop name="layoutBottomMargin">9</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="10" Name="LAYOUT_GROUP19" serial="9">
+   <properties>
+    <prop idx="0" name="shapeSerial">3</prop>
+    <prop idx="1" name="groupSerial">8</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="CONTENT" serial="10">
+   <properties>
+    <prop idx="0" name="groupSerial">1</prop>
+    <prop idx="1" name="groupSerial">2</prop>
+    <prop idx="2" name="groupSerial">9</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">6</prop>
+    <prop name="layoutBottomMargin">0</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="FOOTER" serial="11">
+   <properties>
+    <prop idx="1" name="shapeSerial">35</prop>
+    <prop idx="0" name="shapeSerial">36</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

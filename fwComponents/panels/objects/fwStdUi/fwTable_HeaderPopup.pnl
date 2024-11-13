@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">131 43</prop>
+  <prop name="BackColor">{217,215,213}</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">0</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#event filterChanged(string newFilter)
+#event sortingChanged(bool newSortOrder)
+
+#property string styleSheet
+string myStyleSheet;
+public string getStyleSheet() { return myStyleSheet;}
+public void   setStyleSheet(string s)
+{
+    if (myStyleSheet==&quot;&quot; &amp;&amp; s==&quot;&quot;) return; // avoid unnecessary stylesheet change on init
+    myStyleSheet=s;
+    TheSelector.styleSheet=s;
+    this.styleSheet=s;
+    SortButton.styleSheet=s;
+}
+
+
+
+dyn_string colValues;
+string prevFilter=&quot;&quot;;
+int sortState=0; // +1-&gt;asc, -1-&gt;desc, 0-&gt;undefined
+
+void setSortingIcon()
+{
+    if (sortState==0) SortButton.text=&quot;S&quot;;
+    else if (sortState==-1) SortButton.text=&quot;▲&quot;;
+    else if (sortState==1)  SortButton.text=&quot;▼&quot;;
+}
+]]></script>
+  <script name="Clicked" isEscaped="1"><![CDATA[main(int x, int y, mapping event)
+{
+    PanelOff();
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+    string title=&quot;&quot;;
+    if (isDollarDefined(&quot;$title&quot;)) {
+        title=getDollarValue(&quot;$title&quot;);
+    }
+    Title.text=title;
+    Title.toolTipText=title;
+
+    if (isDollarDefined(&quot;$width&quot;)) {
+        int width=getDollarValue(&quot;$width&quot;);
+        if (width&lt;=0) width=100;
+        int height=40;
+        setPanelSize(myModuleName(), myPanelName(), false, width, height);
+    }
+
+    if (isDollarDefined(&quot;$colValues&quot;)) {
+        string sColValues=getDollarValue(&quot;$colValues&quot;);
+        colValues=sColValues.split(&quot; | &quot;);
+        colValues.prepend(&quot;*&quot;);
+    }
+    TheSelector.items=colValues;
+
+
+    string filter=&quot;&quot;;
+    if (isDollarDefined(&quot;$filter&quot;)) {
+        filter=getDollarValue(&quot;$filter&quot;);
+    }
+
+    if (filter==&quot;&quot; || filter==&quot;*&quot;) {
+        TheSelector.placeholderText=&quot;filter&quot;;
+    } else {
+        filter=strltrim(strrtrim(filter, &quot;*&quot;), &quot;*&quot;);
+        TheSelector.text=filter;
+    }
+
+    if (isDollarDefined(&quot;$sortState&quot;)) {
+        sortState=getDollarValue(&quot;$sortState&quot;);
+    }
+    setSortingIcon();
+
+    setInputFocus(myModuleName(), myPanelName(), &quot;TheSelector&quot;);
+
+}
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="TheSelector" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 22.70000000000002</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">WF_TableAlternatingRowColor_2</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="maximumSize">-1 18</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,12,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 21</prop>
+    <prop name="Size">131 18</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">True</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+    // if we got it by selection then we want to keep the panel open
+    // so that the user could change the selection
+    // otherwise, if it is a result of typing a value and pressing enter then we want to close
+
+    string txt=this.text;
+    if (prevFilter==txt) PanelOff();
+    prevFilter=txt;
+    triggerEvent(&quot;filterChanged&quot;, txt);
+    if (!colValues.contains(txt)) {
+        PanelOff();
+    }
+}
+
+
+]]></script>
+    <script name="KeyboardFocusOut" isEscaped="1"><![CDATA[main()
+{
+//  PanelOff();
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="Title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">88 5.499999999999964</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignLeading|AlignTop</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">True</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapProjecting,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.9999999999999549 0 0 1.030303030303082 -85.99999999999604 -3.666666666666916</prop>
+    <prop name="Location">88 5.499999999999964</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,1,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">$title</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft|AlignTop]</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER2" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">43 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">43 0</prop>
+    <prop name="Size">68 21</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER3" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 21</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="minimumSize">-1 16</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Ignored"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">0 21</prop>
+    <prop name="Size">2 22</prop>
+    <prop name="Orientation">vertical</prop>
+   </properties>
+  </shape>
+  <shape Name="SortButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">103.4374999999997 3.966666666666831</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Click to sort</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+S</prop>
+    <prop name="maximumSize">18 18</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Minimum" horizontal="Minimum"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Sans Serif,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">113 0</prop>
+    <prop name="Size">18 18</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">S</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+    if (sortState==0) {
+        sortState=1;
+    } else {
+        sortState=-sortState;
+    }
+
+    setSortingIcon();
+    triggerEvent(&quot;sortingChanged&quot;, (sortState&gt;0));
+}
+]]></script>
+   </events>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="2" Name="LAYOUT_GROUP1" serial="0">
+   <properties>
+    <prop idx="2" name="shapeSerial">0</prop>
+    <prop idx="0" name="shapeSerial">7</prop>
+    <prop idx="1" name="shapeSerial">8</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutLeftMargin">0</prop>
+    <prop name="layoutRightMargin">0</prop>
+    <prop name="layoutTopMargin">0</prop>
+    <prop name="layoutBottomMargin">0</prop>
+    <prop name="layoutSpacing">2</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="2" Name="LAYOUT_GROUP2" serial="1">
+   <properties>
+    <prop idx="1" name="shapeSerial">3</prop>
+    <prop idx="0" name="shapeSerial">10</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP3" serial="2">
+   <properties>
+    <prop idx="0" name="groupSerial">0</prop>
+    <prop idx="1" name="groupSerial">1</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

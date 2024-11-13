@@ -1,0 +1,666 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">Device Type Registration</prop>
+   <prop name="en_US.iso88591">Device Type Registration</prop>
+  </prop>
+  <prop name="Size">480 450</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 11</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[updateDevices()
+{
+	int i;
+	dyn_string exceptionInfo, dpTypeList;
+	dyn_dyn_string types;
+	
+	fwDevice_getAllTypes(types, exceptionInfo);
+	
+	registeredDeviceTypesTable.deleteAllLines();
+	for(int i = 1; i &lt;= dynlen(types[1]); i++)
+	{
+		registeredDeviceTypesTable.appendLine(	&quot;deviceType&quot;, types[1][i],
+												&quot;deviceDpType&quot;, types[2][i]);
+	}
+	registeredDeviceTypesTable.lineVisible(0);
+	
+	dpTypeList = dpTypes ();
+	nonRegisteredDPTs.deleteAllItems();
+	for(i = 1; i &lt;= dynlen(dpTypeList); i++)
+	{
+		// consider dp types not registered already and
+		// not internal
+		if(strpos(dpTypeList[i], &quot;_&quot;) != 0)
+			if(dynContains(types[2], dpTypeList[i]) &lt; 1)		
+				nonRegisteredDPTs.appendItem(dpTypeList[i]);
+
+	}
+	nonRegisteredDPTs.selectedPos(1);
+	
+	deviceTypeText.text = &quot;&quot;;
+}]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	fwOpenProgressBar(&quot;Register new device type&quot;, &quot;Initializing table...&quot;, 1, 0);
+
+	fwShowProgressBar(&quot;Initializing table...&quot;);
+	
+  updateDevices();
+  registeredDeviceTypesTable.tableMode(TABLE_SELECT_BROWSE); 
+	registeredDeviceTypesTable.selectByClick(TABLE_SELECT_LINE);
+	
+	fwCloseProgressBar(&quot;Table initialized.&quot;);
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="bgRectangle" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 530</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwCorporateColor</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">-1 -1</prop>
+    <prop name="Size">1270 31</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="title" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 3</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">white</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">10 4</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,19,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,19,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Device Type Registration</prop>
+     <prop name="en_US.iso88591">Device Type Registration</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="deviceTypeLabel" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">8 133</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">10 134</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Registered types:</prop>
+     <prop name="en_US.iso88591">Registered types:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Frame1" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 460</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">0.9786780383795309 0 0 0.6434108527131782 -19.36034115138593 -172.3255813953488</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">New device type</prop>
+     <prop name="en_US.iso88591">New device type</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">30 330</prop>
+    <prop name="Size">470 130</prop>
+   </properties>
+  </shape>
+  <shape Name="Text2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">19 63</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">21 64</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Non-registered DP types:</prop>
+     <prop name="en_US.iso88591">Non-registered DP types:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="Text3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">9</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">19 92</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">21 93</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Device type:</prop>
+     <prop name="en_US.iso88591">Device type:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="registeredDeviceTypesTable" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">30 12</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 154</prop>
+    <prop name="Size">460 241</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">20</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">AlwaysOn</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">deviceType</prop>
+     <prop name="Width">220</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device type</prop>
+      <prop name="en_US.iso88591">Device type</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">deviceDpType</prop>
+     <prop name="Width">220</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">Device DP type</prop>
+      <prop name="en_US.iso88591">Device DP type</prop>
+     </prop>
+     <prop name="ToolTipText">
+      <prop name="en_US.utf8"></prop>
+      <prop name="en_US.iso88591"></prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+      <prop name="en_US.utf8">#1</prop>
+      <prop name="en_US.iso88591">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="RightMousePressed" isEscaped="1"><![CDATA[main(int row, string column)
+{
+  const int UNREGISTER_ID = 1;
+  int iReturnedID, iResult;
+  string sSelectedType;
+  dyn_string dsPopup, dsReturn;
+  dyn_float dfReturn;
+  
+  dsPopup = makeDynString(&quot;PUSH_BUTTON, Unregister, &quot; + UNREGISTER_ID + &quot;, 0&quot;);
+  
+  popupMenu(dsPopup, iReturnedID);
+  
+  switch(iReturnedID)
+  {
+    case UNREGISTER_ID:
+      sSelectedType = registeredDeviceTypesTable.cellValueRC(row, &quot;deviceType&quot;);
+      ChildPanelOnCentralModalReturn(&quot;fwGeneral/fwOkCancel.pnl&quot;, &quot;Unregister ...&quot;, makeDynString(&quot;$text:Unregister \&quot;&quot; + sSelectedType + &quot;\&quot;?&quot;), dfReturn, dsReturn);
+      
+      if(dfReturn[1] == 1)
+      {
+        unregisterSelectedItem(sSelectedType);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+unregisterSelectedItem(string sSelectedType)
+{
+  // implement what is necessary. If it is functional, change the enabled state of the popup menu item with id &quot;UNREGISTER_ID&quot; back from 0 to 1.
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="closeButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">395 415</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">395 415</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Close</prop>
+     <prop name="en_US.iso88591">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_float df;
+	dyn_string ds;
+	
+	PanelOffReturn(df, ds);
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="registerButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">419 354</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">6</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">384 60</prop>
+    <prop name="Size">75 53</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Register</prop>
+     <prop name="en_US.iso88591">Register</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	string dp = nonRegisteredDPTs.text + fwDevice_DEFINITION_SUFIX;
+	dyn_string dpElements, dpeElementsTypes, emptyList, falseList, exceptionInfo;
+	
+	if(deviceTypeText.text == &quot;&quot;)
+	{
+		fwException_raise(	exceptionInfo,
+							&quot;ERROR&quot;,
+							&quot;The device type is required to register a new device. &quot; +
+							&quot;It gives a user friendly name to the dp type. &quot; +
+							&quot;If you are not sure of how to call it, use the dp type as device type.&quot;,
+							&quot;&quot;);
+		fwExceptionHandling_display(exceptionInfo);					
+		return;
+	}
+	
+	
+	fwOpenProgressBar(&quot;Register new device type&quot;, &quot;Creating definition dp...&quot;, 1, 0);
+	dpCreate(dp, &quot;_FwDeviceDefinition&quot;);
+	fwShowProgressBar(&quot;Setting definition dp...&quot;);
+	
+	// set defaults for definition
+	dpSet(dp + &quot;.type&quot;, deviceTypeText.text,
+			dp + &quot;.dpType&quot;, nonRegisteredDPTs.text,
+			dp + &quot;.panels.navigator.hardware&quot;, makeDynString(&quot;fwDevice/fwDeviceManage&quot;),
+			dp + &quot;.panels.navigator.logical&quot;, makeDynString(&quot;fwDevice/fwDeviceManage&quot;),
+			dp + &quot;.panels.editor.hardware&quot;, makeDynString(&quot;fwDevice/fwDeviceManage&quot;, &quot;fwDevice/fwDeviceExpertConfiguration&quot;),
+			dp + &quot;.panels.editor.logical&quot;, makeDynString(&quot;fwDevice/fwDeviceManage&quot;),
+			dp + &quot;.panels.editor.expert&quot;, makeDynString(&quot;fwDevice/fwDeviceExpertConfiguration&quot;));
+	
+	// create dummy dp, necessary for some operations
+	if(!dpExists(&quot;dummy_&quot; + nonRegisteredDPTs.text))
+		dpCreate(&quot;dummy_&quot; + nonRegisteredDPTs.text, nonRegisteredDPTs.text);
+	
+	fwGeneral_getDpElements(&quot;&quot;, nonRegisteredDPTs.text, dpElements, dpeElementsTypes, exceptionInfo, makeDynInt(DPEL_STRUCT));
+	//DebugN(dpElements, dpeElementsTypes);
+	
+	fwGeneral_fillDynString(emptyList, dynlen(dpElements), exceptionInfo, &quot;EMPTY&quot;);
+	fwGeneral_fillDynString(falseList, dynlen(dpElements), exceptionInfo, FALSE);
+		
+	// default values properties
+	dpSet(dp + &quot;.properties.dpes&quot;, dpElements,
+			dp + &quot;.properties.names&quot;, dpElements,
+			dp + &quot;.properties.description&quot;, emptyList,
+			dp + &quot;.properties.defaultValues&quot;, emptyList,
+			dp + &quot;.properties.types&quot;, emptyList,
+			dp + &quot;.properties.userData&quot;, emptyList);
+	
+	// default values for configs		
+	dpSet(dp + &quot;.configuration.address.general.defaultType&quot;, fwDevice_ADDRESS_NONE,
+			dp + &quot;.configuration.address.OPC.general.canHave&quot;, FALSE,
+			dp + &quot;.configuration.address.DIM.general.canHave&quot;, FALSE,
+			dp + &quot;.configuration.address.canHave&quot;, falseList,
+			dp + &quot;.configuration.dpFunction.canHave&quot;, falseList,
+			dp + &quot;.configuration.alert.canHave&quot;, falseList,
+			dp + &quot;.configuration.archive.canHave&quot;, falseList,
+			dp + &quot;.configuration.smoothing.canHave&quot;, falseList,		
+			dp + &quot;.configuration.pvRange.canHave&quot;, falseList,			
+			dp + &quot;.configuration.format.canHave&quot;, falseList,
+			dp + &quot;.configuration.unit.canHave&quot;, falseList,		
+			dp + &quot;.configuration.conversion.canHave&quot;, falseList);
+
+
+	fwShowProgressBar(&quot;Updating table...&quot;);
+	updateDevices();
+	fwCloseProgressBar(&quot;New device type registered successfully.&quot;);	
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="nonRegisteredDPTs" shapeType="COMBO_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">210 327</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">174 60</prop>
+    <prop name="Size">200 23</prop>
+    <prop name="Listitems"/>
+    <prop name="Editable">False</prop>
+   </properties>
+  </shape>
+  <shape Name="deviceTypeText" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">139 426</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">99 89</prop>
+    <prop name="Size">275 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <reference parentSerial="-1" Name="" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwHelpButton.pnl</prop>
+    <prop name="Location">350 20</prop>
+    <prop name="Geometry">1 0 0 1 95 -18</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="dollarParameters">
+     <prop name="dollarParameter">
+      <prop name="Dollar">$sPanelRelativePath</prop>
+      <prop name="Value">fwDevice/fwDeviceRegisterType</prop>
+     </prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+   </properties>
+  </reference>
+  <shape Name="Button1" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">289 422</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 415</prop>
+    <prop name="Size">170 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Edit device definitions ...</prop>
+     <prop name="en_US.iso88591">Edit device definitions ...</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	dyn_float df;
+	dyn_string ds;
+	
+	ChildPanelOnCentralModalReturn(	&quot;fwDevice/fwDeviceEditDefinition.pnl&quot;,
+												&quot;Edit device definition&quot;,
+												makeDynString(),
+												df, ds);
+						
+	updateDevices();
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

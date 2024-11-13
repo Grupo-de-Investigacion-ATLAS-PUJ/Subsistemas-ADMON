@@ -1,0 +1,700 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.iso88591">Choose Date / Time ...</prop>
+  </prop>
+  <prop name="Size">345 505</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">100 70</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[time g_tSelectedDate;
+bool g_bCorrectFormat;
+
+// ------------------------------------------------------------------------------------------------
+
+showDate()
+{
+  int iYear = year(g_tSelectedDate);
+  int iMonth = month(g_tSelectedDate);
+  int iDay = day(g_tSelectedDate);
+  int iHour = spinHour.text();
+  int iMinute = spinMinute.text();
+  int iSecond = spinSecond.text();
+  
+  g_tSelectedDate = makeTime(iYear, iMonth, iDay, iHour, iMinute, iSecond);  
+  
+  showTime();
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setInitialTime()
+{
+  if(isDollarDefined(&quot;$sSelectedDate&quot;))
+  {
+    g_tSelectedDate = $sSelectedDate;
+    showTime();
+  }
+  else
+  {
+    setTimeNow();
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setTimeNow()
+{
+  time tNow = getCleanedCurrentTime(); 
+  
+  g_tSelectedDate = tNow;
+  
+  showTime();
+}
+
+// ------------------------------------------------------------------------------------------------
+
+setTimeToControls(string sTime)
+{ 
+  bool bOk;
+  time tTemp;
+    
+  strreplace(sTime, &quot; - &quot;, &quot; &quot;);
+  bOk = fwGeneral_hasCorrectFormat(sTime);
+  
+  if (bOk)
+  {
+    g_bCorrectFormat = TRUE;  
+    textFieldDateTime.backCol(&quot;_Window&quot;);
+    tTemp = fwGeneral_stringToDate(sTime);
+    g_tSelectedDate = tTemp;
+    
+    calendar.selectedDate(g_tSelectedDate);
+    spinHour.text(hour(g_tSelectedDate));
+    spinMinute.text(minute(g_tSelectedDate));
+    spinSecond.text(second(g_tSelectedDate));  
+    sliderHour.value(hour(g_tSelectedDate));
+    sliderMinute.value(minute(g_tSelectedDate));
+    sliderSecond.value(second(g_tSelectedDate)); 
+  }
+  else
+  { 
+    g_bCorrectFormat = FALSE;   
+    textFieldDateTime.backCol(&quot;FwBackgroundUserAttention&quot;);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+showTime()
+{  
+  calendar.selectedDate(g_tSelectedDate);
+  spinHour.text(hour(g_tSelectedDate));
+  spinMinute.text(minute(g_tSelectedDate));
+  spinSecond.text(second(g_tSelectedDate));
+  
+  sliderHour.value(hour(g_tSelectedDate));
+  sliderMinute.value(minute(g_tSelectedDate));
+  sliderSecond.value(second(g_tSelectedDate)); 
+  
+  textFieldDateTime.text(formatTime(FW_GENERAL_NATURAL_TIME_FORMAT, g_tSelectedDate));  
+}
+
+// ------------------------------------------------------------------------------------------------
+
+time getCleanedCurrentTime()
+{
+  time tNow;
+  
+  tNow = getCurrentTime(); 
+  if(selectedTimeZone.text == FW_GENERAL_TIMEZONE_UTC)
+  {
+    tNow = formatTimeUTC(FW_GENERAL_GENERIC_TIME_FORMAT, tNow);
+  }
+  
+  return tNow;
+}
+
+// ------------------------------------------------------------------------------------------------
+
+returnDate()
+{
+  string sDateTime;
+  time tNow;
+  
+  sDateTime = formatTime(FW_GENERAL_NATURAL_TIME_FORMAT, g_tSelectedDate);
+  strreplace(sDateTime, &quot; - &quot;, &quot; &quot;);
+
+  if (!fwGeneral_hasCorrectFormat(sDateTime) &amp;&amp; g_bCorrectFormat) {
+    ChildPanelOnCentralModal( &quot;vision/MessageInfo1&quot;, &quot;Error&quot;, makeDynString(&quot;$1:Wrong date or time format.\nPlease correct.&quot;));
+    return;
+  }  
+    
+  // FWCORE-3359: allow to select a date in future  
+  bool allowFuture=false;
+  if (isDollarDefined(&quot;$bAllowFuture&quot;)) allowFuture=$bAllowFuture; 
+  if (!allowFuture) {
+    tNow = getCleanedCurrentTime();
+    if (period(g_tSelectedDate) &gt; period(tNow)) {
+      ChildPanelOnCentralModal(&quot;vision/MessageInfo1&quot;, &quot;Error&quot;, makeDynString(&quot;$1:Date and time cannot be in the future.\nReset to current.&quot;));
+      setTimeNow();
+      textFieldDateTime.backCol(&quot;FwBackgroundUserAttention&quot;);
+      animate(&quot;textFieldDateTime&quot;,&quot;backCol&quot;,&quot;FwBackgroundUserAttention&quot;,&quot;_Window&quot;,makeMapping(&quot;duration&quot;,&quot;3000&quot;));
+      return;
+    }
+  }
+  
+  PanelOffReturn(makeDynFloat(1.0), makeDynString(g_tSelectedDate));       
+}
+
+
+
+
+
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  g_bCorrectFormat = TRUE;
+  
+  if(isDollarDefined(&quot;$sTimeZone&quot;) &amp;&amp; getDollarValue(&quot;$sTimeZone&quot;) != &quot;&quot;)
+  {
+    selectedTimeZone.text = $sTimeZone;
+  }
+  else
+  {
+    selectedTimeZone.text = FW_GENERAL_TIMEZONE_LOCAL;
+  }
+  
+  setInitialTime();
+}
+
+
+
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="calendar" shapeType="Calendar" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-3 30</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 45</prop>
+    <prop name="Size">325 200</prop>
+    <extended>
+     <script name="clicked" isEscaped="1"><![CDATA[clicked(time date)
+{
+  g_tSelectedDate = date;
+  showDate();
+}]]></script>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="FRAME3" shapeType="FRAME" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 24</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">{0,0,0}</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,0]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Geometry">1.2 0 0 0.8292682926829268 -14 235.0975609756098</prop>
+    <prop name="BorderStyle">3D</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Time</prop>
+    </prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">20 24</prop>
+    <prop name="Size">271 247</prop>
+   </properties>
+  </shape>
+  <shape Name="spinHour" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">441.3636363636363 80</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">260 275</prop>
+    <prop name="Size">64 23</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">23</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  showDate();
+  sliderHour.value(this.text());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="sliderHour" shapeType="SLIDER" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">630 135</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 303</prop>
+    <prop name="Size">303 20</prop>
+    <extended>
+     <prop type="ENUM" name="inputMethodHints">0</prop>
+     <prop type="ENUM" name="contextMenuPolicy">1</prop>
+     <prop type="ENUM" name="layoutDirection">0</prop>
+     <prop type="ENUM" name="tickPosition">0</prop>
+     <prop type="INT" name="maxValue">23</prop>
+     <prop type="ENUM" name="orientation">0</prop>
+     <script name="Change" isEscaped="1"><![CDATA[Change(int value)
+{
+  spinHour.text(value);
+  showDate();
+}]]></script>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="sliderMinute" shapeType="SLIDER" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">630 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 366</prop>
+    <prop name="Size">303 20</prop>
+    <extended>
+     <prop type="INT" name="maxValue">59</prop>
+     <prop type="ENUM" name="orientation">0</prop>
+     <script name="Change" isEscaped="1"><![CDATA[Change(int value)
+{
+  spinMinute.text(value);
+  showDate();
+}]]></script>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="sliderSecond" shapeType="SLIDER" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">310 215</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">21 429</prop>
+    <prop name="Size">303 20</prop>
+    <extended>
+     <prop type="INT" name="maxValue">59</prop>
+     <prop type="ENUM" name="orientation">0</prop>
+     <script name="Change" isEscaped="1"><![CDATA[Change(int value)
+{
+  spinSecond.text(value);
+  showDate();
+}]]></script>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="spinMinute" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">441.3636363636363 85</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">260 338</prop>
+    <prop name="Size">64 23</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">59</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  showDate();
+  sliderMinute.value(this.text());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="spinSecond" shapeType="SPIN_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">444.5454545454545 212</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">260 407</prop>
+    <prop name="Size">64 23</prop>
+    <prop name="MinimumID">0</prop>
+    <prop name="MaximumID">59</prop>
+    <prop name="IncrAccelerator">1</prop>
+    <prop name="Position">0</prop>
+   </properties>
+   <events>
+    <script name="Changed" isEscaped="1"><![CDATA[main()
+{
+  showDate();
+  sliderSecond.value(this.text());
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 279</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">21 279</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Hours:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 342</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">20</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">21 342</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Minutes:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT3" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">21</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">21 405</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">21</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">21 405</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Seconds:</prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="pushButtonNow" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">300 -201</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Set date/time to now</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">285 9</prop>
+    <prop name="Size">50 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Now</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  setTimeNow();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="pushButtonOK" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">289 340</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Use selected date/time</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">178 470</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  returnDate();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="pushButtonCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">341 325</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Abort selection</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">260 470</prop>
+    <prop name="Size">75 25</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.iso88591">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  PanelOffReturn(makeDynFloat(), makeDynString());
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="selectedTimeZone" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">26</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 470</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">26</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Current selected time zone</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 470</prop>
+    <prop name="Size">80 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignHCenter]</prop>
+   </properties>
+  </shape>
+  <shape Name="textFieldDateTime" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">27</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.iso88591">Edit to change date and time</prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.iso88591">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Size">265 23</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Editable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+   <events>
+    <script name="TextChanged" isEscaped="1"><![CDATA[main(string newText)
+{
+  setTimeToControls(newText);
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

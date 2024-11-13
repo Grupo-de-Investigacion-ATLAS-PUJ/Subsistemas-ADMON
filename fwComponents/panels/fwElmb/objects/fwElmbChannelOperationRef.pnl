@@ -1,0 +1,441 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">fwElmbChannelOperationRef</prop>
+  </prop>
+  <prop name="Size">650 350</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+<events>
+	<script name="ScopeLib" isEscaped="1"><![CDATA[
+
+#uses &quot;fwGeneral/fwColour.ctl&quot;
+		#uses &quot;fwGeneral/fwColour.ctl&quot;
+	]]></script>
+</events>
+
+ <shapes>
+  <shape Name="tabStandardChannels" shapeType="TABLE" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-6 -48</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 10</prop>
+    <prop name="Size">631 331</prop>
+    <prop name="ShowColumnHeader">True</prop>
+    <prop name="ShowRowHeader">False</prop>
+    <prop name="SortOnClick">True</prop>
+    <prop name="RowHeight">26</prop>
+    <prop name="RowHeaderWidth">30</prop>
+    <prop name="GridType">Cross</prop>
+    <prop name="VScrollBarMode">Auto</prop>
+    <prop name="HScrollBarMode">Auto</prop>
+    <prop name="Column">
+     <prop name="Name">dpe</prop>
+     <prop name="Width">159</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">dpe</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">channelName</prop>
+     <prop name="Width">159</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Channel Name</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8"></prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">comment</prop>
+     <prop name="Width">159</prop>
+     <prop name="Visible">False</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Comment</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8">Shows comment for channel if set, otherwise full name</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">type</prop>
+     <prop name="Width">181</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Type</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8">AI: Analog Input; AO: Analog Output; DI: Digital Input; DO: Digital Output</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">value</prop>
+     <prop name="Width">105</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Value</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8">Current value</prop>
+     </prop>
+    </prop>
+    <prop name="Column">
+     <prop name="Name">timeStamp</prop>
+     <prop name="Width">165</prop>
+     <prop name="Visible">True</prop>
+     <prop name="Editable">False</prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">Time Stamp</prop>
+     </prop>
+     <prop name="ToolTipText">
+	<prop name="en_US.utf8">Current time stamp</prop>
+     </prop>
+    </prop>
+    <prop name="Row">
+     <prop name="Name"></prop>
+     <prop name="Label">
+	<prop name="en_US.utf8">#1</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+// Local Variables
+// ---------------
+  int i, j;
+	
+  dyn_string dsChannels;
+  dyn_string dsChannelTypes = makeDynString(ELMB_AI_CONFIG_NAME, ELMB_AO_CONFIG_NAME, ELMB_DI_CONFIG_NAME, ELMB_DO_CONFIG_NAME, ELMB_DO_CONFIG_NAME);
+  dyn_string dsChannelDPTs = makeDynString(ELMB_AI_TYPE_NAME, ELMB_AO_TYPE_NAME, ELMB_DI_TYPE_NAME, ELMB_DO_TYPE_NAME, ELMB_DO_BYTES_TYPE_NAME);
+
+// Executable Code
+// ---------------
+  // Delete all existing lines in table:
+  this.deleteAllLines();
+
+  // Get all channels defined for this ELMB, a 'type' at a time
+  for (i = 1; i &lt;= dynlen(dsChannelTypes); i++) {	
+	
+    // Get all channels for this type
+    dsChannels = dpNames($sDpName + fwDevice_HIERARCHY_SEPARATOR + dsChannelTypes[i] + fwDevice_HIERARCHY_SEPARATOR + &quot;*&quot;, dsChannelDPTs[i]);
+		
+    // Get the current values
+    if (dsChannelDPTs[i] == ELMB_AI_TYPE_NAME) {
+      // Connect to all standard analog input channels
+      for (j = 1; j &lt;= dynlen(dsChannels); j++) {
+        dpConnect(&quot;cbkUpdateAiLine&quot;,
+                  dsChannels[j] + &quot;.value&quot;,
+                  dsChannels[j] + &quot;.value:_online.._stime&quot;,
+                  dsChannels[j] + &quot;.value:_online.._invalid&quot;,
+                  dsChannels[j] + &quot;.type&quot;);
+      }
+    } else if (dsChannelDPTs[i] == ELMB_DO_BYTES_TYPE_NAME) {
+      // Connect to all digital output byte types
+      for (j = 1; j &lt;= dynlen(dsChannels); j++) {
+        dpConnect(&quot;cbkUpdateDoByteLine&quot;, dsChannels[j] + &quot;.do_C_read&quot;, dsChannels[j] + &quot;.do_C_read:_online.._stime&quot;, dsChannels[j] + &quot;.do_C_read:_online.._invalid&quot;);
+        dpConnect(&quot;cbkUpdateDoByteLine&quot;, dsChannels[j] + &quot;.do_A_read&quot;, dsChannels[j] + &quot;.do_A_read:_online.._stime&quot;, dsChannels[j] + &quot;.do_A_read:_online.._invalid&quot;);
+        dpConnect(&quot;cbkUpdateDoByteLine&quot;, dsChannels[j] + &quot;.do_write&quot;, dsChannels[j] + &quot;.do_write:_online.._stime&quot;, dsChannels[j] + &quot;.do_write:_online.._invalid&quot;);
+      } 
+    } else {
+      // Connect to all other channel types
+      for (j = 1; j &lt;= dynlen(dsChannels); j++) {
+        dpConnect(&quot;cbkUpdateElmbChannelLine&quot;,
+                  dsChannels[j] + &quot;.value&quot;,
+                  dsChannels[j] + &quot;.value:_online.._stime&quot;,
+                  dsChannels[j] + &quot;.value:_online.._invalid&quot;);
+      } 
+    }
+  }
+	
+  // Return to calling routine
+  return;
+}
+				  					   
+void cbkUpdateAiLine(string argsValue, float argfValue,
+                     string argsValueStime, string argsValueTimeStamp,
+                     string argsValueInvalid, bool argbInvalid,
+                     string argsType, string argsTypeValue)
+					
+{
+// Local Variables
+// ---------------
+  bool bActive;
+
+  int iType;
+  int iRowFont;
+  int iDecPlaces = -1;
+
+  string sChannelName;
+  string sChannelDpName;
+  string sElementColour;
+  string sAlertColour;
+  string sType;
+  string sFormat;
+  string sValue;
+  string sDecPlaces;
+
+  langString lsDescription;
+
+  dyn_string dsTemp;
+  dyn_string dsExceptionInfo;
+
+  dyn_anytype daValueInfo;
+	
+// Executable Code
+// ---------------
+  // Get the name of the channel DP
+  sChannelDpName = dpSubStr(argsValue, DPSUB_SYS_DP);
+  lsDescription = dpGetDescription(argsValue);
+	
+  // Get whether alert handling has been defined
+  dpGet(sChannelDpName + &quot;.value:_alert_hdl.._type&quot;, iType);
+  if (iType == DPCONFIG_NONE) {
+    fwColour_convertStatusToColour(sElementColour, &quot;&quot;, false, argbInvalid, dsExceptionInfo);
+  } else {
+    dpGet(sChannelDpName + &quot;.value:_alert_hdl.._active&quot;, bActive,
+          sChannelDpName + &quot;.value:_alert_hdl.._act_state_color&quot;, sAlertColour);
+    fwColour_convertStatusToColour(sElementColour, sAlertColour, !bActive, argbInvalid, dsExceptionInfo);
+  }
+
+  if (argbInvalid)
+    iRowFont = 3;
+  else
+    iRowFont = 0;
+
+  // Get the channel name
+  dsTemp = strsplit(sChannelDpName, fwDevice_HIERARCHY_SEPARATOR);
+  sChannelName = dsTemp[dynlen(dsTemp)];
+  sType = ELMB_AI_CONFIG_NAME + &quot;&gt;&quot; + argsTypeValue;
+
+  // Get whether a format has been specified
+  sDecPlaces = lblFormat.text;
+  if (strlen(sDecPlaces) &gt; 0)
+    iDecPlaces = sDecPlaces;
+  if (iDecPlaces &gt;= 0) {
+    sFormat = &quot;%.&quot; + sDecPlaces + &quot;f&quot;;
+    sprintf(sValue, sFormat, argfValue);
+    daValueInfo[1] = sValue;
+  } else {
+    daValueInfo[1] = argfValue;
+  }
+  daValueInfo[2] = sElementColour;
+
+  // Update the information into the row
+  tabStandardChannels.updateLine(1,
+                                 &quot;channelName&quot;, sChannelName,
+                                 &quot;comment&quot;, lsDescription,
+                                 &quot;type&quot;, sType,
+                                 &quot;value&quot;, daValueInfo,
+                                 &quot;dpe&quot;, argsValue,
+                                 &quot;timeStamp&quot;,  argsValueTimeStamp,
+                                 0, iRowFont);
+
+  // Return to calling routine
+  return;
+}
+				  					   
+void cbkUpdateDoByteLine(string argsValue, float argfValue,
+                         string argsValueStime, string argsValueTimeStamp,
+                         string argsValueInvalid, bool argbInvalid)
+					
+{
+// Local Variables
+// ---------------
+  bool bActive;
+	
+  int iType;
+  int iRowFont;
+	
+  string sChannelName;
+  string sChannelDpName;
+  string sElementColour;
+  string sAlertColour;
+  string sType;
+	
+  langString lsDescription;
+	
+  dyn_string dsTemp;
+  dyn_string dsExceptionInfo;
+	
+  dyn_anytype daValueInfo;
+	
+// Executable Code
+// ---------------
+  // Get the name of the channel DP
+  sChannelDpName = dpSubStr(argsValue, DPSUB_SYS_DP_EL);
+  lsDescription = dpGetDescription(argsValue);
+	
+  // Get whether alert handling has been defined
+  dpGet(sChannelDpName + &quot;:_alert_hdl.._type&quot;, iType);
+  if (iType == DPCONFIG_NONE) {
+    fwColour_convertStatusToColour(sElementColour, &quot;&quot;, false, argbInvalid, dsExceptionInfo);
+  } else {
+    dpGet(sChannelDpName + &quot;:_alert_hdl.._active&quot;, bActive,
+          sChannelDpName + &quot;:_alert_hdl.._act_state_color&quot;, sAlertColour);
+    fwColour_convertStatusToColour(sElementColour, sAlertColour, !bActive, argbInvalid, dsExceptionInfo);
+  }
+	
+  if (argbInvalid)
+    iRowFont = 3;
+  else
+    iRowFont = 0;
+	
+  // Get the channel name
+  dsTemp = strsplit(sChannelDpName, fwDevice_HIERARCHY_SEPARATOR);
+  sType = dsTemp[dynlen(dsTemp) - 1];
+  dsTemp = strsplit(sChannelDpName, &quot;.&quot;);
+  sChannelName = dsTemp[dynlen(dsTemp)];
+  daValueInfo[1] = argfValue;
+  daValueInfo[2] = sElementColour;
+
+  // Update the information into the row
+  tabStandardChannels.updateLine(1,
+                                 &quot;channelName&quot;, sChannelName,
+                                 &quot;comment&quot;, lsDescription,
+                                 &quot;type&quot;, sType,
+                                 &quot;value&quot;, daValueInfo,
+                                 &quot;timeStamp&quot;,  argsValueTimeStamp,
+                                 0, iRowFont);
+
+  // Return to calling routine
+  return;
+}
+
+void cbkUpdateElmbChannelLine(string argsValue, float argfValue,
+                              string argsValueStime, string argsValueTimeStamp,
+                              string argsValueInvalid, bool argbInvalid)
+					
+{
+// Local Variables
+// ---------------
+  bool bActive;
+	
+  int iType;
+  int iRowFont;
+	
+  string sChannelName;
+  string sChannelDpName;
+  string sElementColour;
+  string sAlertColour;
+  string sType;
+	
+  langString lsDescription;
+	
+  dyn_string dsTemp;
+  dyn_string dsExceptionInfo;
+	
+  dyn_anytype daValueInfo;
+	
+// Executable Code
+// ---------------
+  // Get the name of the channel DP
+  sChannelDpName = dpSubStr(argsValue, DPSUB_SYS_DP);
+  lsDescription = dpGetDescription(argsValue);
+	
+  // Get whether alert handling has been defined
+  dpGet(sChannelDpName + &quot;.value:_alert_hdl.._type&quot;, iType);
+  if (iType == DPCONFIG_NONE) {
+    fwColour_convertStatusToColour(sElementColour, &quot;&quot;, false, argbInvalid, dsExceptionInfo);
+  } else {
+    dpGet(sChannelDpName + &quot;.value:_alert_hdl.._active&quot;, bActive,
+          sChannelDpName + &quot;.value:_alert_hdl.._act_state_color&quot;, sAlertColour);
+    fwColour_convertStatusToColour(sElementColour, sAlertColour, !bActive, argbInvalid, dsExceptionInfo);
+  }
+	
+  if (argbInvalid)
+    iRowFont = 3;
+  else
+    iRowFont = 0;
+	
+  // Get the channel name
+  dsTemp = strsplit(sChannelDpName, fwDevice_HIERARCHY_SEPARATOR);
+  sChannelName = dsTemp[dynlen(dsTemp)];
+  sType = dsTemp[dynlen(dsTemp) - 1];
+  daValueInfo[1] = argfValue;
+  daValueInfo[2] = sElementColour;
+
+  // Update the information into the row
+  tabStandardChannels.updateLine(1,
+                                 &quot;channelName&quot;, sChannelName,
+                                 &quot;comment&quot;, lsDescription,
+                                 &quot;type&quot;, sType,
+                                 &quot;value&quot;, daValueInfo,
+                                 &quot;timeStamp&quot;,  argsValueTimeStamp,
+                                 0, iRowFont);
+
+  // Return to calling routine
+  return;
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="lblFormat" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">170 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">170 0</prop>
+    <prop name="Size">31 11</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Distance">2</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+ </shapes>
+</panel>

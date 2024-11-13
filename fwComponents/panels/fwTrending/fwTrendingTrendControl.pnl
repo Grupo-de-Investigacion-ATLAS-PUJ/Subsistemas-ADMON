@@ -1,0 +1,1378 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">518 95</prop>
+  <prop name="BackColor">FwTrendingViewBackground</prop>
+  <prop name="RefPoint">0 0</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+  <prop name="layoutLeftMargin">9</prop>
+  <prop name="layoutRightMargin">9</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">0</prop>
+  <prop name="sizePolicy">
+   <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+  </prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="cmSaveHidden" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">46</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">22.98245614035091 -41.37931034482759</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">24</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Save configuration to plot data point</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+S</prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">3 3</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Save</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+  
+    fwTrending_save($sRefName);  
+
+}
+
+
+
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  delay(0,500);
+  this.enabled = saveSettings.enabled;
+//   this.visible = true;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="xzoomin" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">29</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+6</prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,12,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">3 3</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">xzoomin</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+  string ref = $sRefName;
+  fwTrending_trendZoomX(ref, true);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="xzoomout" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">30</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+4</prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,12,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">3 3</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">xzoomout</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+  string ref = $sRefName;
+  fwTrending_trendZoomX(ref, false);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="yzoomin" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">31</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+2</prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,12,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">3 3</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">yzoomin</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+  string ref = $sRefName;
+  fwTrending_trendZoomY(ref, true);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="yzoomout" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">32</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+8</prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,12,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">3 3</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">yzoomout</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+  string ref = $sRefName;
+  fwTrending_trendZoomY(ref, false);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="StopButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">22</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">7 -1</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Minimum"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">7 -1</prop>
+    <prop name="Size">42 16</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Freeze</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+  string buttonState = this.text;
+  string ref = $sRefName;
+  
+  if(buttonState == &quot;Run&quot;) { // in stop-&gt;run
+    fwTrending_trendRun(ref, true, &quot;&quot;);
+  } else { // in Run -&gt; stop
+    fwTrending_trendRun(ref, false, &quot;&quot;);
+  }
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="TimeCascadeButton" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">23</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">1 0.4285714285714291</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Minimum"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">1 -1</prop>
+    <prop name="Size">90 21</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Time Range</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">10minutes</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">10 minutes</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1hour</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">1 hour</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">8hours</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">8 hours</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1day</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">1 day</prop>
+      </prop>
+      <prop name="Hotkey">Alt+1</prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">10days</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">10 days</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">userSpec</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">User specified</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">11</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">___</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">xzoom</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Zoom</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">xzoomin</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Zoom in</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">xzoomout</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Zoom out</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">jump</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Jump to time...</prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id) {
+  dyn_string ids = makeDynString(&quot;10minutes&quot;, &quot;1hour&quot;, &quot;8hours&quot;, &quot;1day&quot;, &quot;10days&quot;, &quot;userSpec&quot;, &quot;xzoomin&quot;, &quot;xzoomout&quot;);
+  dyn_string texts = makeDynString(&quot;10 minutes&quot;, &quot;1 hour&quot;, &quot;8 hours&quot;, &quot;1 day&quot;, &quot;10 days&quot;, &quot;User Specified&quot;);
+  string sTimeRange;
+  dyn_string ds; 
+  dyn_float df;
+  int d, h, m, t;
+  string activeTrend, trendRunning;
+  string ref = $sRefName;
+  dyn_string trendShapeStr, plotData, exceptionInfo;
+  long tStart, tEnd;
+  long midTime, startTime;
+
+  switch (id) {
+    case &quot;10minutes&quot;:
+      fwTrending_changeTrendTimeRange(ref, 600, &quot;&quot;, &quot;  0 d  0 h 10 m&quot;, 0, texts[1] + &quot;  *&quot;);
+      break;    
+    case &quot;1hour&quot; :
+      fwTrending_changeTrendTimeRange(ref, 3600, &quot;&quot;, &quot;  0 d  1 h  0 m&quot;, 1, texts[2] + &quot;  *&quot;);
+      break;  
+    case &quot;8hours&quot; :
+      fwTrending_changeTrendTimeRange(ref, 28800, &quot;&quot;, &quot;  0 d  8 h  0 m&quot;, 2, texts[3] + &quot;  *&quot;);
+      break;  
+    case &quot;1day&quot; :
+      fwTrending_changeTrendTimeRange(ref, 86400, &quot;&quot;, &quot;  1 d  0 h  0 m&quot;, 3, texts[4] + &quot;  *&quot;);
+      break;  
+    case &quot;10days&quot; :
+      fwTrending_changeTrendTimeRange(ref, 864000, &quot;&quot;, &quot; 10 d  0 h  0 m&quot;, 4, texts[5] + &quot;  *&quot;);
+      break;  
+    case &quot;userSpec&quot; :
+      fwTrending_getRuntimePlotDataWithStrings(ref, trendRunning, trendShapeStr, plotData, exceptionInfo, FALSE);
+      sTimeRange = plotData[fwTrending_PLOT_OBJECT_TIME_RANGE];
+
+      sscanf(sTimeRange,&quot;%d&quot;,t);
+      fwTrending_decodeTime(t, d, h, m);
+      ChildPanelOnCentralModalReturn(&quot;fwTrending/fwTrendingTimeSpec.pnl&quot;, &quot;Specify a Time Range&quot;,
+          makeDynString(&quot;$iDays:&quot;+d,&quot;$iHours:&quot;+h,&quot;$iMins:&quot;+m), df, ds);
+      
+      if(dynlen(ds) &gt; 0 &amp;&amp; ds[1] == &quot;ok&quot;) {
+        d = df[1]; h = df[2]; m = df[3];
+        fwTrending_encodeTime(t, d, h, m);
+        fwTrending_decodeTime(t, d, h, m);
+        
+        if(t &gt; 0) {
+          sprintf(sTimeRange,&quot;%3d d %2d h %2d m&quot;,d,h,m);
+          plotData[fwTrending_PLOT_OBJECT_TIME_RANGE] = t;
+          fwTrending_setRuntimePlotDataWithStrings(ref, trendRunning, plotData, exceptionInfo, FALSE);
+          fwTrending_changeTrendTimeRange(ref, t, &quot;&quot;, sTimeRange, 5, texts[6] + &quot; (&quot; + d + &quot;d &quot; + h + &quot;h &quot; + m + &quot;m)  *&quot;);
+        }
+      }
+      break;
+    case &quot;jump&quot; :
+      fwTrending_getRuntimePlotDataWithStrings(ref, trendRunning, trendShapeStr, plotData, exceptionInfo, FALSE);
+      sTimeRange = plotData[fwTrending_PLOT_OBJECT_TIME_RANGE];
+      getValue(trendShapeStr[fwTrending_ACTIVE_TREND_NAME], &quot;visibleTimeRange&quot;, 0, tStart, tEnd);
+      midTime = tStart + (tEnd-tStart)/2;
+
+      sscanf(sTimeRange,&quot;%d&quot;,t);
+      fwTrending_decodeTime(t, d, h, m);
+      ChildPanelOnCentralModalReturn(&quot;fwTrending/fwTrendingTimeJumpSpec.pnl&quot;, &quot;Specify a Time Range to Display&quot;,
+          makeDynString(&quot;$iDays:&quot;+d,&quot;$iHours:&quot;+h,&quot;$iMins:&quot;+m,&quot;$iMidTime:&quot; + midTime), df, ds);
+      
+      if(dynlen(ds) &gt; 0 &amp;&amp; ds[1] == &quot;ok&quot;) {
+        d = df[1]; h = df[2]; m = df[3]; midTime = df[4];
+        //this.textItem(prev - 1, texts[prev] + &quot;  *&quot;);
+        fwTrending_encodeTime(t, d, h, m);
+        fwTrending_decodeTime(t, d, h, m);
+        startTime = midTime - (t/2);
+            if((startTime + t) &gt; getCurrentTime()) {
+          startTime = getCurrentTime() - t;
+            }
+            
+        if(t &gt; 0) {
+          sprintf(sTimeRange,&quot;%3d d %2d h %2d m&quot;,d,h,m);
+          plotData[fwTrending_PLOT_OBJECT_TIME_RANGE] = t;
+          fwTrending_setRuntimePlotDataWithStrings(ref, trendRunning, plotData, exceptionInfo, FALSE);
+          fwTrending_changeTrendTimeRange(ref, t, &quot;&quot;, sTimeRange, 5, texts[6] + &quot; (&quot; + d + &quot;d &quot; + h + &quot;h &quot; + m + &quot;m)  *&quot;);
+          setValue(trendShapeStr[fwTrending_LINEAR_TREND_NAME], &quot;timeBegin&quot;, startTime);
+        }
+      }
+      break;
+    case &quot;xzoomin&quot; :
+      fwTrending_trendZoomX(ref, false);
+      break;  
+    case &quot;xzoomout&quot; :
+      fwTrending_trendZoomX(ref, true);
+      break;  
+  }
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="Border1" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">39</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">341 11</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">FwTrendingFaceplateBackground</prop>
+    <prop name="BackColor">FwTrendingFaceplateBackground</prop>
+    <prop name="TabOrder">16</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">1 0 0 1 25 -2</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">341 1</prop>
+    <prop name="Size">101 11</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="curvesTimeRangeHidden" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">34</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-2 -2</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[dashed,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">3 3</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">hiddenUserCurveTimerange</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">True</prop>
+    <prop name="Fit">False</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="trendRefreshButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">40</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 0</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">17</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Refresh plotted data</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+R</prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">3 3</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">refresh.gif</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+  string ref = $sRefName;
+
+  fwTrending_trendRefresh(ref);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="logCheckBox" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">38</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">292 0</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">292 0</prop>
+    <prop name="Size">38 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">log </prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state) {
+  fwTrending_toggleLog(state);
+}  
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="rigthArrow" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">35</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">22 -51</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">FwTrendingFaceplateForeground</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Courier New,-1,12,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">3 3</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="leftArrow" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">36</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">34 -51</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">FwTrendingFaceplateForeground</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Courier New,-1,12,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">3 3</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="curvesTimeRange" shapeType="TEXT_FIELD" layerId="0">
+   <properties>
+    <prop name="serialId">37</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">20 -48</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">False</prop>
+    <prop name="ForeColor">FwTrendingFaceplateForeground</prop>
+    <prop name="BackColor">red</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">3 3</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Editable">False</prop>
+    <prop name="TextFormat">[15s,,,AlignLeft]</prop>
+    <prop name="ulcClientSideWidget">False</prop>
+   </properties>
+  </shape>
+  <shape Name="YAxiiCascadeButton" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">24</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">140 473.000000000001</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Minimum"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">90 -1</prop>
+    <prop name="Size">65 21</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Y Axes</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">curve1</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Legend1</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">curve2</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Legend2</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">curve3</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Legend3</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">curve4</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Legend4</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">curve5</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Legend5</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">curve6</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Legend6</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">curve7</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Legend7</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">curve8</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Legend8</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">1</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">___</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">yzoom</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Zoom</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">yzoomin</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Zoom in</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">yzoomout</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Zoom out</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(string id) {
+  int i;
+  dyn_bool axii = makeDynBool(false, false, false, false, false, false, false, false);
+  string tempAxii, temp, trendRunning;
+  dyn_string split, splitDPE, splitLegend, plotShapes, plotData, exceptionInfo;
+  string ref = $sRefName, currentParameterValues;
+
+  getValue(ref+&quot;trend.parameterValues&quot;, &quot;text&quot;, currentParameterValues);
+  fwTrending_getRuntimePlotDataWithStrings(ref, trendRunning, plotShapes, plotData, exceptionInfo, FALSE);
+  _fwTrending_evaluateTemplate(currentParameterValues, plotData[fwTrending_PLOT_OBJECT_DPES], exceptionInfo);    
+  _fwTrending_evaluateTemplate(currentParameterValues, plotData[fwTrending_PLOT_OBJECT_LEGENDS], exceptionInfo);    
+  _fwTrending_evaluateTemplate(currentParameterValues, plotData[fwTrending_PLOT_OBJECT_EXT_TOOLTIPS], exceptionInfo);    
+
+  // get the visibility state of the curve scale
+  split = strsplit(plotData[fwTrending_PLOT_OBJECT_AXII], &quot;;&quot;);
+  for(i=1;i&lt;=8;i++) {
+      if(split[i] == &quot;TRUE&quot;) {
+      axii[i] = true;
+      }
+  }
+
+  // get the shape of the list of DPE
+  splitDPE = strsplit(plotData[fwTrending_PLOT_OBJECT_DPES], &quot;;&quot;);    
+
+  // get the shape of the list of legends
+  splitLegend = strsplit(plotData[fwTrending_PLOT_OBJECT_LEGENDS], &quot;;&quot;);    
+
+  switch(id) {
+    case &quot;curve1&quot;:
+      axii[1] = !axii[1];
+      fwTrending_setCurveScaleVisibility(ref, axii, 1, splitDPE, splitLegend);
+   set_menuScaleVisibility (ref, axii, 1, splitDPE, splitLegend);
+      break;
+    case &quot;curve2&quot;:
+      axii[2] = !axii[2];
+      fwTrending_setCurveScaleVisibility(ref, axii, 2, splitDPE, splitLegend);
+   set_menuScaleVisibility (ref, axii, 2, splitDPE, splitLegend);
+      break;
+    case &quot;curve3&quot;:
+      axii[3] = !axii[3];
+      fwTrending_setCurveScaleVisibility(ref, axii, 3, splitDPE, splitLegend);
+   set_menuScaleVisibility (ref, axii, 3, splitDPE, splitLegend);
+      break;
+    case &quot;curve4&quot;:
+      axii[4] = !axii[4];
+      fwTrending_setCurveScaleVisibility(ref, axii, 4, splitDPE, splitLegend);
+   set_menuScaleVisibility (ref, axii, 4, splitDPE, splitLegend);
+      break;
+    case &quot;curve5&quot;:
+      axii[5] = !axii[5];
+      fwTrending_setCurveScaleVisibility(ref, axii, 5, splitDPE, splitLegend);
+   set_menuScaleVisibility (ref, axii, 5, splitDPE, splitLegend);
+      break;
+    case &quot;curve6&quot;:
+      axii[6] = !axii[6];
+      fwTrending_setCurveScaleVisibility(ref, axii, 6, splitDPE, splitLegend);
+   set_menuScaleVisibility (ref, axii, 6, splitDPE, splitLegend);
+      break;
+    case &quot;curve7&quot;:
+      axii[7] = !axii[7];
+      fwTrending_setCurveScaleVisibility(ref, axii, 7, splitDPE, splitLegend);
+   set_menuScaleVisibility (ref, axii, 7, splitDPE, splitLegend);
+      break;
+    case &quot;curve8&quot;:
+      axii[8] = !axii[8];
+      fwTrending_setCurveScaleVisibility(ref, axii, 8, splitDPE, splitLegend);
+   set_menuScaleVisibility (ref, axii, 8, splitDPE, splitLegend);
+      break;
+    case &quot;yzoomin&quot;:
+      fwTrending_trendZoomY(ref, false);
+      break;
+    case &quot;yzoomout&quot;:
+      fwTrending_trendZoomY(ref, true);
+      break;
+  }
+}
+
+
+
+set_menuScaleVisibility(string ref, dyn_bool axii, int curveNumber, dyn_string dsDpe, dyn_string dsLegend) {
+
+  // set the text of the cascade button. add * to the text if the scale is visible
+    if(axii[curveNumber]) {
+    this.textItem(curveNumber-1, (dsLegend[curveNumber] != &quot;&quot; ? dsLegend[curveNumber] : dsDpe[curveNumber]) + &quot;  *&quot;);
+    } else  {
+    this.textItem(curveNumber-1, dsLegend[curveNumber] != &quot;&quot; ? dsLegend[curveNumber] : dsDpe[curveNumber]);
+    }
+
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="saveSettings" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">25</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">132 -1</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Save configuration to plot data point</prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Minimum"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">154 -1</prop>
+    <prop name="Size">58 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Save</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+  
+    fwTrending_save($sRefName);  
+
+}
+
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="resetTrendZoomButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">27</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">260 -1</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Reset zooming on Y axis and Time axis</prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+R</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Minimum"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">268 -1</prop>
+    <prop name="Size">24 21</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">1:1</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main() {
+  string ref = $sRefName;
+
+  fwTrending_trendUnzoom(ref);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="autoScaleCheckBox" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">41</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">327 -1</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">19</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Switch between predefined Y axis ranges and auto scaling</prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">327 0</prop>
+    <prop name="Size">44 20</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+       <prop name="en_US.utf8">auto</prop>
+      </prop>
+      <prop name="Select">False</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state) {
+  fwTrendingControl_autoScalePushed(state);
+}
+
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="RECTANGLE1" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">44</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">330 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">22</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Preferred" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">0 19</prop>
+    <prop name="Size">516 -22</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="OtherCascadeButton" shapeType="CASCADE_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">45</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">-70.7567567567568 10.5</prop>
+    <prop name="Enable">False</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">23</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Minimum"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,11,5,40,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">211 -1</prop>
+    <prop name="Size">58 21</prop>
+    <prop name="PopupItemId"></prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Other</prop>
+    </prop>
+    <prop name="PopupMenu">
+     <prop name="PopupItem">
+      <prop name="PopupItemId">zoom</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Zoomed Window</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">export</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Export plot to CSV...</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">print</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Print plot</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">12</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">___</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">Legends</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Legend</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">Controls</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Controls</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">grid</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Grid</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">11</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">___</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">Plot configuration</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Plot configuration ...</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">saveas</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Save plot settings as ...</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">10</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">___</prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">6</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Snapshot</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">7</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Send by e-mail...</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">9</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Save to disk...</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">13</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Send to Logbook</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+     <prop name="PopupItem">
+      <prop name="PopupItemId">markersStyle</prop>
+      <prop name="Text">
+       <prop name="en_US.utf8">Markers style</prop>
+      </prop>
+      <prop name="PopupMenu">
+       <prop name="PopupItem">
+        <prop name="PopupItemId">markersFilled</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Filled circle</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">markersUnfilled</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">Unfilled circle</prop>
+        </prop>
+       </prop>
+       <prop name="PopupItem">
+        <prop name="PopupItemId">markersNone</prop>
+        <prop name="Text">
+         <prop name="en_US.utf8">None</prop>
+        </prop>
+       </prop>
+      </prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[bool controls = false;
+
+main(string id)
+{
+  bool bIsLog, bEnabled;
+  string trendRunning, tempString, sCurrentParameterValues, sDpName, sProposedName;
+  dyn_float dfReturn;
+  dyn_string dsReturn, dsParameters, dsPlotShapes, dsPanels, dsPlotData, dsModifiedPlotData, dsOldCurves, dsVisibleCurves, exceptionInfo;
+  dyn_dyn_string ddsExtendedPlotData;
+  shape activeTrendShape, standardTrendShape;
+  int iLength;
+
+  string ref = $sRefName;
+
+  //start 19/09/2008: Herve
+  fwTrending_getAndSaveFromTrendWidget();
+  //end 19/09/2008: Herve
+
+  fwTrending_getRuntimePlotDataWithStrings(ref, trendRunning, dsPlotShapes, dsPlotData, exceptionInfo, FALSE);
+
+  // FWTREND-995; be backwards-compatible with previous format of data structure
+  bool bSaveUserFolder=false;
+  if (dynlen(dsPlotData)&gt;=fwTrending_PLOT_OBJECT_SAVE_TO_USER_FOLDER){
+      bSaveUserFolder=dsPlotData[fwTrending_PLOT_OBJECT_SAVE_TO_USER_FOLDER];
+  }
+
+
+  // get standard trend shape
+  standardTrendShape = getShape(dsPlotShapes[fwTrending_LINEAR_TREND_NAME]);
+
+  // get the active trend shape
+  activeTrendShape = getShape(dsPlotShapes[fwTrending_ACTIVE_TREND_NAME]);
+
+  switch(id) {
+    case &quot;print&quot; :
+      printPanel(myModuleName(), myPanelName());
+      break;
+    case &quot;zoom&quot; :
+  fwTrending_openZoomedWindow(ref, dsPlotData);
+      break;
+    case &quot;export&quot;:
+      getValue(ref + &quot;trend.parameterValues&quot;, &quot;text&quot;, sCurrentParameterValues);
+
+      fwTrending_pageExportTrend(makeDynString(ref),
+                                 sCurrentParameterValues,
+                                 bSaveUserFolder);
+      break;
+    case &quot;Legends&quot;:
+      tempString = dsPlotData[fwTrending_PLOT_OBJECT_LEGEND_ON];
+      if((tempString == &quot;TRUE&quot;) || (tempString == TRUE)) {
+        fwTrending_legendOnOff(ref, FALSE, &quot;&quot;, exceptionInfo);
+      } else {
+        fwTrending_legendOnOff(ref, TRUE, &quot;&quot;, exceptionInfo);
+      }
+      break;
+    case &quot;grid&quot;:
+      tempString = dsPlotData[fwTrending_PLOT_OBJECT_GRID];
+      if((tempString == &quot;TRUE&quot;) || (tempString == TRUE)) {
+        fwTrending_gridOnOff(ref, FALSE, &quot;&quot;, exceptionInfo);
+      } else {
+        fwTrending_gridOnOff(ref, TRUE, &quot;&quot;, exceptionInfo);
+      }
+      break;
+    case &quot;Controls&quot;:
+      if(controls) {
+        this.textItem(5, &quot;Controls&quot;);
+      } else {
+        this.textItem(5, &quot;Controls&quot; + &quot;  *&quot;);
+      }
+      controls = !controls;
+      // added by Herve
+      standardTrendShape.manageCommands(controls);
+      // end
+      break;
+    case &quot;markersFilled&quot;:
+      fwTrending_markersOnOff(ref, fwTrending_MARKER_TYPE_FILLED_CIRCLE, &quot;&quot;, exceptionInfo);
+      break;
+    case &quot;markersUnfilled&quot;:
+      fwTrending_markersOnOff(ref, fwTrending_MARKER_TYPE_UNFILLED_CIRCLE, &quot;&quot;, exceptionInfo);
+      break;
+    case &quot;markersNone&quot;:
+      fwTrending_markersOnOff(ref, fwTrending_MARKER_TYPE_NONE, &quot;&quot;, exceptionInfo);
+      break;
+    case &quot;Plot configuration&quot;:
+      fwTrending_openConfiguration(ref, dsPlotData);
+      break;
+    case &quot;saveas&quot;:
+      fwTrending_saveAs(ref, dsPlotData, saveSettings.enabled);
+      break;
+    case &quot;7&quot;://snapshot to file+mail
+      fwScreenShot_sendScreenShotByEmail( exceptionInfo, &quot;&quot;, &quot;&quot;);
+      break;
+    case &quot;9&quot;://snapshot to file
+      fwTrending_saveSnapshot();
+      break;
+//CG
+    case &quot;13&quot;://snapshot to logbook -&gt; see also initialize script of cascade button
+      if(isFunctionDefined(&quot;lbTrending_sendSnapshotToLogbook&quot;))
+        lbTrending_sendSnapshotToLogbook(ref, activeTrendShape, dsPlotData);
+      break;
+    default:
+      break;
+  }
+
+  if(dynlen(exceptionInfo)&gt;0 &amp;&amp;
+    !patternMatch(&quot;*_fwScreenShot_getTemporaryFileName*&quot;, exceptionInfo[2]))
+ {
+    fwExceptionHandling_display(exceptionInfo);
+  }
+}
+]]></script>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  this.enableItemId(&quot;13&quot;, isFunctionDefined(&quot;lbTrending_sendSnapshotToLogbook&quot;));
+}]]></script>
+   </events>
+  </shape>
+  <reference parentSerial="-1" Name="PANEL_REF0" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwRdbRaimaSwitch.pnl</prop>
+    <prop name="Location">406 -1</prop>
+    <prop name="Geometry">0.07142857142857142 0 0 0.06451612903225806 -31.78571428571428 1</prop>
+    <prop name="TabOrder">25</prop>
+    <prop name="minimumSize">1 1</prop>
+    <prop name="maximumSize">5 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+   </properties>
+  </reference>
+ </shapes>
+</panel>

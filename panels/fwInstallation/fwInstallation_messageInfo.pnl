@@ -1,0 +1,482 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">450 269</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">251 55</prop>
+  <prop name="InitAndTermRef">False</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">96</prop>
+  <prop name="PDPI">96</prop>
+  <prop name="layoutType">HBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">0</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwInstallation/fwInstallation.ctl&quot;
+
+/** Dollar parameters:
+  * $text
+  * $okLabel = &quot;Ok&quot;
+  * $cancelLabel = &quot;Cancel&quot;
+  * $hideCancelBtn = false [to hide Cancel button set this $param to: &quot;yes&quot;]
+  * $icon = &quot;INFO&quot; [allowed: &quot;INFO&quot;, &quot;WARNING&quot;, &lt;pathToCustonIcon&gt;]
+  * $help = &quot;&quot;
+  */
+
+/** Returned values:
+  * btnCancel, panelClose -&gt; 0.0, &quot;CANCEL&quot;
+  * btnOk -&gt; 1.0, &quot;OK&quot;
+  */
+
+const string DOLLAR_PARAM_TEXT = &quot;$text&quot;;
+const string DOLLAR_PARAM_OK_LABEL = &quot;$okLabel&quot;;
+const string DOLLAR_PARAM_CANCEL_LABEL = &quot;$cancelLabel&quot;;
+const string DOLLAR_PARAM_HIDE_CANCEL_BTN = &quot;$hideCancelBtn&quot;;
+const string DOLLAR_PARAM_ICON = &quot;$icon&quot;;
+const string DOLLAR_PARAM_HELP = &quot;$help&quot;;
+
+const string ICON_ID_INFO = &quot;INFO&quot;;
+const string ICON_ID_WARNING = &quot;WARNING&quot;;
+
+const string HIDE_CANCEL_BUTTON_ID_YES = &quot;yes&quot;;
+
+const string DEFAULT_OK_LABEL = &quot;OK&quot;;
+const string DEFAULT_CANCEL_LABEL = &quot;Cancel&quot;;
+const string DEFAULT_ICON = ICON_ID_INFO;
+const string DEFAULT_TITLE = &quot;Info&quot;;
+
+
+void init(){
+  if(!isDollarDefined(DOLLAR_PARAM_TEXT)){
+    fwInstallation_throw(&quot;Text to display in the messageInfo2 panel is not provided. Cannot continue panel initialization&quot;, &quot;ERROR&quot;);
+    return;
+  }
+  string text = getDollarValue(DOLLAR_PARAM_TEXT);
+  string okLabel = isDollarDefined(DOLLAR_PARAM_OK_LABEL)?getDollarValue(DOLLAR_PARAM_OK_LABEL):DEFAULT_OK_LABEL;
+  string cancelLabel = isDollarDefined(DOLLAR_PARAM_CANCEL_LABEL)?getDollarValue(DOLLAR_PARAM_CANCEL_LABEL):DEFAULT_CANCEL_LABEL;
+  string iconId = isDollarDefined(DOLLAR_PARAM_ICON)?getDollarValue(DOLLAR_PARAM_ICON):DEFAULT_ICON;
+  string help = isDollarDefined(DOLLAR_PARAM_HELP)?getDollarValue(DOLLAR_PARAM_HELP):&quot;&quot;;
+
+  bool hideCancelButton = isDollarDefined(DOLLAR_PARAM_HIDE_CANCEL_BTN) &amp;&amp; (getDollarValue(DOLLAR_PARAM_HIDE_CANCEL_BTN) == HIDE_CANCEL_BUTTON_ID_YES);
+
+  showTextMessage(text);
+  setButtonsLabel(okLabel, cancelLabel);
+  setCancelButtonVisibility(!hideCancelButton);
+  loadIcon(getIcon(iconId));
+  initHelp(help);
+}
+
+void showTextMessage(string text){
+  textMessage.text = text;
+}
+
+void setButtonsLabel(string okLabel, string cancelLabel){
+  btnOk.text = okLabel;
+  btnCancel.text = cancelLabel;
+}
+
+void setCancelButtonVisibility(bool cancelVisible){
+  btnCancel.visible = cancelVisible;
+}
+
+bool isCancelEnabled(){
+  return btnCancel.visible();
+}
+
+string getIcon(string iconId){
+  switch(iconId){
+    case &quot;INFO&quot;:    return getPath(PICTURES_REL_PATH, &quot;StandardIcons/info_40.png&quot;);
+    case &quot;WARNING&quot;: return getPath(PICTURES_REL_PATH, &quot;StandardIcons/Attention_40.png&quot;);
+  } // default: return iconId (assume that this is a path to custom icon)
+  return iconId;
+}
+
+void loadIcon(string icon){
+  if(icon == &quot;&quot; || access(icon, R_OK) != 0){
+    fwInstallation_throw(&quot;Icon file: &quot; + icon + &quot; does not exist, default icon is displayed&quot;, &quot;WARNING&quot;);
+  }
+  rectIconPlaceholder.fill(&quot;[pattern,[fit,any,&quot; + icon + &quot;]]&quot;);
+}
+
+string helpLink;
+
+void initHelp(string help){
+  if(help == &quot;&quot;/* || access(helpLink, R_OK) != 0*/){ // help path is relative, cannot be tested with access()
+    btnHelp.visible = false; // note that spacer has minimum&amp;maximum size + size policy set in order to prevent expansion of text box to the top of the panel when help button is hidden.
+    return;
+  }
+  helpLink = help;
+}
+
+const int SELECTED_CANCEL = 0;
+const int SELECTED_OK = 1;
+
+const string TEXT_CANCEL = &quot;CANCEL&quot;;
+const string TEXT_OK = &quot;OK&quot;;
+
+string getSelectionString(int selection){
+  switch(selection){
+    case SELECTED_CANCEL: return TEXT_CANCEL;
+    case SELECTED_OK:     return TEXT_OK;
+  } // default
+  return &quot;&quot;;
+}
+
+
+void panelCloseWithReturn(int selection){
+  if(isEvConnOpen()){
+    PanelOffReturn(makeDynFloat(selection), makeDynString(getSelectionString(selection)));
+  }else{
+    panelOff(makeDynAnytype(myModuleName(), myPanelName(),
+                            makeDynAnytype(selection, getSelectionString(selection))
+                            ));
+  }
+}
+
+]]></script>
+  <script name="Close" isEscaped="1"><![CDATA[main()
+{
+  if(isCancelEnabled()){
+    panelCloseWithReturn(SELECTED_CANCEL);
+  }
+}
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  init();
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="btnCancel" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">8</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">276 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Esc</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">362 155</prop>
+    <prop name="Size">80 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">Cancel</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  panelCloseWithReturn(SELECTED_CANCEL);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="btnOk" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">273 153</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">275 155</prop>
+    <prop name="Size">80 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">OK</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  panelCloseWithReturn(SELECTED_OK);
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="rectBackground" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">16</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">0 -5</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_Transparent</prop>
+    <prop name="BackColor">FwInstallationCorporateColor</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Preferred"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinBevel,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Geometry">0.8108108108108109 0 0 1.17 0 0</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">0 0</prop>
+    <prop name="Size">75 160</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="rectIconPlaceholder" shapeType="RECTANGLE" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">14 14</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DFace</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="minimumSize">40 40</prop>
+    <prop name="maximumSize">40 40</prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[none,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="BorderScalable">False</prop>
+    <prop name="FillType" SharedPixmap="1">[pattern,[fit,any,pictures/StandardIcons/info_40.png]]</prop>
+    <prop name="Geometry">1 0 0 1 -4 39</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Location">15 35</prop>
+    <prop name="Size">40 40</prop>
+    <prop name="CornerRadius">0</prop>
+    <prop name="Transformable">True</prop>
+   </properties>
+  </shape>
+  <shape Name="btnHelp" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">17</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">407 13.18</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">8</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">413 9.5</prop>
+    <prop name="Size">29 24</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">help_2.xpm</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  fwInstallation_showHelpForPanel(helpLink);
+}
+
+]]></script>
+   </events>
+  </shape>
+  <shape Name="textMessage" shapeType="TEXT_EDIT" layerId="0">
+   <properties>
+    <prop name="serialId">18</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">70 39</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">9</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">70 39</prop>
+    <prop name="Size">371 110</prop>
+    <extended>
+     <prop type="BOOL" name="readOnly">True</prop>
+     <prop type="ENUM" name="textInteractionFlags">0</prop>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">19</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">70 155</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Ignored" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">70 155</prop>
+    <prop name="Size">199 23</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+  <shape Name="SPACER2" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">20</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">70 9</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="minimumSize">24 -1</prop>
+    <prop name="maximumSize">-1 24</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Expanding"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">70 9</prop>
+    <prop name="Size">337 24</prop>
+    <prop name="Orientation">horizontal</prop>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="-1" Name="LEFT_BAR" serial="0">
+   <properties>
+    <prop name="shapeSerial">16</prop>
+    <prop idx="0" name="shapeSerial">10</prop>
+    <prop name="isContainerShape">True</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="4" Name="LAYOUT_GROUP2" serial="1">
+   <properties>
+    <prop idx="0" name="shapeSerial">19</prop>
+    <prop idx="1" name="shapeSerial">0</prop>
+    <prop idx="2" name="shapeSerial">8</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="4" Name="LAYOUT_GROUP3" serial="2">
+   <properties>
+    <prop idx="0" name="shapeSerial">20</prop>
+    <prop idx="1" name="shapeSerial">17</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="4" Name="LAYOUT_GROUP4" serial="3">
+   <properties>
+    <prop idx="0" name="shapeSerial">18</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="CONTENT" serial="4">
+   <properties>
+    <prop idx="2" name="groupSerial">1</prop>
+    <prop idx="0" name="groupSerial">2</prop>
+    <prop idx="1" name="groupSerial">3</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutLeftMargin">9</prop>
+    <prop name="layoutRightMargin">9</prop>
+    <prop name="layoutTopMargin">9</prop>
+    <prop name="layoutBottomMargin">9</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

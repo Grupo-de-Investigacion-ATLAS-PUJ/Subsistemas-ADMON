@@ -1,0 +1,385 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+	<prop name="en_US.utf8">(NoName)</prop>
+  </prop>
+  <prop name="Size">507 480</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">10 10</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"/>
+  <prop name="KeepInMemory">False</prop>
+  <prop name="DPI">98.05147058823529</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwElmb/fwElmb.ctl&quot;]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <shape Name="lblTitle" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">7</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">7</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[solid]</prop>
+    <prop name="Location">12 12</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Modification of '_Do_Read...' OPC groups parameters</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="lstBusNames" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">10</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 120</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">10</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 120</prop>
+    <prop name="Size">471 279</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">SingleSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+   <events>
+    <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+  int i;
+	dyn_string dsAllBuses;
+
+	lstBusNames.deleteAllItems();
+
+        dyn_string dsOPCgroups;
+        bool checkbox;
+        getValue(&quot;chksystem&quot;, &quot;state&quot;, 0, checkbox);
+        if (checkbox == TRUE) { dsOPCgroups = dpNames(&quot;*:&quot; + &quot;_Do_Read*&quot;, OPC_GROUPS_TYPE_NAME); }
+        else { dsOPCgroups = dpNames(getSystemName() + &quot;_Do_Read*&quot;, OPC_GROUPS_TYPE_NAME); }
+        dyn_string dsAllBuses;
+        bool DataSourceDevice, EnableCallback;
+        for (int i=1; i &lt;= dynlen(dsOPCgroups); ++i) {
+          string Bus = dsOPCgroups[i];
+          if (checkbox == FALSE) { strreplace(Bus, getSystemName(), &quot;&quot;); }
+          if (strpos(Bus, &quot;dummy&quot;)&gt;-1) continue;
+          dpGet(dsOPCgroups[i]+&quot;.DataSourceDevice&quot;, DataSourceDevice);
+          dpGet(dsOPCgroups[i]+&quot;.EnableCallback&quot;, EnableCallback);  
+          if (DataSourceDevice == true || EnableCallback == true) {
+            dynAppend(dsAllBuses, Bus);
+          }
+        }
+	lstBusNames.items = dsAllBuses;
+      
+  if ( dynlen(dsAllBuses) == 0 ) {
+    btnApplyModif.enabled = false;
+  }
+
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnClose" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">11</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">410 440</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">11</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">410 440</prop>
+    <prop name="Size">71 29</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Close</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+	PanelOff();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="btnApplyModif" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">12</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">569.8715596330276 340</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">12</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">250 440</prop>
+    <prop name="Size">150 29</prop>
+    <prop name="BorderStyle">Normal</prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Apply Modifications</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main()
+{
+  dyn_string dsOPCgroups = lstBusNames.items;  
+  
+  for (int i = 1; i &lt;= dynlen(dsOPCgroups); i++) {
+    dpSet(dsOPCgroups[i]+&quot;.DataSourceDevice&quot;, false);
+    dpSet(dsOPCgroups[i]+&quot;.EnableCallback&quot;, false);  
+	}
+
+  ChildPanelOnCentral(&quot;vision/MessageInfo1&quot;, &quot;FSM tree created&quot;, makeDynString(&quot;Modifications applied to the '_Do_Read' OPCgroups. You need to restart the OPC Client.&quot;));
+  
+  int i;
+	dyn_string dsAllBuses;
+
+	lstBusNames.deleteAllItems();
+
+        dyn_string dsOPCgroups;
+        bool checkbox;
+        getValue(&quot;chksystem&quot;, &quot;state&quot;, 0, checkbox);
+        if (checkbox == TRUE) { dsOPCgroups = dpNames(&quot;*:&quot; + &quot;_Do_Read*&quot;, OPC_GROUPS_TYPE_NAME); }
+        else { dsOPCgroups = dpNames(getSystemName() + &quot;_Do_Read*&quot;, OPC_GROUPS_TYPE_NAME); }
+        dyn_string dsAllBuses;
+        bool DataSourceDevice, EnableCallback;
+        for (int i=1; i &lt;= dynlen(dsOPCgroups); ++i) {
+          string Bus = dsOPCgroups[i];
+          if (checkbox == FALSE) { strreplace(Bus, getSystemName(), &quot;&quot;); }
+          if (strpos(Bus, &quot;dummy&quot;)&gt;-1) continue;
+          dpGet(dsOPCgroups[i]+&quot;.DataSourceDevice&quot;, DataSourceDevice);
+          dpGet(dsOPCgroups[i]+&quot;.EnableCallback&quot;, EnableCallback);  
+          if (DataSourceDevice == true || EnableCallback == true) {
+            dynAppend(dsAllBuses, Bus);
+          }
+        }
+	lstBusNames.items = dsAllBuses;
+      
+  if ( dynlen(dsAllBuses) == 0 ) {
+    btnApplyModif.enabled = false;
+  }  
+  
+}
+]]></script>
+   </events>
+  </shape>
+  <shape Name="Text2" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">13</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">18 38</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">13</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">20 40</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">Sets new parameters for the OPC groups dedicated to the reading of DO ports
+ - Disabling of the callbacks and change in the DataSource from Device to Cache</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="PRIMITIVE_TEXT1" shapeType="PRIMITIVE_TEXT" layerId="0">
+   <properties>
+    <prop name="serialId">14</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 100</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">14</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="DashBackColor">_Transparent</prop>
+    <prop name="AntiAliased">False</prop>
+    <prop name="LineType">[solid,oneColor,JoinMiter,CapButt,1]</prop>
+    <prop name="BorderZoomable">False</prop>
+    <prop name="FillType">[outline]</prop>
+    <prop name="Location">12 102</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Text">
+	<prop name="en_US.utf8">List of OPC groups causing eventual conflicts:
+</prop>
+    </prop>
+    <prop name="Distance">0</prop>
+    <prop name="BorderOffset">2</prop>
+    <prop name="Bordered">False</prop>
+    <prop name="Fit">True</prop>
+    <prop name="Transformable">True</prop>
+    <prop name="TextFormat">[0s,,,AlignLeft]</prop>
+   </properties>
+  </shape>
+  <shape Name="chksystem" shapeType="CHECK_BOX" layerId="0">
+   <properties>
+    <prop name="serialId">15</prop>
+    <prop name="Type"/>
+    <prop name="RefPoint">10 400</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_3DFace</prop>
+    <prop name="TabOrder">15</prop>
+    <prop name="ToolTipText">
+	<prop name="en_US.utf8"/>
+    </prop>
+    <prop name="layoutAlignment">AlignCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+	<prop name="en_US.utf8">Arial,-1,13,5,50,0,0,0,0,0</prop>
+    </prop>
+    <prop name="Location">10 400</prop>
+    <prop name="Size">231 41</prop>
+    <prop name="Listitems">
+     <prop name="Item">
+      <prop name="Text">
+	<prop name="en_US.utf8">OPC groups on distributed systems</prop>
+      </prop>
+      <prop name="Select">True</prop>
+     </prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(int button, bool state)
+{
+  int i;
+	dyn_string dsAllBuses;
+
+	lstBusNames.deleteAllItems();
+
+        dyn_string dsOPCgroups;
+        bool checkbox;
+        getValue(&quot;chksystem&quot;, &quot;state&quot;, 0, checkbox);
+        if (checkbox == TRUE) { dsOPCgroups = dpNames(&quot;*:&quot; + &quot;_Do*&quot;, OPC_GROUPS_TYPE_NAME); }
+        else { dsOPCgroups = dpNames(getSystemName() + &quot;_Do*&quot;, OPC_GROUPS_TYPE_NAME); }
+        dyn_string dsAllBuses;
+        bool DataSourceDevice, EnableCallback;
+        for (int i=1; i &lt;= dynlen(dsOPCgroups); ++i) {
+          string Bus = dsOPCgroups[i];
+          if (checkbox == FALSE) { strreplace(Bus, getSystemName(), &quot;&quot;); }
+          if (strpos(Bus, &quot;dummy&quot;)&gt;-1) continue;
+          dpGet(dsOPCgroups[i]+&quot;.DataSourceDevice&quot;, DataSourceDevice);
+          dpGet(dsOPCgroups[i]+&quot;.EnableCallback&quot;, EnableCallback);  
+          if (DataSourceDevice == true || EnableCallback == true) {
+            dynAppend(dsAllBuses, Bus);
+          }
+        }
+	lstBusNames.items = dsAllBuses;
+      
+  if ( dynlen(dsAllBuses) == 0 ) {
+    btnApplyModif.enabled = false;
+  }
+
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+</panel>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+   <prop name="en_US.iso88591"></prop>
+  </prop>
+  <prop name="Size">1270 835</prop>
+  <prop name="BackColor">FwTrendingViewBackground</prop>
+  <prop name="RefPoint">1215 410</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96</prop>
+  <prop name="layoutType">None</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;fwTrending/fwTrending.ctl&quot;
+#uses &quot;fwTrending/fwTrendingTree.ctl&quot;
+]]></script>
+  <script name="Initialize" isEscaped="1"><![CDATA[main()
+{
+	dyn_string dsReference;
+	string sPlotName = $PlotName;
+  
+//	DebugN(&quot;Debug M1 &quot;, $PageName, $OpenPageName, $PlotName, $bEdit);
+
+// Resizable icon not to be visible in the Main unicos window
+  if (patternMatch(&quot;*unicos*&quot;, myModuleName())) {
+    PANEL_REF1.visible(false); 
+  }
+	if(isDollarDefined(&quot;$templateParameters&quot;))
+		fwTrending_showPlot(1, makeDynString(sPlotName), dsReference, makeDynString(getDollarValue(&quot;$templateParameters&quot;)));
+	else
+		fwTrending_showPlot(1, makeDynString(sPlotName), dsReference, makeDynString(&quot;&quot;));
+}
+]]></script>
+ </events>
+ <layers>
+  <layer layerId="0">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer1</prop>
+  </layer>
+  <layer layerId="1">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer2</prop>
+  </layer>
+  <layer layerId="2">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer3</prop>
+  </layer>
+  <layer layerId="3">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer4</prop>
+  </layer>
+  <layer layerId="4">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer5</prop>
+  </layer>
+  <layer layerId="5">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer6</prop>
+  </layer>
+  <layer layerId="6">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer7</prop>
+  </layer>
+  <layer layerId="7">
+   <prop name="Visible">True</prop>
+   <prop name="Name">Layer8</prop>
+  </layer>
+ </layers>
+ <shapes>
+  <reference parentSerial="-1" Name="PANEL_REF1" referenceId="0">
+   <properties>
+    <prop name="FileName">objects/fwGeneral/fwResizableIcon.pnl</prop>
+    <prop name="Location">1062.5 639</prop>
+    <prop name="Geometry">1 0 0 1 7.5 1</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="layoutAlignment">AlignTrailing|AlignBottom</prop>
+   </properties>
+  </reference>
+ </shapes>
+</panel>

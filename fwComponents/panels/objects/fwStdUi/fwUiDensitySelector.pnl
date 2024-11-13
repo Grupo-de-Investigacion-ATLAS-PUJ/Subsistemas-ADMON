@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">124 27</prop>
+  <prop name="BackColor">_Transparent</prop>
+  <prop name="RefPoint">90 27.33333333333333</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96.05283687943262</prop>
+  <prop name="PDPI">96.05283687943262</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">0</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#event densityChanged (unsigned newDensity)
+#property unsigned density
+
+public void setDensity(unsigned d)
+{
+  if (d&lt;=DensitySelector.maxValue &amp;&amp; d&gt;=DensitySelector.minValue) DensitySelector.value=d;
+}
+
+public unsigned getDensity() { return DensitySelector.value;}
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="DensitySelector" shapeType="SLIDER" layerId="0">
+   <properties>
+    <prop name="serialId">1</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">23 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_3DText</prop>
+    <prop name="BackColor">_Transparent</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="maximumSize">-1 20</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Minimum"/>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Noto Sans,-1,16,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">23 10</prop>
+    <prop name="Size">75 13</prop>
+    <extended>
+     <prop type="INT" name="sliderPosition">1</prop>
+     <prop type="ENUM" name="orientation">0</prop>
+     <prop type="INT" name="pageStep">1</prop>
+     <prop type="INT" name="lineStep">1</prop>
+     <prop type="INT" name="maxValue">3</prop>
+     <prop type="ENUM" name="tickPosition">3</prop>
+     <prop type="INT" name="tickInterval">1</prop>
+     <script name="Change" isEscaped="1"><![CDATA[Change(int value)
+{
+  triggerEvent(&quot;densityChanged&quot;, (unsigned) value);
+}
+]]></script>
+    </extended>
+   </properties>
+  </shape>
+  <shape Name="DensityMinus" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">174 77.16666666666666</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">{249,249,249,0}</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+-</prop>
+    <prop name="maximumSize">20 20</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">DejaVu Sans,-1,9,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">3 7.166666666666657</prop>
+    <prop name="Size">20 20</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">A</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  unsigned val=DensitySelector.value;
+  if (val&gt;DensitySelector.minValue) val--;
+  DensitySelector.value=val;
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="DensityPlus" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">167 79.58333333333333</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">{249,249,249,0}</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="Hotkey">Ctrl+=</prop>
+    <prop name="maximumSize">20 20</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignVCenter</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">DejaVu Sans,-1,16,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">97 6.583333333333329</prop>
+    <prop name="Size">20 20</prop>
+    <prop name="BorderStyle">None</prop>
+    <prop name="Text">
+     <prop name="en_US.utf8">A</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  unsigned val=DensitySelector.value;
+  if (val&lt;DensitySelector.maxValue) val++;
+  DensitySelector.value=val;
+}]]></script>
+   </events>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP1" serial="0">
+   <properties>
+    <prop idx="1" name="shapeSerial">1</prop>
+    <prop idx="0" name="shapeSerial">2</prop>
+    <prop idx="2" name="shapeSerial">3</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>

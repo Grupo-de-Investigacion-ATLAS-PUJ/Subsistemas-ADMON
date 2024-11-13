@@ -1,0 +1,525 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+ <properties>
+  <prop name="Name">
+   <prop name="en_US.utf8"></prop>
+  </prop>
+  <prop name="Size">187 133</prop>
+  <prop name="BackColor">_3DFace</prop>
+  <prop name="RefPoint">30 30</prop>
+  <prop name="InitAndTermRef">True</prop>
+  <prop name="SendClick">False</prop>
+  <prop name="RefFileName"></prop>
+  <prop name="DPI">96.06430220166801</prop>
+  <prop name="PDPI">96.064302201668</prop>
+  <prop name="layoutType">VBox</prop>
+  <prop name="layoutLeftMargin">0</prop>
+  <prop name="layoutRightMargin">0</prop>
+  <prop name="layoutTopMargin">0</prop>
+  <prop name="layoutBottomMargin">0</prop>
+  <prop name="layoutSpacing">0</prop>
+ </properties>
+ <events>
+  <script name="ScopeLib" isEscaped="1"><![CDATA[#uses &quot;classes/fwGeneral/FwException.ctl&quot;
+#uses &quot;CtrlOOUtils&quot;
+
+bool isEditable=false;
+#property bool editable
+public bool getEditable() {return isEditable;}
+public void setEditable(bool bEditable) {
+  isEditable=bEditable;
+  ButtonsLayout.visible=bEditable;
+}
+
+#event listChanged(mixed modifiedList)
+
+unsigned _dataType; // to know how to interpret the data in getData()...
+string _separator; // used if string was passed to reconstruct back the string
+string _memberToDisplay; // used if we have a vector of objects
+
+vector&lt;void&gt; _data;
+
+/** set the data;
+  We could pass:
+   - a dyn_string (or vector&lt;string&gt;)
+   - a vector of instances of vector of shared_ptr to instances then use the member variable
+      or function specified by the @c opt parameter to determine what to display
+   - a string; the separator need to be set using the @c option member
+
+   Note that calling it with @c data remaining an uninitialized mixed var will simply
+   clear the list (e.g. what we want to make FwPanel::setWidgetsFromObject() when passing
+   a nullptr).
+  */
+public void setData(mixed data, string opt=&quot;&quot;)
+{
+  _data.clear(); // we will set it in the functions below...
+  _dataType=0; // reset... we will set the actual one in the functions invoked below...
+  _separator=&quot;&quot;;
+  _memberToDisplay=&quot;&quot;;
+  switch (getType(data)) {
+    case VECTOR_VAR:
+      setDataFromObjVec(data,opt);
+      break;
+    case DYN_STRING_VAR:
+      setDataFromDynString(data);
+      break;
+    case STRING_VAR:
+      if (opt==&quot;&quot;) opt=&quot;,&quot;;
+      setDataFromString(data,opt);
+      break;
+    case MIXED_VAR:
+      // the &quot;uninitialized&quot; case - e.g. invoked from FwPanel::setWidgetsFromObject
+      // with a null object.
+      TheList.deleteAllItems();
+      break;
+    default:
+      TheList.deleteAllItems();
+      FwException::raise(&quot;Unsupported data type in fwStdUi/List.pnl setData():&quot;,makeDynString(getTypeName(data)));
+      break;
+  }
+
+}
+
+public void setDataFromString(string data, string separator)
+{
+  _dataType=STRING_VAR;
+  _separator=separator;
+  _memberToDisplay=&quot;&quot;;
+  TheList.deleteAllItems();
+  dyn_string items=data.split(separator);
+  _data=items;
+  repaint();
+}
+
+public void setDataFromDynString(dyn_string items)
+{
+  _dataType=DYN_STRING_VAR;
+  _memberToDisplay=&quot;&quot;;
+  _separator=&quot;&quot;;
+  TheList.deleteAllItems();
+  _data=items;
+  repaint();
+}
+
+public void setDataFromObjVec(vector&lt;void&gt; data, string memberToDisplay)
+{
+  _dataType=VECTOR_VAR;
+  _separator=&quot;&quot;;
+  _memberToDisplay=memberToDisplay;
+
+  TheList.deleteAllItems();
+  _data=data;
+  repaint();
+}
+
+
+public void repaint()
+{
+  dyn_string curSelItems=TheList.selectedItems;
+  TheList.deleteAllItems();
+  dyn_string items;
+  if (_dataType==DYN_STRING_VAR || _dataType==STRING_VAR) {
+    // nothing special to do: _data is ready to be set...
+    TheList.items=(dyn_string)_data;
+    TheList.selectedItems(curSelItems);
+    return;
+  } else {
+    // otherwise it is the non-trivial case of vector of objects...
+    if (_data.isEmpty()) return;
+
+    dyn_string items;
+
+    string memberFunc=&quot;&quot;;
+    if (_memberToDisplay.contains(&quot;()&quot;)) {
+      memberFunc=_memberToDisplay;
+      _memberFunc.replace(&quot;()&quot;,&quot;&quot;);
+    }
+
+    for (int i=0;i&lt;_data.count();i++) {
+      mixed obj=_data.at(i);
+      mixed mValue;
+      try {
+        if (memberFunc==&quot;&quot;) {
+          mValue=fwGetMember(obj,_memberToDisplay);
+        } else {
+          mValue=fwInvokeMethod(obj,memberFun);
+        }
+      } catch {
+        FwException exc=FwException::last();
+        mValue=&quot;&lt;Item Error&gt;&quot;;
+        DebugTN(__FILE__,__FUNCTION__,&quot;ERROR:&quot;+FwException::getText());
+      } finally {
+        dynAppend(items,mValue);
+      }
+    }
+    TheList.items=items;
+    TheList.selectedItems(curSelItems);
+  }
+}
+
+public mixed getData()
+{
+  if (_dataType==DYN_STRING_VAR) return _data;
+  if (_dataType==VECTOR_VAR) return _data;
+  if (_dataType==STRING_VAR) {
+    string s;
+    for (int i=0;i&lt;_data.count();i++) {
+      if (i&gt;0) s+=_separator;
+      s+=_data.at(i);
+    }
+    return s;
+  }
+  return &quot;ERROR&quot;; // we should never reach here...
+}
+
+void moveSelectedToTop()
+{
+  dyn_int selItemsPositions = TheList.selectedPositions;
+  selItemsPositions.sort();
+  vector&lt;void&gt; newItemList;
+  // start by putting the selected ones on top...
+  for (int i=0;i&lt;selItemsPositions.count();i++) {
+    int idx = selItemsPositions.at(i)-1; // because list items are counted from 1!
+    newItemList.append(_data.at(idx));
+  }
+  // and now append the remaining if not present
+  for (int i=0;i&lt;_data.count();i++) {
+    if (! newItemList.contains(_data.at(i))) newItemList.append(_data.at(i));
+  }
+  _data=newItemList;
+  repaint();
+  triggerEvent(&quot;listChanged&quot;,getData());
+}
+
+void moveSelectedToBottom()
+{
+  dyn_int selItemsPositions = TheList.selectedPositions;
+  selItemsPositions.sort();
+  vector&lt;void&gt; newItemList;
+  // start by putting the selected ones - we will keep them at the bottom
+  for (int i=0;i&lt;selItemsPositions.count();i++) {
+    int idx = selItemsPositions.at(i)-1; // because list items are counted from 1!
+    newItemList.append(_data.at(idx));
+  }
+  // and now prepend the remaining if not present
+  for (int i=_data.count()-1;i&gt;=0;i--) {
+    if (! newItemList.contains(_data.at(i))) newItemList.prepend(_data.at(i));
+  }
+  _data=newItemList;
+  repaint();
+  triggerEvent(&quot;listChanged&quot;,getData());
+}
+
+void moveSelectedUp()
+{
+  dyn_int selItemsPositions = TheList.selectedPositions;
+  selItemsPositions.sort();
+  // make the positions zero-based for easier logic
+  for (int i=1;i&lt;=dynlen(selItemsPositions);i++) selItemsPositions[i]=selItemsPositions[i]-1;
+
+  vector&lt;void&gt; newItemList;
+  // list of positions at which we inserted due to what was selected
+  dyn_int usedPositions;
+
+  // start by putting the ones that are not in the selection
+  for (int i=0;i&lt;_data.count();i++) {
+    if (! selItemsPositions.contains(i)) newItemList.append(_data.at(i));
+  }
+
+  // then work through the list of selected ones, from the top
+  // paying attention not to overwrite the position of previously inserted items
+
+  for (int i=0;i&lt;selItemsPositions.count();i++) {
+    int idx = selItemsPositions.at(i);
+    int newPos=idx-1; // desired position
+    // case of the first item:
+    if (newPos&lt;0) {
+      newPos=0;
+    } else if (usedPositions.contains(newPos)) {
+    // check if we already haven't inserted something there... If so, don't push it on top of it...
+    // so that the order is preserved
+      newPos=newPos+1;
+    }
+    newItemList.insertAt(newPos,_data.at(idx));
+    usedPositions.append(newPos);
+  }
+  _data=newItemList;
+  repaint();
+  triggerEvent(&quot;listChanged&quot;,getData());
+}
+
+void moveSelectedDown()
+{
+  dyn_int selItemsPositions = TheList.selectedPositions;
+  selItemsPositions.sort();
+  // make the positions zero-based for easier logic
+  for (int i=1;i&lt;=dynlen(selItemsPositions);i++) selItemsPositions[i]=selItemsPositions[i]-1;
+
+  vector&lt;void&gt; newItemList;
+  // list of positions at which we inserted due to what was selected
+  dyn_int usedPositions;
+
+  // start by putting the ones that are not in the selection
+  for (int i=0;i&lt;_data.count();i++) {
+    if (! selItemsPositions.contains(i)) newItemList.append(_data.at(i));
+  }
+
+  // then work through the list of selected ones, from the top
+  // paying attention not to overwrite the position of previously inserted items
+
+  for (int i=0;i&lt;selItemsPositions.count();i++) {
+    int idx = selItemsPositions.at(i);
+    int newPos=idx+1; // desired position
+    // case of the last item:
+    if (newPos&gt;= _data.count()) {
+      newPos=_data.count()-1;
+    } else if (usedPositions.contains(newPos)) {
+    // check if we already haven't inserted something there... If so, don't push it below it...
+    // so that the order is preserved
+
+      newPos=newPos-1;
+    }
+    if (newPos&gt;=newItemList.count()) {
+      newItemList.append(_data.at(idx));
+      usedPositions.append(newItemList.count());
+    } else {
+      newItemList.insertAt(newPos,_data.at(idx));
+      usedPositions.append(newPos);
+    }
+  }
+  _data=newItemList;
+  repaint();
+  triggerEvent(&quot;listChanged&quot;,getData());
+}
+
+
+]]></script>
+ </events>
+ <shapes>
+  <shape Name="TheList" shapeType="SELECTION_LIST" layerId="0">
+   <properties>
+    <prop name="serialId">0</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">10 9.999999999999993</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_WindowText</prop>
+    <prop name="BackColor">_Window</prop>
+    <prop name="TabOrder">0</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Noto Sans,-1,13,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">10 9.999999999999993</prop>
+    <prop name="Size">141 101</prop>
+    <prop name="Listitems"/>
+    <prop name="SelectionMode">ExtendedSelection</prop>
+    <prop name="alternatingRowColors">False</prop>
+   </properties>
+  </shape>
+  <shape Name="TopButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">2</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">210 10</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">1</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Move selecteced items to top [kb.HOME]</prop>
+    </prop>
+    <prop name="Hotkey">Home</prop>
+    <prop name="minimumSize">18 18</prop>
+    <prop name="maximumSize">18 18</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Noto Sans,-1,16,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">190 10</prop>
+    <prop name="Size">24 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">fwStdUi/ListsAndArrows/arrowTop.svg</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+  moveSelectedToTop();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="BottomButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">3</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">210 140</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">2</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Move selecteced items to bottom [kb.END]</prop>
+    </prop>
+    <prop name="Hotkey">End</prop>
+    <prop name="minimumSize">18 18</prop>
+    <prop name="maximumSize">18 28</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Noto Sans,-1,16,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">190 140</prop>
+    <prop name="Size">24 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">fwStdUi/ListsAndArrows/arrowBottom.svg</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+    moveSelectedToBottom();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="UpButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">4</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">210 40</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">3</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Move selecteced items up [kb.UP]</prop>
+    </prop>
+    <prop name="Hotkey">Up</prop>
+    <prop name="minimumSize">18 18</prop>
+    <prop name="maximumSize">18 18</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Noto Sans,-1,16,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">190 40</prop>
+    <prop name="Size">24 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">fwStdUi/ListsAndArrows/arrowUp.svg</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+    moveSelectedUp();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="DownButton" shapeType="PUSH_BUTTON" layerId="0">
+   <properties>
+    <prop name="serialId">5</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">210 110</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">_ButtonText</prop>
+    <prop name="BackColor">_Button</prop>
+    <prop name="TabOrder">4</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8">Move selecteced items down [kb.DOWN]</prop>
+    </prop>
+    <prop name="Hotkey">Down</prop>
+    <prop name="minimumSize">18 18</prop>
+    <prop name="maximumSize">18 18</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Fixed" horizontal="Fixed"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Font">
+     <prop name="en_US.utf8">Noto Sans,-1,16,5,50,0,0,0,0,0,Regular</prop>
+    </prop>
+    <prop name="Location">190 110</prop>
+    <prop name="Size">24 24</prop>
+    <prop name="BorderStyle">Styled</prop>
+    <prop name="Image" SharedPixmap="1">
+     <prop name="BackgroundPixmap">fwStdUi/ListsAndArrows/arrowDown.svg</prop>
+    </prop>
+   </properties>
+   <events>
+    <script name="Clicked" isEscaped="1"><![CDATA[main(mapping event)
+{
+    moveSelectedDown();
+}]]></script>
+   </events>
+  </shape>
+  <shape Name="SPACER1" shapeType="SPACER" layerId="0">
+   <properties>
+    <prop name="serialId">6</prop>
+    <prop name="Type"></prop>
+    <prop name="RefPoint">190 70</prop>
+    <prop name="Enable">True</prop>
+    <prop name="Visible">True</prop>
+    <prop name="ForeColor">{0,0,0}</prop>
+    <prop name="BackColor">{255,255,255}</prop>
+    <prop name="TabOrder">5</prop>
+    <prop name="ToolTipText">
+     <prop name="en_US.utf8"></prop>
+    </prop>
+    <prop name="TransparentForMouse">True</prop>
+    <prop name="minimumSize">-1 5</prop>
+    <prop name="sizePolicy">
+     <sizePolicy vertical="Expanding" horizontal="Ignored"/>
+    </prop>
+    <prop name="layoutAlignment">AlignNone</prop>
+    <prop name="snapMode">Point</prop>
+    <prop name="Location">190 70</prop>
+    <prop name="Size">21 34</prop>
+    <prop name="Orientation">vertical</prop>
+   </properties>
+  </shape>
+ </shapes>
+ <groups>
+  <layout parentSerial="1" Name="ButtonsLayout" serial="0">
+   <properties>
+    <prop idx="0" name="shapeSerial">2</prop>
+    <prop idx="4" name="shapeSerial">3</prop>
+    <prop idx="1" name="shapeSerial">4</prop>
+    <prop idx="3" name="shapeSerial">5</prop>
+    <prop idx="2" name="shapeSerial">6</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">VBox</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+  <layout parentSerial="-1" Name="LAYOUT_GROUP4" serial="1">
+   <properties>
+    <prop idx="0" name="shapeSerial">0</prop>
+    <prop idx="1" name="groupSerial">0</prop>
+    <prop name="isContainerShape">False</prop>
+    <prop name="layoutType">HBox</prop>
+    <prop name="layoutSpacing">0</prop>
+   </properties>
+  </layout>
+ </groups>
+</panel>
